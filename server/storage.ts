@@ -7,6 +7,8 @@ import {
   type InsertCampaign,
   type Client,
   type InsertClient,
+  type AdAccount,
+  type InsertAdAccount,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -16,6 +18,9 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
+  getAllUsers(): Promise<User[]>;
   validateCredentials(username: string, password: string): Promise<User | null>;
   
   // Session methods
@@ -36,6 +41,13 @@ export interface IStorage {
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: string): Promise<boolean>;
+  
+  // Ad Account methods
+  getAdAccounts(): Promise<AdAccount[]>;
+  getAdAccount(id: string): Promise<AdAccount | undefined>;
+  createAdAccount(adAccount: InsertAdAccount): Promise<AdAccount>;
+  updateAdAccount(id: string, adAccount: Partial<InsertAdAccount>): Promise<AdAccount | undefined>;
+  deleteAdAccount(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -43,6 +55,7 @@ export class MemStorage implements IStorage {
   private sessions: Map<string, Session>;
   private campaigns: Map<string, Campaign>;
   private clients: Map<string, Client>;
+  private adAccounts: Map<string, AdAccount>;
 
   constructor() {
     this.users = new Map();
@@ -66,13 +79,14 @@ export class MemStorage implements IStorage {
     const client1Id = randomUUID();
     const client1: Client = {
       id: client1Id,
-      name: "TechCorp Solutions",
+      clientName: "TechCorp Solutions",
+      businessName: "TechCorp Inc.",
+      contactPerson: "John Smith",
       email: "contact@techcorp.com",
       phone: "+1-555-0123",
-      company: "TechCorp Inc.",
-      initialBalance: "25000.00",
-      adAccountsCount: 3,
-      isActive: true,
+      address: "123 Tech Street, Silicon Valley, CA",
+      notes: "Enterprise client with multiple campaigns",
+      status: "active",
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -81,13 +95,14 @@ export class MemStorage implements IStorage {
     const client2Id = randomUUID();
     const client2: Client = {
       id: client2Id,
-      name: "Marketing Pro",
+      clientName: "Marketing Pro",
+      businessName: "Marketing Pro LLC",
+      contactPerson: "Sarah Johnson",
       email: "hello@marketingpro.com",
       phone: "+1-555-0456",
-      company: "Marketing Pro LLC",
-      initialBalance: "50000.00",
-      adAccountsCount: 5,
-      isActive: true,
+      address: "456 Marketing Ave, New York, NY",
+      notes: "High-volume advertising client",
+      status: "active",
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -96,13 +111,14 @@ export class MemStorage implements IStorage {
     const client3Id = randomUUID();
     const client3: Client = {
       id: client3Id,
-      name: "Digital Dynamics",
+      clientName: "Digital Dynamics",
+      businessName: "Digital Dynamics Corp",
+      contactPerson: "Mike Chen",
       email: "info@digitaldynamics.net",
       phone: "+1-555-0789",
-      company: "Digital Dynamics Corp",
-      initialBalance: "15000.00",
-      adAccountsCount: 2,
-      isActive: true,
+      address: "789 Digital Blvd, Austin, TX",
+      notes: "Tech startup focusing on social media",
+      status: "active",
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -124,11 +140,34 @@ export class MemStorage implements IStorage {
     const user: User = { 
       ...insertUser, 
       id,
+      role: UserRole.USER, // Default role for new users
       isActive: true,
       createdAt: new Date(),
     };
     this.users.set(id, user);
     return user;
+  }
+
+  async updateUser(id: string, updateData: Partial<InsertUser>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser: User = {
+      ...user,
+      ...updateData,
+    };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    return this.users.delete(id);
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values()).sort((a, b) => {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
   }
 
   async validateCredentials(username: string, password: string): Promise<User | null> {
@@ -189,6 +228,9 @@ export class MemStorage implements IStorage {
       ...insertCampaign,
       id,
       status: insertCampaign.status || "active",
+      comments: insertCampaign.comments || null,
+      clientId: insertCampaign.clientId || null,
+      spend: insertCampaign.spend || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -229,7 +271,9 @@ export class MemStorage implements IStorage {
     const client: Client = {
       ...insertClient,
       id,
-      isActive: insertClient.isActive ?? true,
+      status: insertClient.status || "active",
+      address: insertClient.address || null,
+      notes: insertClient.notes || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -252,6 +296,49 @@ export class MemStorage implements IStorage {
 
   async deleteClient(id: string): Promise<boolean> {
     return this.clients.delete(id);
+  }
+
+  // Ad Account methods
+  async getAdAccounts(): Promise<AdAccount[]> {
+    return Array.from(this.adAccounts.values()).sort((a, b) => {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+  }
+
+  async getAdAccount(id: string): Promise<AdAccount | undefined> {
+    return this.adAccounts.get(id);
+  }
+
+  async createAdAccount(insertAdAccount: InsertAdAccount): Promise<AdAccount> {
+    const id = randomUUID();
+    const adAccount: AdAccount = {
+      ...insertAdAccount,
+      id,
+      totalSpend: "0",
+      status: insertAdAccount.status || "active",
+      notes: insertAdAccount.notes || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.adAccounts.set(id, adAccount);
+    return adAccount;
+  }
+
+  async updateAdAccount(id: string, updateData: Partial<InsertAdAccount>): Promise<AdAccount | undefined> {
+    const adAccount = this.adAccounts.get(id);
+    if (!adAccount) return undefined;
+    
+    const updatedAdAccount: AdAccount = {
+      ...adAccount,
+      ...updateData,
+      updatedAt: new Date(),
+    };
+    this.adAccounts.set(id, updatedAdAccount);
+    return updatedAdAccount;
+  }
+
+  async deleteAdAccount(id: string): Promise<boolean> {
+    return this.adAccounts.delete(id);
   }
 }
 

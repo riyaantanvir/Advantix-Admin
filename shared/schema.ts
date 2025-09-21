@@ -5,6 +5,8 @@ import { z } from "zod";
 
 // User roles enum - must be declared before use
 export const UserRole = {
+  USER: 'user' as const,
+  MANAGER: 'manager' as const,
   ADMIN: 'admin' as const,
   SUPER_ADMIN: 'super_admin' as const,
 } as const;
@@ -13,14 +15,15 @@ export type UserRoleType = typeof UserRole[keyof typeof UserRole];
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name"),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("admin"), // "admin" or "super_admin"
+  role: text("role").notNull().default("user"), // "user", "manager", "admin", "super_admin"
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => {
   return {
-    roleCheck: sql`CHECK (${table.role} IN ('admin', 'super_admin'))`
+    roleCheck: sql`CHECK (${table.role} IN ('user', 'manager', 'admin', 'super_admin'))`
   }
 });
 
@@ -32,13 +35,28 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Ad Accounts Management
+export const adAccounts = pgTable("ad_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  platform: text("platform").notNull(), // "facebook", "google", "tiktok", etc.
+  accountName: text("account_name").notNull(),
+  accountId: text("account_id").notNull(), // External account ID
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "restrict" }).notNull(),
+  spendLimit: decimal("spend_limit", { precision: 12, scale: 2 }).notNull(),
+  totalSpend: decimal("total_spend", { precision: 12, scale: 2 }).default("0"),
+  status: text("status").notNull().default("active"), // "active", "suspended"
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Campaign Management
 export const campaigns = pgTable("campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   startDate: timestamp("start_date").notNull(),
   comments: text("comments"),
-  adAccount: text("ad_account").notNull(),
+  adAccountId: varchar("ad_account_id").references(() => adAccounts.id, { onDelete: "restrict" }).notNull(),
   clientId: varchar("client_id").references(() => clients.id, { onDelete: "set null" }),
   status: text("status").notNull().default("active"), // "active", "paused", "completed"
   objective: text("objective").notNull(),
@@ -51,13 +69,14 @@ export const campaigns = pgTable("campaigns", {
 // Client Management
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  email: text("email").unique(),
-  phone: text("phone"),
-  company: text("company"),
-  initialBalance: decimal("initial_balance", { precision: 12, scale: 2 }).default("0"),
-  adAccountsCount: integer("ad_accounts_count").default(0),
-  isActive: boolean("is_active").default(true),
+  clientName: text("client_name").notNull(),
+  businessName: text("business_name").notNull(),
+  contactPerson: text("contact_person").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  address: text("address"),
+  notes: text("notes"),
+  status: text("status").notNull().default("active"), // "active", "paused"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -95,18 +114,27 @@ export const workReports = pgTable("work_reports", {
 });
 
 // Validation schemas with role constraints
-const UserRoleEnum = z.enum([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+const UserRoleEnum = z.enum([UserRole.USER, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN]);
 
 export const insertUserSchema = createInsertSchema(users).pick({
+  name: true,
   username: true,
   password: true,
 }).extend({
+  name: z.string().min(1, "Name is required"),
   password: z.string().min(3, "Password must be at least 3 characters"),
 });
 
 // Admin-only user creation schema (for super admins)
 export const insertUserWithRoleSchema = insertUserSchema.extend({
-  role: UserRoleEnum.default(UserRole.ADMIN),
+  role: UserRoleEnum.default(UserRole.USER),
+});
+
+export const insertAdAccountSchema = createInsertSchema(adAccounts).omit({
+  id: true,
+  totalSpend: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertCampaignSchema = createInsertSchema(campaigns).omit({
@@ -147,6 +175,9 @@ export type InsertUserWithRole = z.infer<typeof insertUserWithRoleSchema>;
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type LoginRequest = z.infer<typeof loginSchema>;
+
+export type InsertAdAccount = z.infer<typeof insertAdAccountSchema>;
+export type AdAccount = typeof adAccounts.$inferSelect;
 
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
 export type Campaign = typeof campaigns.$inferSelect;
