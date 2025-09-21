@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import Login from "@/pages/login";
 import Home from "@/pages/home";
 import CampaignsPage from "@/pages/campaigns";
+import ClientsPage from "@/pages/clients";
+import AdAccountsPage from "@/pages/ad-accounts";
 import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 
@@ -67,6 +69,8 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/campaigns" component={() => <AuthenticatedRoute component={CampaignsPage} />} />
+      <Route path="/clients" component={() => <AuthenticatedRoute component={ClientsPage} />} />
+      <Route path="/ad-accounts" component={() => <AuthenticatedRoute component={AdAccountsPage} />} />
       <Route path="/admin" component={() => <AuthenticatedRoute component={AdminPage} />} />
       <Route path="/" component={() => <AuthenticatedRoute component={Home} />} />
       <Route component={NotFound} />

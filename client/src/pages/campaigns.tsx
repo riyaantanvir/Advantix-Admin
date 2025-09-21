@@ -66,7 +66,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { z } from "zod";
-import { insertCampaignSchema, type Campaign, type Client } from "@shared/schema";
+import { insertCampaignSchema, type Campaign, type Client, type AdAccount } from "@shared/schema";
 import Sidebar from "@/components/layout/Sidebar";
 
 // Form schemas
@@ -100,7 +100,7 @@ export default function CampaignsPage() {
       name: "",
       startDate: new Date(),
       comments: "",
-      adAccount: "",
+      adAccountId: "",
       objective: "",
       budget: "0",
       status: "active",
@@ -133,6 +133,16 @@ export default function CampaignsPage() {
       const response = await apiRequest("GET", "/api/clients");
       const data = await response.json();
       return data as Client[];
+    },
+  });
+
+  // Fetch ad accounts
+  const { data: adAccounts = [] } = useQuery({
+    queryKey: ["/api/ad-accounts"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/ad-accounts");
+      const data = await response.json();
+      return data as AdAccount[];
     },
   });
 
@@ -213,12 +223,20 @@ export default function CampaignsPage() {
     },
   });
 
+  // Get ad account name from ID
+  const getAdAccountName = (adAccountId: string | null) => {
+    if (!adAccountId) return "Unknown";
+    const adAccount = adAccounts.find(a => a.id === adAccountId);
+    return adAccount ? `${adAccount.accountName} (${adAccount.platform})` : "Unknown Ad Account";
+  };
+
   // Filter campaigns based on search query
   const filteredCampaigns = campaigns.filter((campaign) => {
     const searchLower = searchQuery.toLowerCase();
+    const adAccountName = getAdAccountName(campaign.adAccountId);
     return (
       campaign.name.toLowerCase().includes(searchLower) ||
-      campaign.adAccount.toLowerCase().includes(searchLower) ||
+      adAccountName.toLowerCase().includes(searchLower) ||
       campaign.objective.toLowerCase().includes(searchLower) ||
       (campaign.comments && campaign.comments.toLowerCase().includes(searchLower))
     );
@@ -228,28 +246,17 @@ export default function CampaignsPage() {
   const getClientName = (clientId: string | null) => {
     if (!clientId) return "No Client";
     const client = clients.find(c => c.id === clientId);
-    return client?.name || "Unknown Client";
+    return client?.clientName || "Unknown Client";
   };
 
-  // Get client initial balance by ID
-  const getClientInitialBalance = (clientId: string | null) => {
-    if (!clientId) return 0;
-    const client = clients.find(c => c.id === clientId);
-    return parseFloat(client?.initialBalance || "0");
-  };
-
-  // Calculate available balance for a client (aggregate across all campaigns)
-  const calculateAvailableBalance = (clientId: string | null) => {
-    if (!clientId) return 0;
-    
-    const initialBalance = getClientInitialBalance(clientId);
-    
-    // Sum up all spend across all campaigns for this client
-    const totalSpendForClient = campaigns
-      .filter(campaign => campaign.clientId === clientId)
-      .reduce((sum, campaign) => sum + parseFloat(campaign.spend || "0"), 0);
-    
-    return initialBalance - totalSpendForClient;
+  // Get ad account available balance
+  const getAdAccountAvailableBalance = (adAccountId: string | null) => {
+    if (!adAccountId) return 0;
+    const adAccount = adAccounts.find(a => a.id === adAccountId);
+    if (!adAccount) return 0;
+    const spendLimit = parseFloat(adAccount.spendLimit || "0");
+    const totalSpend = parseFloat(adAccount.totalSpend || "0");
+    return spendLimit - totalSpend;
   };
 
   // Format currency
@@ -269,7 +276,7 @@ export default function CampaignsPage() {
       name: campaign.name,
       startDate: new Date(campaign.startDate),
       comments: campaign.comments || "",
-      adAccount: campaign.adAccount,
+      adAccountId: campaign.adAccountId,
       clientId: campaign.clientId || "",
       status: campaign.status,
       objective: campaign.objective,
@@ -279,12 +286,22 @@ export default function CampaignsPage() {
     setIsEditDialogOpen(true);
   };
 
-  // Auto-fill available balance when client is selected in create form
-  const handleClientChange = (clientId: string, form: typeof createForm | typeof editForm) => {
-    const client = clients.find(c => c.id === clientId);
-    form.setValue("clientId", clientId);
-    if (client) {
-      // This would set available balance, but since it's auto-calculated, we don't need to store it
+  // Handle ad account selection to show available balance
+  const handleAdAccountChange = (adAccountId: string, form: typeof createForm | typeof editForm) => {
+    form.setValue("adAccountId", adAccountId);
+    const availableBalance = getAdAccountAvailableBalance(adAccountId);
+    // Show toast with available balance for user awareness
+    if (availableBalance > 0) {
+      toast({
+        title: "Ad Account Selected",
+        description: `Available balance: ${formatCurrency(availableBalance)}`,
+      });
+    } else if (availableBalance <= 0) {
+      toast({
+        title: "Warning",
+        description: `Ad account has no available balance: ${formatCurrency(availableBalance)}`,
+        variant: "destructive",
+      });
     }
   };
 
@@ -360,13 +377,27 @@ export default function CampaignsPage() {
                             />
                             <FormField
                               control={createForm.control}
-                              name="adAccount"
+                              name="adAccountId"
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>Ad Account</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} data-testid="input-ad-account" />
-                                  </FormControl>
+                                  <Select
+                                    onValueChange={(value) => handleAdAccountChange(value, createForm)}
+                                    value={field.value || ""}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-ad-account">
+                                        <SelectValue placeholder="Select an ad account" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {adAccounts.map((adAccount) => (
+                                        <SelectItem key={adAccount.id} value={adAccount.id}>
+                                          {adAccount.accountName} ({adAccount.platform}) - Available: {formatCurrency(getAdAccountAvailableBalance(adAccount.id))}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -381,8 +412,8 @@ export default function CampaignsPage() {
                                 <FormItem>
                                   <FormLabel>Client</FormLabel>
                                   <Select
-                                    onValueChange={(value) => handleClientChange(value, createForm)}
-                                    defaultValue={field.value || ""}
+                                    onValueChange={field.onChange}
+                                    value={field.value || ""}
                                   >
                                     <FormControl>
                                       <SelectTrigger data-testid="select-client">
@@ -392,7 +423,7 @@ export default function CampaignsPage() {
                                     <SelectContent>
                                       {clients.map((client) => (
                                         <SelectItem key={client.id} value={client.id}>
-                                          {client.name} (Balance: {formatCurrency(client.initialBalance || "0")})
+                                          {client.clientName} ({client.businessName})
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -595,7 +626,7 @@ export default function CampaignsPage() {
                       </TableRow>
                     ) : (
                       filteredCampaigns.map((campaign) => {
-                        const availableBalance = calculateAvailableBalance(campaign.clientId);
+                        const availableBalance = getAdAccountAvailableBalance(campaign.adAccountId);
                         const clientName = getClientName(campaign.clientId);
                         
                         return (
@@ -623,12 +654,12 @@ export default function CampaignsPage() {
                                   // TODO: Navigate to Ad Account Details page
                                   toast({
                                     title: "Ad Account Details",
-                                    description: `Opening details for ${campaign.adAccount}`,
+                                    description: `Opening details for ${getAdAccountName(campaign.adAccountId)}`,
                                   });
                                 }}
                                 data-testid={`link-ad-account-${campaign.id}`}
                               >
-                                {campaign.adAccount}
+                                {getAdAccountName(campaign.adAccountId)}
                                 <ExternalLink className="h-3 w-3 ml-1" />
                               </Button>
                             </TableCell>
@@ -745,13 +776,27 @@ export default function CampaignsPage() {
                         />
                         <FormField
                           control={editForm.control}
-                          name="adAccount"
+                          name="adAccountId"
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Ad Account</FormLabel>
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
+                              <Select
+                                onValueChange={(value) => handleAdAccountChange(value, editForm)}
+                                value={field.value || ""}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select an ad account" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {adAccounts.map((adAccount) => (
+                                    <SelectItem key={adAccount.id} value={adAccount.id}>
+                                      {adAccount.accountName} ({adAccount.platform}) - Available: {formatCurrency(getAdAccountAvailableBalance(adAccount.id))}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -766,8 +811,8 @@ export default function CampaignsPage() {
                             <FormItem>
                               <FormLabel>Client</FormLabel>
                               <Select
-                                onValueChange={(value) => handleClientChange(value, editForm)}
-                                defaultValue={field.value || ""}
+                                onValueChange={field.onChange}
+                                value={field.value || ""}
                               >
                                 <FormControl>
                                   <SelectTrigger>
@@ -777,7 +822,7 @@ export default function CampaignsPage() {
                                 <SelectContent>
                                   {clients.map((client) => (
                                     <SelectItem key={client.id} value={client.id}>
-                                      {client.name} (Balance: {formatCurrency(client.initialBalance || "0")})
+                                      {client.clientName} ({client.businessName})
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -794,7 +839,7 @@ export default function CampaignsPage() {
                               <FormLabel>Status</FormLabel>
                               <Select
                                 onValueChange={field.onChange}
-                                defaultValue={field.value}
+                                value={field.value}
                               >
                                 <FormControl>
                                   <SelectTrigger>
