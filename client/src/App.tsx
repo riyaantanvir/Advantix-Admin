@@ -12,8 +12,33 @@ function AuthenticatedRoute({ component: Component }: { component: React.Compone
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    setIsAuthenticated(!!token);
+    const checkAuth = () => {
+      const token = localStorage.getItem("authToken");
+      setIsAuthenticated(!!token);
+    };
+
+    // Check authentication on mount
+    checkAuth();
+
+    // Listen for storage changes (when token is added/removed)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "authToken") {
+        checkAuth();
+      }
+    };
+
+    // Listen for custom event when login happens in same tab
+    const handleAuthChange = () => {
+      checkAuth();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("auth-change", handleAuthChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("auth-change", handleAuthChange);
+    };
   }, []);
 
   if (isAuthenticated === null) {

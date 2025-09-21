@@ -24,6 +24,9 @@ export default function Home() {
       localStorage.removeItem("authToken");
       localStorage.removeItem("user");
       
+      // Dispatch custom event to notify auth state change
+      window.dispatchEvent(new Event("auth-change"));
+      
       toast({
         title: "Logged out successfully",
         description: "You have been signed out of Advantix Admin.",
@@ -37,6 +40,10 @@ export default function Home() {
       // Even if logout fails on server, clear local storage
       localStorage.removeItem("authToken");
       localStorage.removeItem("user");
+      
+      // Dispatch custom event to notify auth state change
+      window.dispatchEvent(new Event("auth-change"));
+      
       setLocation("/login");
     },
   });

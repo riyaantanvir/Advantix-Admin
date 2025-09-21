@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 interface LoginResponse {
   user: {
@@ -21,8 +21,45 @@ interface LoginResponse {
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({ username: "", password: "" });
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+
+  // Validation functions
+  const validateUsername = (value: string) => {
+    if (!value.trim()) {
+      return "Username is required";
+    }
+    if (value.length < 2) {
+      return "Username must be at least 2 characters";
+    }
+    return "";
+  };
+
+  const validatePassword = (value: string) => {
+    if (!value) {
+      return "Password is required";
+    }
+    if (value.length < 3) {
+      return "Password must be at least 3 characters";
+    }
+    return "";
+  };
+
+  // Handle username change with validation
+  const handleUsernameChange = (value: string) => {
+    setUsername(value);
+    const error = validateUsername(value);
+    setErrors(prev => ({ ...prev, username: error }));
+  };
+
+  // Handle password change with validation  
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    const error = validatePassword(value);
+    setErrors(prev => ({ ...prev, password: error }));
+  };
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
@@ -33,6 +70,9 @@ export default function Login() {
       // Store token in localStorage
       localStorage.setItem("authToken", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
+      
+      // Dispatch custom event to notify auth state change
+      window.dispatchEvent(new Event("auth-change"));
       
       toast({
         title: "Login successful!",
@@ -56,14 +96,26 @@ export default function Login() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password.trim()) {
+    
+    // Validate all fields
+    const usernameError = validateUsername(username);
+    const passwordError = validatePassword(password);
+    
+    setErrors({
+      username: usernameError,
+      password: passwordError,
+    });
+    
+    // Stop submission if there are validation errors
+    if (usernameError || passwordError) {
       toast({
-        title: "Missing credentials",
-        description: "Please enter both username and password.",
+        title: "Validation errors",
+        description: "Please fix the errors below and try again.",
         variant: "destructive",
       });
       return;
     }
+    
     loginMutation.mutate({ username: username.trim(), password });
   };
 
@@ -95,11 +147,20 @@ export default function Login() {
                   type="text"
                   placeholder="Admin"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white outline-none text-gray-900"
+                  onChange={(e) => handleUsernameChange(e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white outline-none text-gray-900 ${
+                    errors.username 
+                      ? 'border-red-300 focus:ring-red-500' 
+                      : 'border-gray-200 focus:ring-blue-500'
+                  }`}
                   required
                   data-testid="input-username"
                 />
+                {errors.username && (
+                  <p className="text-sm text-red-600 mt-1" data-testid="error-username">
+                    {errors.username}
+                  </p>
+                )}
               </div>
 
               {/* Password Field */}
@@ -107,17 +168,40 @@ export default function Login() {
                 <Label htmlFor="password" className="text-sm font-medium text-gray-700">
                   Password
                 </Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white outline-none text-gray-900"
-                  required
-                  data-testid="input-password"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••"
+                    value={password}
+                    onChange={(e) => handlePasswordChange(e.target.value)}
+                    className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white outline-none text-gray-900 ${
+                      errors.password 
+                        ? 'border-red-300 focus:ring-red-500' 
+                        : 'border-gray-200 focus:ring-blue-500'
+                    }`}
+                    required
+                    data-testid="input-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                    data-testid="button-toggle-password"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+                {errors.password && (
+                  <p className="text-sm text-red-600 mt-1" data-testid="error-password">
+                    {errors.password}
+                  </p>
+                )}
               </div>
 
               {/* Login Button */}
@@ -136,6 +220,22 @@ export default function Login() {
                   "Login"
                 )}
               </Button>
+
+              {/* Forgot Password Link */}
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => toast({
+                    title: "Password Reset",
+                    description: "For demo purposes: Use default credentials Admin/2604. In production, this would send a reset email.",
+                    duration: 5000,
+                  })}
+                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors duration-200"
+                  data-testid="link-forgot-password"
+                >
+                  Forgot your password?
+                </button>
+              </div>
             </form>
           </CardContent>
         </Card>
