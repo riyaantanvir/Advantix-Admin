@@ -13,6 +13,10 @@ import {
   type InsertAdCopySet,
   type WorkReport,
   type InsertWorkReport,
+  type Page,
+  type InsertPage,
+  type RolePermission,
+  type InsertRolePermission,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -67,6 +71,23 @@ export interface IStorage {
   createWorkReport(workReport: InsertWorkReport): Promise<WorkReport>;
   updateWorkReport(id: string, workReport: Partial<InsertWorkReport>): Promise<WorkReport | undefined>;
   deleteWorkReport(id: string): Promise<boolean>;
+  
+  // Page methods
+  getPages(): Promise<Page[]>;
+  getPage(id: string): Promise<Page | undefined>;
+  getPageByKey(pageKey: string): Promise<Page | undefined>;
+  createPage(page: InsertPage): Promise<Page>;
+  updatePage(id: string, page: Partial<InsertPage>): Promise<Page | undefined>;
+  deletePage(id: string): Promise<boolean>;
+  
+  // Role Permission methods
+  getRolePermissions(role?: string): Promise<RolePermission[]>; // If role provided, filter by role; otherwise get all
+  getRolePermission(id: string): Promise<RolePermission | undefined>;
+  getRolePermissionByRoleAndPage(role: string, pageId: string): Promise<RolePermission | undefined>;
+  createRolePermission(permission: InsertRolePermission): Promise<RolePermission>;
+  updateRolePermission(id: string, permission: Partial<InsertRolePermission>): Promise<RolePermission | undefined>;
+  deleteRolePermission(id: string): Promise<boolean>;
+  checkUserPagePermission(userId: string, pageKey: string, action: 'view' | 'edit' | 'delete'): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -77,6 +98,8 @@ export class MemStorage implements IStorage {
   private adAccounts: Map<string, AdAccount>;
   private adCopySets: Map<string, AdCopySet>;
   private workReports: Map<string, WorkReport>;
+  private pages: Map<string, Page>;
+  private rolePermissions: Map<string, RolePermission>;
 
   constructor() {
     this.users = new Map();
@@ -86,6 +109,8 @@ export class MemStorage implements IStorage {
     this.adAccounts = new Map();
     this.adCopySets = new Map();
     this.workReports = new Map();
+    this.pages = new Map();
+    this.rolePermissions = new Map();
     
     // Create default admin user
     const adminId = randomUUID();
@@ -148,6 +173,108 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
     this.clients.set(client3Id, client3);
+
+    // Initialize default pages
+    this.initializeDefaultPages();
+    this.initializeDefaultPermissions();
+  }
+
+  private initializeDefaultPages() {
+    const defaultPages = [
+      { pageKey: "dashboard", displayName: "Dashboard", path: "/", description: "Main dashboard with metrics and overview" },
+      { pageKey: "campaigns", displayName: "Campaign Management", path: "/campaigns", description: "Manage advertising campaigns" },
+      { pageKey: "campaign_details", displayName: "Campaign Details", path: "/campaigns/:id", description: "View and edit individual campaign details" },
+      { pageKey: "clients", displayName: "Client Management", path: "/clients", description: "Manage client accounts and information" },
+      { pageKey: "ad_accounts", displayName: "Ad Accounts", path: "/ad-accounts", description: "Manage advertising account connections" },
+      { pageKey: "salaries", displayName: "Salary Management", path: "/salaries", description: "Manage employee salaries and payments" },
+      { pageKey: "work_reports", displayName: "Work Reports", path: "/work-reports", description: "Track and submit work hours and tasks" },
+      { pageKey: "admin", displayName: "Admin Panel", path: "/admin", description: "Administrative settings and user management" },
+    ];
+
+    defaultPages.forEach(pageData => {
+      const pageId = randomUUID();
+      const page: Page = {
+        id: pageId,
+        pageKey: pageData.pageKey,
+        displayName: pageData.displayName,
+        path: pageData.path,
+        description: pageData.description,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.pages.set(pageId, page);
+    });
+  }
+
+  private initializeDefaultPermissions() {
+    const pages = Array.from(this.pages.values());
+    const roles = [UserRole.USER, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN];
+
+    // Define default permission matrix
+    const defaultPermissions = {
+      [UserRole.USER]: {
+        dashboard: { view: true, edit: false, delete: false },
+        campaigns: { view: false, edit: false, delete: false },
+        campaign_details: { view: false, edit: false, delete: false },
+        clients: { view: false, edit: false, delete: false },
+        ad_accounts: { view: false, edit: false, delete: false },
+        salaries: { view: false, edit: false, delete: false },
+        work_reports: { view: true, edit: true, delete: false },
+        admin: { view: false, edit: false, delete: false },
+      },
+      [UserRole.MANAGER]: {
+        dashboard: { view: true, edit: false, delete: false },
+        campaigns: { view: true, edit: false, delete: false },
+        campaign_details: { view: true, edit: false, delete: false },
+        clients: { view: true, edit: false, delete: false },
+        ad_accounts: { view: true, edit: false, delete: false },
+        salaries: { view: false, edit: false, delete: false },
+        work_reports: { view: true, edit: true, delete: false },
+        admin: { view: false, edit: false, delete: false },
+      },
+      [UserRole.ADMIN]: {
+        dashboard: { view: true, edit: true, delete: false },
+        campaigns: { view: true, edit: true, delete: true },
+        campaign_details: { view: true, edit: true, delete: false },
+        clients: { view: true, edit: true, delete: true },
+        ad_accounts: { view: true, edit: true, delete: true },
+        salaries: { view: true, edit: true, delete: false },
+        work_reports: { view: true, edit: true, delete: true },
+        admin: { view: false, edit: false, delete: false },
+      },
+      [UserRole.SUPER_ADMIN]: {
+        dashboard: { view: true, edit: true, delete: true },
+        campaigns: { view: true, edit: true, delete: true },
+        campaign_details: { view: true, edit: true, delete: true },
+        clients: { view: true, edit: true, delete: true },
+        ad_accounts: { view: true, edit: true, delete: true },
+        salaries: { view: true, edit: true, delete: true },
+        work_reports: { view: true, edit: true, delete: true },
+        admin: { view: true, edit: true, delete: true },
+      },
+    };
+
+    roles.forEach(role => {
+      pages.forEach(page => {
+        const rolePermissions = defaultPermissions[role as keyof typeof defaultPermissions];
+        const permissions = rolePermissions[page.pageKey as keyof typeof rolePermissions];
+        if (permissions) {
+          const permissionId = randomUUID();
+          const rolePermission: RolePermission = {
+            id: permissionId,
+            role,
+            pageId: page.id,
+            canView: permissions.view,
+            canEdit: permissions.edit,
+            canDelete: permissions.delete,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          this.rolePermissions.set(permissionId, rolePermission);
+        }
+      });
+    });
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -490,6 +617,135 @@ export class MemStorage implements IStorage {
 
   async deleteWorkReport(id: string): Promise<boolean> {
     return this.workReports.delete(id);
+  }
+
+  // Page methods
+  async getPages(): Promise<Page[]> {
+    return Array.from(this.pages.values()).sort((a, b) => {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+  }
+
+  async getPage(id: string): Promise<Page | undefined> {
+    return this.pages.get(id);
+  }
+
+  async getPageByKey(pageKey: string): Promise<Page | undefined> {
+    return Array.from(this.pages.values()).find(page => page.pageKey === pageKey);
+  }
+
+  async createPage(insertPage: InsertPage): Promise<Page> {
+    const id = randomUUID();
+    const page: Page = {
+      ...insertPage,
+      id,
+      isActive: insertPage.isActive ?? true,
+      description: insertPage.description || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.pages.set(id, page);
+    return page;
+  }
+
+  async updatePage(id: string, updateData: Partial<InsertPage>): Promise<Page | undefined> {
+    const page = this.pages.get(id);
+    if (!page) return undefined;
+    
+    const updatedPage: Page = {
+      ...page,
+      ...updateData,
+      updatedAt: new Date(),
+    };
+    this.pages.set(id, updatedPage);
+    return updatedPage;
+  }
+
+  async deletePage(id: string): Promise<boolean> {
+    return this.pages.delete(id);
+  }
+
+  // Role Permission methods
+  async getRolePermissions(role?: string): Promise<RolePermission[]> {
+    const permissions = Array.from(this.rolePermissions.values());
+    const filteredPermissions = role 
+      ? permissions.filter(permission => permission.role === role)
+      : permissions;
+    
+    return filteredPermissions.sort((a, b) => {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+  }
+
+  async getRolePermission(id: string): Promise<RolePermission | undefined> {
+    return this.rolePermissions.get(id);
+  }
+
+  async getRolePermissionByRoleAndPage(role: string, pageId: string): Promise<RolePermission | undefined> {
+    return Array.from(this.rolePermissions.values()).find(
+      permission => permission.role === role && permission.pageId === pageId
+    );
+  }
+
+  async createRolePermission(insertPermission: InsertRolePermission): Promise<RolePermission> {
+    const id = randomUUID();
+    const permission: RolePermission = {
+      ...insertPermission,
+      id,
+      canView: insertPermission.canView || false,
+      canEdit: insertPermission.canEdit || false,
+      canDelete: insertPermission.canDelete || false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.rolePermissions.set(id, permission);
+    return permission;
+  }
+
+  async updateRolePermission(id: string, updateData: Partial<InsertRolePermission>): Promise<RolePermission | undefined> {
+    const permission = this.rolePermissions.get(id);
+    if (!permission) return undefined;
+    
+    const updatedPermission: RolePermission = {
+      ...permission,
+      ...updateData,
+      updatedAt: new Date(),
+    };
+    this.rolePermissions.set(id, updatedPermission);
+    return updatedPermission;
+  }
+
+  async deleteRolePermission(id: string): Promise<boolean> {
+    return this.rolePermissions.delete(id);
+  }
+
+  async checkUserPagePermission(userId: string, pageKey: string, action: 'view' | 'edit' | 'delete'): Promise<boolean> {
+    // Get user
+    const user = await this.getUser(userId);
+    if (!user) return false;
+
+    // Super Admin has access to everything
+    if (user.role === UserRole.SUPER_ADMIN) return true;
+
+    // Get page
+    const page = await this.getPageByKey(pageKey);
+    if (!page || !page.isActive) return false;
+
+    // Get permission for this role and page
+    const permission = await this.getRolePermissionByRoleAndPage(user.role, page.id);
+    if (!permission) return false;
+
+    // Check specific action
+    switch (action) {
+      case 'view':
+        return permission.canView ?? false;
+      case 'edit':
+        return permission.canEdit ?? false;
+      case 'delete':
+        return permission.canDelete ?? false;
+      default:
+        return false;
+    }
   }
 }
 

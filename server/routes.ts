@@ -9,12 +9,15 @@ import {
   insertAdAccountSchema,
   insertAdCopySetSchema,
   insertWorkReportSchema,
+  insertRolePermissionSchema,
   type Campaign,
   type Client,
   type User,
   type AdAccount,
   type AdCopySet,
   type WorkReport,
+  type Page,
+  type RolePermission,
   UserRole 
 } from "@shared/schema";
 import { z } from "zod";
@@ -708,6 +711,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Work report deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete work report" });
+    }
+  });
+
+  // === PAGE PERMISSIONS ROUTES ===
+  
+  // Get all pages (Super Admin only)
+  app.get("/api/pages", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const pages = await storage.getPages();
+      res.json(pages);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch pages" });
+    }
+  });
+
+  // Get all role permissions (Super Admin only)
+  app.get("/api/role-permissions", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const permissions = await storage.getRolePermissions();
+      res.json(permissions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch role permissions" });
+    }
+  });
+
+  // Get role permissions for a specific role (Super Admin only)
+  app.get("/api/role-permissions/:role", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const permissions = await storage.getRolePermissions(req.params.role);
+      res.json(permissions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch role permissions" });
+    }
+  });
+
+  // Update role permission (Super Admin only)
+  app.put("/api/role-permissions/:id", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertRolePermissionSchema.partial().parse(req.body);
+      const permission = await storage.updateRolePermission(req.params.id, validatedData);
+      
+      if (!permission) {
+        return res.status(404).json({ message: "Role permission not found" });
+      }
+      
+      res.json(permission);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update role permission" });
+    }
+  });
+
+  // Bulk update role permissions (Super Admin only)
+  app.put("/api/role-permissions/bulk", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const updates = z.array(z.object({
+        id: z.string(),
+        canView: z.boolean().optional(),
+        canEdit: z.boolean().optional(),
+        canDelete: z.boolean().optional(),
+      })).parse(req.body);
+
+      const updatedPermissions = [];
+      for (const update of updates) {
+        const { id, ...updateData } = update;
+        const permission = await storage.updateRolePermission(id, updateData);
+        if (permission) {
+          updatedPermissions.push(permission);
+        }
+      }
+
+      res.json(updatedPermissions);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update role permissions" });
+    }
+  });
+
+  // Check user permission for a specific page
+  app.get("/api/permissions/check/:pageKey", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { pageKey } = req.params;
+      const { action = 'view' } = req.query;
+      
+      if (!['view', 'edit', 'delete'].includes(action as string)) {
+        return res.status(400).json({ message: "Invalid action. Must be 'view', 'edit', or 'delete'" });
+      }
+      
+      const hasPermission = await storage.checkUserPagePermission(
+        req.user!.id, 
+        pageKey, 
+        action as 'view' | 'edit' | 'delete'
+      );
+      
+      res.json({ hasPermission });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check permission" });
     }
   });
 

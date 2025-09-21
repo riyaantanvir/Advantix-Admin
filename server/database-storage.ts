@@ -12,6 +12,10 @@ import {
   type InsertAdCopySet,
   type WorkReport,
   type InsertWorkReport,
+  type Page,
+  type InsertPage,
+  type RolePermission,
+  type InsertRolePermission,
   UserRole,
   users,
   sessions,
@@ -19,7 +23,9 @@ import {
   clients,
   adAccounts,
   adCopySets,
-  workReports
+  workReports,
+  pages,
+  rolePermissions
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, and, desc } from "drizzle-orm";
@@ -92,9 +98,111 @@ export class DatabaseStorage implements IStorage {
           },
         ]);
       }
+
+      // Initialize default pages if not exist
+      const existingPages = await db.select().from(pages).limit(1);
+      if (existingPages.length === 0) {
+        await this.initializeDefaultPages();
+      }
+
+      // Initialize default permissions if not exist
+      const existingPermissions = await db.select().from(rolePermissions).limit(1);
+      if (existingPermissions.length === 0) {
+        await this.initializeDefaultPermissions();
+      }
     } catch (error) {
       // Silently fail if tables don't exist yet - they'll be created by schema push
       console.log("Database initialization pending schema creation:", error);
+    }
+  }
+
+  private async initializeDefaultPages() {
+    const defaultPages = [
+      { pageKey: "dashboard", displayName: "Dashboard", path: "/", description: "Main dashboard with metrics and overview" },
+      { pageKey: "campaigns", displayName: "Campaign Management", path: "/campaigns", description: "Manage advertising campaigns" },
+      { pageKey: "campaign_details", displayName: "Campaign Details", path: "/campaigns/:id", description: "View and edit individual campaign details" },
+      { pageKey: "clients", displayName: "Client Management", path: "/clients", description: "Manage client accounts and information" },
+      { pageKey: "ad_accounts", displayName: "Ad Accounts", path: "/ad-accounts", description: "Manage advertising account connections" },
+      { pageKey: "salaries", displayName: "Salary Management", path: "/salaries", description: "Manage employee salaries and payments" },
+      { pageKey: "work_reports", displayName: "Work Reports", path: "/work-reports", description: "Track and submit work hours and tasks" },
+      { pageKey: "admin", displayName: "Admin Panel", path: "/admin", description: "Administrative settings and user management" },
+    ];
+
+    for (const pageData of defaultPages) {
+      await db.insert(pages).values({
+        id: randomUUID(),
+        pageKey: pageData.pageKey,
+        displayName: pageData.displayName,
+        path: pageData.path,
+        description: pageData.description,
+        isActive: true,
+      });
+    }
+  }
+
+  private async initializeDefaultPermissions() {
+    const allPages = await db.select().from(pages);
+    const roles = [UserRole.USER, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN];
+
+    // Define default permission matrix
+    const defaultPermissions = {
+      [UserRole.USER]: {
+        dashboard: { view: true, edit: false, delete: false },
+        campaigns: { view: false, edit: false, delete: false },
+        campaign_details: { view: false, edit: false, delete: false },
+        clients: { view: false, edit: false, delete: false },
+        ad_accounts: { view: false, edit: false, delete: false },
+        salaries: { view: false, edit: false, delete: false },
+        work_reports: { view: true, edit: true, delete: false },
+        admin: { view: false, edit: false, delete: false },
+      },
+      [UserRole.MANAGER]: {
+        dashboard: { view: true, edit: false, delete: false },
+        campaigns: { view: true, edit: false, delete: false },
+        campaign_details: { view: true, edit: false, delete: false },
+        clients: { view: true, edit: false, delete: false },
+        ad_accounts: { view: true, edit: false, delete: false },
+        salaries: { view: false, edit: false, delete: false },
+        work_reports: { view: true, edit: true, delete: false },
+        admin: { view: false, edit: false, delete: false },
+      },
+      [UserRole.ADMIN]: {
+        dashboard: { view: true, edit: true, delete: false },
+        campaigns: { view: true, edit: true, delete: true },
+        campaign_details: { view: true, edit: true, delete: false },
+        clients: { view: true, edit: true, delete: true },
+        ad_accounts: { view: true, edit: true, delete: true },
+        salaries: { view: true, edit: true, delete: false },
+        work_reports: { view: true, edit: true, delete: true },
+        admin: { view: false, edit: false, delete: false },
+      },
+      [UserRole.SUPER_ADMIN]: {
+        dashboard: { view: true, edit: true, delete: true },
+        campaigns: { view: true, edit: true, delete: true },
+        campaign_details: { view: true, edit: true, delete: true },
+        clients: { view: true, edit: true, delete: true },
+        ad_accounts: { view: true, edit: true, delete: true },
+        salaries: { view: true, edit: true, delete: true },
+        work_reports: { view: true, edit: true, delete: true },
+        admin: { view: true, edit: true, delete: true },
+      },
+    };
+
+    for (const role of roles) {
+      for (const page of allPages) {
+        const rolePerms = defaultPermissions[role as keyof typeof defaultPermissions];
+        const permissions = rolePerms[page.pageKey as keyof typeof rolePerms];
+        if (permissions) {
+          await db.insert(rolePermissions).values({
+            id: randomUUID(),
+            role,
+            pageId: page.id,
+            canView: permissions.view,
+            canEdit: permissions.edit,
+            canDelete: permissions.delete,
+          });
+        }
+      }
     }
   }
 
@@ -383,5 +491,121 @@ export class DatabaseStorage implements IStorage {
   async deleteWorkReport(id: string): Promise<boolean> {
     const result = await db.delete(workReports).where(eq(workReports.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // Page methods
+  async getPages(): Promise<Page[]> {
+    return db.select().from(pages).orderBy(desc(pages.createdAt));
+  }
+
+  async getPage(id: string): Promise<Page | undefined> {
+    const result = await db.select().from(pages).where(eq(pages.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getPageByKey(pageKey: string): Promise<Page | undefined> {
+    const result = await db.select().from(pages).where(eq(pages.pageKey, pageKey)).limit(1);
+    return result[0];
+  }
+
+  async createPage(insertPage: InsertPage): Promise<Page> {
+    const id = randomUUID();
+    const page = {
+      ...insertPage,
+      id,
+      isActive: insertPage.isActive ?? true,
+    };
+    
+    await db.insert(pages).values(page);
+    return page as Page;
+  }
+
+  async updatePage(id: string, updateData: Partial<InsertPage>): Promise<Page | undefined> {
+    await db.update(pages).set(updateData).where(eq(pages.id, id));
+    return this.getPage(id);
+  }
+
+  async deletePage(id: string): Promise<boolean> {
+    const result = await db.delete(pages).where(eq(pages.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Role Permission methods
+  async getRolePermissions(role?: string): Promise<RolePermission[]> {
+    const query = db.select().from(rolePermissions);
+    
+    if (role) {
+      return query
+        .where(eq(rolePermissions.role, role))
+        .orderBy(desc(rolePermissions.createdAt));
+    } else {
+      return query.orderBy(desc(rolePermissions.createdAt));
+    }
+  }
+
+  async getRolePermission(id: string): Promise<RolePermission | undefined> {
+    const result = await db.select().from(rolePermissions).where(eq(rolePermissions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getRolePermissionByRoleAndPage(role: string, pageId: string): Promise<RolePermission | undefined> {
+    const result = await db.select()
+      .from(rolePermissions)
+      .where(and(eq(rolePermissions.role, role), eq(rolePermissions.pageId, pageId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createRolePermission(insertPermission: InsertRolePermission): Promise<RolePermission> {
+    const id = randomUUID();
+    const permission = {
+      ...insertPermission,
+      id,
+      canView: insertPermission.canView || false,
+      canEdit: insertPermission.canEdit || false,
+      canDelete: insertPermission.canDelete || false,
+    };
+    
+    await db.insert(rolePermissions).values(permission);
+    return permission as RolePermission;
+  }
+
+  async updateRolePermission(id: string, updateData: Partial<InsertRolePermission>): Promise<RolePermission | undefined> {
+    await db.update(rolePermissions).set(updateData).where(eq(rolePermissions.id, id));
+    return this.getRolePermission(id);
+  }
+
+  async deleteRolePermission(id: string): Promise<boolean> {
+    const result = await db.delete(rolePermissions).where(eq(rolePermissions.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async checkUserPagePermission(userId: string, pageKey: string, action: 'view' | 'edit' | 'delete'): Promise<boolean> {
+    // Get user
+    const user = await this.getUser(userId);
+    if (!user) return false;
+
+    // Super Admin has access to everything
+    if (user.role === UserRole.SUPER_ADMIN) return true;
+
+    // Get page
+    const page = await this.getPageByKey(pageKey);
+    if (!page || !page.isActive) return false;
+
+    // Get permission for this role and page
+    const permission = await this.getRolePermissionByRoleAndPage(user.role, page.id);
+    if (!permission) return false;
+
+    // Check specific action
+    switch (action) {
+      case 'view':
+        return permission.canView ?? false;
+      case 'edit':
+        return permission.canEdit ?? false;
+      case 'delete':
+        return permission.canDelete ?? false;
+      default:
+        return false;
+    }
   }
 }

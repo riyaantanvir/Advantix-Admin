@@ -5,6 +5,8 @@ import Sidebar from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
@@ -49,8 +51,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw } from "lucide-react";
-import type { User, InsertUserWithRole } from "@shared/schema";
+import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock } from "lucide-react";
+import type { User, InsertUserWithRole, Page, RolePermission } from "@shared/schema";
 
 interface UserFormData {
   name: string;
@@ -547,6 +549,242 @@ function UserManagement() {
   );
 }
 
+// Access Control Component
+function AccessControl() {
+  const { toast } = useToast();
+  
+  // Fetch pages and role permissions
+  const { data: pages = [], isLoading: pagesLoading } = useQuery<Page[]>({
+    queryKey: ["/api/pages"],
+  });
+
+  const { data: rolePermissions = [], isLoading: permissionsLoading, refetch } = useQuery<RolePermission[]>({
+    queryKey: ["/api/role-permissions"],
+  });
+
+  // Update permission mutation
+  const updatePermissionMutation = useMutation({
+    mutationFn: async ({ id, canView, canEdit, canDelete }: { id: string, canView?: boolean, canEdit?: boolean, canDelete?: boolean }) => {
+      const response = await apiRequest("PUT", `/api/role-permissions/${id}`, {
+        canView,
+        canEdit,
+        canDelete,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/role-permissions"] });
+      toast({
+        title: "Permission updated",
+        description: "Role permission has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update permission",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const roles = ["user", "manager", "admin", "super_admin"];
+
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case "user": return "User";
+      case "manager": return "Manager";
+      case "admin": return "Admin";
+      case "super_admin": return "Super Admin";
+      default: return role;
+    }
+  };
+
+  const getPermissionForRoleAndPage = (role: string, pageId: string) => {
+    return rolePermissions.find(p => p.role === role && p.pageId === pageId);
+  };
+
+  const handlePermissionToggle = (permissionId: string, action: 'view' | 'edit' | 'delete', value: boolean) => {
+    const updateData: any = { id: permissionId };
+    updateData[`can${action.charAt(0).toUpperCase() + action.slice(1)}`] = value;
+    updatePermissionMutation.mutate(updateData);
+  };
+
+  if (pagesLoading || permissionsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2 text-gray-600 dark:text-gray-400">Loading access control settings...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Lock className="w-6 h-6" />
+            Access Control
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Manage page visibility and permissions for each role
+          </p>
+        </div>
+        <Button onClick={() => refetch()} variant="outline" size="sm">
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Role-Based Page Permissions</CardTitle>
+          <CardDescription>
+            Configure which pages each role can access and what actions they can perform.
+            Changes are saved automatically.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-48">Page</TableHead>
+                  {roles.map(role => (
+                    <TableHead key={role} className="text-center min-w-32">
+                      <div className="flex flex-col items-center">
+                        <Shield className="w-4 h-4 mb-1" />
+                        {getRoleDisplayName(role)}
+                      </div>
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pages.map(page => (
+                  <TableRow key={page.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <span className="font-semibold">{page.displayName}</span>
+                        <span className="text-sm text-gray-500">{page.path}</span>
+                        {page.description && (
+                          <span className="text-xs text-gray-400 mt-1">{page.description}</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    {roles.map(role => {
+                      const permission = getPermissionForRoleAndPage(role, page.id);
+                      if (!permission) return (
+                        <TableCell key={role} className="text-center text-gray-400">
+                          No permission found
+                        </TableCell>
+                      );
+
+                      return (
+                        <TableCell key={role} className="text-center">
+                          <div className="space-y-2">
+                            {/* View Permission */}
+                            <div className="flex items-center justify-center space-x-2">
+                              <Switch
+                                checked={permission.canView ?? false}
+                                onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'view', checked)}
+                                disabled={updatePermissionMutation.isPending}
+                                data-testid={`switch-view-${role}-${page.pageKey}`}
+                              />
+                              <span className="text-xs text-gray-600">View</span>
+                            </div>
+                            
+                            {/* Edit Permission */}
+                            <div className="flex items-center justify-center space-x-2">
+                              <Switch
+                                checked={permission.canEdit ?? false}
+                                onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'edit', checked)}
+                                disabled={updatePermissionMutation.isPending || !permission.canView}
+                                data-testid={`switch-edit-${role}-${page.pageKey}`}
+                              />
+                              <span className="text-xs text-gray-600">Edit</span>
+                            </div>
+                            
+                            {/* Delete Permission */}
+                            <div className="flex items-center justify-center space-x-2">
+                              <Switch
+                                checked={permission.canDelete ?? false}
+                                onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'delete', checked)}
+                                disabled={updatePermissionMutation.isPending || !permission.canView}
+                                data-testid={`switch-delete-${role}-${page.pageKey}`}
+                              />
+                              <span className="text-xs text-gray-600">Delete</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Permission Guidelines</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+            <p>• <strong>View:</strong> Access to view the page content</p>
+            <p>• <strong>Edit:</strong> Ability to modify content (requires View permission)</p>
+            <p>• <strong>Delete:</strong> Ability to delete content (requires View permission)</p>
+            <p>• <strong>Super Admin:</strong> Always has full access to all pages regardless of settings</p>
+            <p>• Changes are automatically saved and will take effect immediately for users</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminPage() {
-  return <UserManagement />;
+  return (
+    <Sidebar>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
+        <div className="max-w-7xl mx-auto space-y-8">
+          {/* Header */}
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <Settings className="w-8 h-8" />
+              Admin Panel
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Manage users, permissions, and system settings
+            </p>
+          </div>
+
+          {/* Tabs */}
+          <Tabs defaultValue="users" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2 max-w-md">
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                User Management
+              </TabsTrigger>
+              <TabsTrigger value="access" className="flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                Access Control
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="users">
+              <UserManagement />
+            </TabsContent>
+
+            <TabsContent value="access">
+              <AccessControl />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    </Sidebar>
+  );
 }

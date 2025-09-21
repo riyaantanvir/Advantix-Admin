@@ -135,6 +135,35 @@ export const workReports = pgTable("work_reports", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Page definitions for access control
+export const pages = pgTable("pages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pageKey: text("page_key").notNull().unique(), // e.g., "dashboard", "campaigns", "clients"
+  displayName: text("display_name").notNull(), // e.g., "Dashboard", "Campaign Management"
+  path: text("path").notNull(), // e.g., "/", "/campaigns", "/clients"
+  description: text("description"), // Optional description of the page
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Role-based page permissions
+export const rolePermissions = pgTable("role_permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  role: text("role").notNull(), // "user", "manager", "admin", "super_admin"
+  pageId: varchar("page_id").references(() => pages.id, { onDelete: "cascade" }).notNull(),
+  canView: boolean("can_view").default(false),
+  canEdit: boolean("can_edit").default(false),
+  canDelete: boolean("can_delete").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => {
+  return {
+    roleCheck: sql`CHECK (${table.role} IN ('user', 'manager', 'admin', 'super_admin'))`,
+    uniqueRolePage: sql`UNIQUE(${table.role}, ${table.pageId})`
+  }
+});
+
 // Validation schemas with role constraints
 const UserRoleEnum = z.enum([UserRole.USER, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN]);
 
@@ -198,6 +227,20 @@ export const insertAdCopySetSchema = createInsertSchema(adCopySets).omit({
   updatedAt: true,
 });
 
+export const insertPageSchema = createInsertSchema(pages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRolePermissionSchema = createInsertSchema(rolePermissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  role: UserRoleEnum,
+});
+
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
@@ -227,3 +270,9 @@ export type WorkReport = typeof workReports.$inferSelect;
 
 export type InsertAdCopySet = z.infer<typeof insertAdCopySetSchema>;
 export type AdCopySet = typeof adCopySets.$inferSelect;
+
+export type InsertPage = z.infer<typeof insertPageSchema>;
+export type Page = typeof pages.$inferSelect;
+
+export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
+export type RolePermission = typeof rolePermissions.$inferSelect;
