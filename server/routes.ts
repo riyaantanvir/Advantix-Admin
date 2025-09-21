@@ -5,8 +5,13 @@ import {
   loginSchema, 
   insertCampaignSchema, 
   insertClientSchema,
+  insertUserWithRoleSchema,
+  insertAdAccountSchema,
   type Campaign,
-  type Client 
+  type Client,
+  type User,
+  type AdAccount,
+  UserRole 
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -17,6 +22,7 @@ declare global {
       user?: {
         id: string;
         username: string;
+        role: string;
       };
     }
   }
@@ -44,12 +50,21 @@ async function authenticate(req: Request, res: Response, next: Function) {
     req.user = {
       id: user.id,
       username: user.username,
+      role: user.role,
     };
 
     next();
   } catch (error) {
     return res.status(500).json({ message: "Authentication error" });
   }
+}
+
+// Middleware to check Super Admin role
+async function requireSuperAdmin(req: Request, res: Response, next: Function) {
+  if (!req.user || req.user.role !== UserRole.SUPER_ADMIN) {
+    return res.status(403).json({ message: "Super Admin access required" });
+  }
+  next();
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -71,6 +86,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user: {
           id: user.id,
           username: user.username,
+          role: user.role,
+          name: user.name,
         },
         token: session.token,
         expiresAt: session.expiresAt,
@@ -263,6 +280,154 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Client deleted successfully" });
     } catch (error) {
       console.error("Delete client error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // User Management Routes (Super Admin only)
+  // Get all users
+  app.get("/api/users", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Get users error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create new user
+  app.post("/api/users", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertUserWithRoleSchema.parse(req.body);
+      const user = await storage.createUser(validatedData);
+      res.status(201).json(user);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Create user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update user (role changes)
+  app.put("/api/users/:id", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertUserWithRoleSchema.partial().parse(req.body);
+      const user = await storage.updateUser(req.params.id, validatedData);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Update user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete user
+  app.delete("/api/users/:id", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteUser(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Delete user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Ad Accounts Routes
+  // Get all ad accounts
+  app.get("/api/ad-accounts", authenticate, async (req: Request, res: Response) => {
+    try {
+      const adAccounts = await storage.getAdAccounts();
+      res.json(adAccounts);
+    } catch (error) {
+      console.error("Get ad accounts error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get single ad account
+  app.get("/api/ad-accounts/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const adAccount = await storage.getAdAccount(req.params.id);
+      if (!adAccount) {
+        return res.status(404).json({ message: "Ad account not found" });
+      }
+      res.json(adAccount);
+    } catch (error) {
+      console.error("Get ad account error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create new ad account
+  app.post("/api/ad-accounts", authenticate, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertAdAccountSchema.parse(req.body);
+      
+      // Validate that client exists
+      const client = await storage.getClient(validatedData.clientId);
+      if (!client) {
+        return res.status(400).json({ message: "Client not found" });
+      }
+      
+      const adAccount = await storage.createAdAccount(validatedData);
+      res.status(201).json(adAccount);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Create ad account error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update ad account
+  app.put("/api/ad-accounts/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertAdAccountSchema.partial().parse(req.body);
+      
+      // Validate that client exists if clientId is being updated
+      if (validatedData.clientId) {
+        const client = await storage.getClient(validatedData.clientId);
+        if (!client) {
+          return res.status(400).json({ message: "Client not found" });
+        }
+      }
+      
+      const adAccount = await storage.updateAdAccount(req.params.id, validatedData);
+      if (!adAccount) {
+        return res.status(404).json({ message: "Ad account not found" });
+      }
+      res.json(adAccount);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Update ad account error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete ad account
+  app.delete("/api/ad-accounts/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteAdAccount(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Ad account not found" });
+      }
+      res.json({ message: "Ad account deleted successfully" });
+    } catch (error) {
+      console.error("Delete ad account error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

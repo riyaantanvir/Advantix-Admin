@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import Login from "@/pages/login";
 import Home from "@/pages/home";
 import CampaignsPage from "@/pages/campaigns";
+import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 
 function AuthenticatedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -66,6 +67,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/campaigns" component={() => <AuthenticatedRoute component={CampaignsPage} />} />
+      <Route path="/admin" component={() => <AuthenticatedRoute component={AdminPage} />} />
       <Route path="/" component={() => <AuthenticatedRoute component={Home} />} />
       <Route component={NotFound} />
     </Switch>
