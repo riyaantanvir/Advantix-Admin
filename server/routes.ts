@@ -83,14 +83,14 @@ async function requireAdminOrSuperAdmin(req: Request, res: Response, next: Funct
 }
 
 // Middleware factory to check page permissions
-function requirePagePermission(pageKey: string, action: 'view' | 'edit' | 'delete' = 'view') {
+function requirePagePermission(pageKey: string, action: 'view' | 'edit' | 'delete' = 'view', options: { superAdminBypass?: boolean } = {}) {
   return async (req: Request, res: Response, next: Function) => {
     if (!req.user) {
       return res.status(401).json({ message: "Authentication required" });
     }
 
-    // Super Admin always has access
-    if (req.user.role === UserRole.SUPER_ADMIN) {
+    // Super Admin bypass only for emergency access (admin/permissions endpoints)
+    if (options.superAdminBypass && req.user.role === UserRole.SUPER_ADMIN) {
       return next();
     }
 
@@ -364,7 +364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // User Management Routes (Super Admin only)
   // Get all users
-  app.get("/api/users", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+  app.get("/api/users", authenticate, requirePagePermission('admin', 'view', { superAdminBypass: true }), async (req: Request, res: Response) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users);
@@ -375,7 +375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new user
-  app.post("/api/users", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+  app.post("/api/users", authenticate, requirePagePermission('admin', 'edit', { superAdminBypass: true }), async (req: Request, res: Response) => {
     try {
       const validatedData = insertUserWithRoleSchema.parse(req.body);
       const user = await storage.createUser(validatedData);
@@ -390,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update user (role changes)
-  app.put("/api/users/:id", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+  app.put("/api/users/:id", authenticate, requirePagePermission('admin', 'edit', { superAdminBypass: true }), async (req: Request, res: Response) => {
     try {
       const validatedData = insertUserWithRoleSchema.partial().parse(req.body);
       const user = await storage.updateUser(req.params.id, validatedData);
@@ -408,7 +408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete user
-  app.delete("/api/users/:id", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+  app.delete("/api/users/:id", authenticate, requirePagePermission('admin', 'delete', { superAdminBypass: true }), async (req: Request, res: Response) => {
     try {
       const deleted = await storage.deleteUser(req.params.id);
       if (!deleted) {
@@ -744,7 +744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // === PAGE PERMISSIONS ROUTES ===
   
   // Get all pages (Super Admin only)
-  app.get("/api/pages", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+  app.get("/api/pages", authenticate, requirePagePermission('admin', 'view', { superAdminBypass: true }), async (req: Request, res: Response) => {
     try {
       const pages = await storage.getPages();
       res.json(pages);
@@ -754,7 +754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all role permissions (Super Admin only)
-  app.get("/api/role-permissions", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+  app.get("/api/role-permissions", authenticate, requirePagePermission('admin', 'view', { superAdminBypass: true }), async (req: Request, res: Response) => {
     try {
       const permissions = await storage.getRolePermissions();
       res.json(permissions);
@@ -764,7 +764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get role permissions for a specific role (Super Admin only)
-  app.get("/api/role-permissions/:role", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+  app.get("/api/role-permissions/:role", authenticate, requirePagePermission('admin', 'view', { superAdminBypass: true }), async (req: Request, res: Response) => {
     try {
       const permissions = await storage.getRolePermissions(req.params.role);
       res.json(permissions);
@@ -774,7 +774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update role permission (Super Admin only)
-  app.put("/api/role-permissions/:id", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+  app.put("/api/role-permissions/:id", authenticate, requirePagePermission('admin', 'edit', { superAdminBypass: true }), async (req: Request, res: Response) => {
     try {
       const validatedData = insertRolePermissionSchema.partial().parse(req.body);
       const permission = await storage.updateRolePermission(req.params.id, validatedData);
@@ -793,7 +793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk update role permissions (Super Admin only)
-  app.put("/api/role-permissions/bulk", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+  app.put("/api/role-permissions/bulk", authenticate, requirePagePermission('admin', 'edit', { superAdminBypass: true }), async (req: Request, res: Response) => {
     try {
       const updates = z.array(z.object({
         id: z.string(),

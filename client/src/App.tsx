@@ -126,8 +126,8 @@ function ProtectedRoute({ component: Component, pageKey }: { component: React.Co
     return <Login />;
   }
 
-  // Super Admin has access to everything
-  if (user?.role === 'super_admin') {
+  // Super Admin bypass only for admin page (emergency access)
+  if (user?.role === 'super_admin' && pageKey === 'admin') {
     return <Component />;
   }
 
