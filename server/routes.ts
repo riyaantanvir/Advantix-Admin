@@ -334,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // User Management Routes (Super Admin only)
   // Get all users
-  app.get("/api/users", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+  app.get("/api/users", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users);

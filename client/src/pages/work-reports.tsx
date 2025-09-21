@@ -72,10 +72,13 @@ import Sidebar from "@/components/layout/Sidebar";
 
 // Form schemas
 const workReportFormSchema = insertWorkReportSchema.extend({
-  date: z.date({
+  date: z.coerce.date({
     required_error: "Date is required",
   }),
-  hoursWorked: z.coerce.number().min(0.1, "Hours worked must be at least 0.1"),
+  hoursWorked: z.string().refine((val) => {
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= 0.1;
+  }, "Hours worked must be a valid number of at least 0.1"),
 });
 
 type WorkReportFormData = z.infer<typeof workReportFormSchema>;
@@ -108,7 +111,8 @@ export default function WorkReportsPage() {
     mutationFn: async (data: WorkReportFormData) => {
       const response = await apiRequest("POST", "/api/work-reports", {
         ...data,
-        date: data.date.toISOString(),
+        date: data.date,
+        hoursWorked: data.hoursWorked,
       });
       return response.json();
     },
@@ -134,7 +138,8 @@ export default function WorkReportsPage() {
     mutationFn: async ({ id, data }: { id: string; data: Partial<WorkReportFormData> }) => {
       const response = await apiRequest("PUT", `/api/work-reports/${id}`, {
         ...data,
-        date: data.date ? data.date.toISOString() : undefined,
+        date: data.date,
+        hoursWorked: data.hoursWorked,
       });
       return response.json();
     },
@@ -184,7 +189,7 @@ export default function WorkReportsPage() {
     defaultValues: {
       title: "",
       description: "",
-      hoursWorked: 1,
+      hoursWorked: "1",
       date: new Date(),
       status: "submitted",
       userId: currentUser?.id || "",
@@ -213,7 +218,7 @@ export default function WorkReportsPage() {
     editForm.reset({
       title: workReport.title,
       description: workReport.description,
-      hoursWorked: parseFloat(workReport.hoursWorked.toString()),
+      hoursWorked: workReport.hoursWorked.toString(),
       date: new Date(workReport.date),
       status: workReport.status,
       userId: workReport.userId,
@@ -237,7 +242,7 @@ export default function WorkReportsPage() {
     createForm.reset({
       title: "",
       description: "",
-      hoursWorked: 1,
+      hoursWorked: "1",
       date: new Date(),
       status: "submitted",
       userId: currentUser?.id || "",
@@ -594,6 +599,7 @@ export default function WorkReportsPage() {
                           min="0.1"
                           placeholder="8.0" 
                           {...field}
+                          onChange={(e) => field.onChange(e.target.value)}
                           data-testid="input-working-time"
                         />
                       </FormControl>
@@ -755,6 +761,7 @@ export default function WorkReportsPage() {
                           min="0.1"
                           placeholder="8.0" 
                           {...field}
+                          onChange={(e) => field.onChange(e.target.value)}
                           data-testid="input-edit-working-time"
                         />
                       </FormControl>

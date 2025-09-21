@@ -184,6 +184,12 @@ export const insertWorkReportSchema = createInsertSchema(workReports).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  date: z.coerce.date(),
+  hoursWorked: z.string().refine((val) => {
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= 0.1;
+  }, "Hours worked must be a valid number of at least 0.1"),
 });
 
 export const insertAdCopySetSchema = createInsertSchema(adCopySets).omit({
