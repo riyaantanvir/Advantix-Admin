@@ -233,8 +233,8 @@ export default function WorkReportsPage() {
 
   // Filter work reports based on search term
   const filteredWorkReports = workReports.filter((report) =>
-    report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    report.description.toLowerCase().includes(searchTerm.toLowerCase())
+    report.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (report.description || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Reset create form when dialog opens
