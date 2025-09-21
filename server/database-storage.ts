@@ -10,13 +10,16 @@ import {
   type InsertAdAccount,
   type AdCopySet,
   type InsertAdCopySet,
+  type WorkReport,
+  type InsertWorkReport,
   UserRole,
   users,
   sessions,
   campaigns,
   clients,
   adAccounts,
-  adCopySets
+  adCopySets,
+  workReports
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, and, desc } from "drizzle-orm";
@@ -339,6 +342,46 @@ export class DatabaseStorage implements IStorage {
       .set({ isActive: true })
       .where(and(eq(adCopySets.id, setId), eq(adCopySets.campaignId, campaignId)));
 
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Work Report methods
+  async getWorkReports(userId?: string): Promise<WorkReport[]> {
+    const query = db.select().from(workReports);
+    
+    if (userId) {
+      return query
+        .where(eq(workReports.userId, userId))
+        .orderBy(desc(workReports.createdAt));
+    } else {
+      return query.orderBy(desc(workReports.createdAt));
+    }
+  }
+
+  async getWorkReport(id: string): Promise<WorkReport | undefined> {
+    const result = await db.select().from(workReports).where(eq(workReports.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createWorkReport(insertWorkReport: InsertWorkReport): Promise<WorkReport> {
+    const id = randomUUID();
+    const workReport = {
+      ...insertWorkReport,
+      id,
+      status: insertWorkReport.status || "submitted",
+    };
+    
+    await db.insert(workReports).values(workReport);
+    return workReport as WorkReport;
+  }
+
+  async updateWorkReport(id: string, updateData: Partial<InsertWorkReport>): Promise<WorkReport | undefined> {
+    await db.update(workReports).set(updateData).where(eq(workReports.id, id));
+    return this.getWorkReport(id);
+  }
+
+  async deleteWorkReport(id: string): Promise<boolean> {
+    const result = await db.delete(workReports).where(eq(workReports.id, id));
     return (result.rowCount ?? 0) > 0;
   }
 }

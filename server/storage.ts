@@ -11,6 +11,8 @@ import {
   type InsertAdAccount,
   type AdCopySet,
   type InsertAdCopySet,
+  type WorkReport,
+  type InsertWorkReport,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -58,6 +60,13 @@ export interface IStorage {
   updateAdCopySet(id: string, adCopySet: Partial<InsertAdCopySet>): Promise<AdCopySet | undefined>;
   deleteAdCopySet(id: string): Promise<boolean>;
   setActiveAdCopySet(campaignId: string, setId: string): Promise<boolean>;
+  
+  // Work Report methods
+  getWorkReports(userId?: string): Promise<WorkReport[]>; // If userId provided, filter by user; otherwise get all (admin only)
+  getWorkReport(id: string): Promise<WorkReport | undefined>;
+  createWorkReport(workReport: InsertWorkReport): Promise<WorkReport>;
+  updateWorkReport(id: string, workReport: Partial<InsertWorkReport>): Promise<WorkReport | undefined>;
+  deleteWorkReport(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -67,6 +76,7 @@ export class MemStorage implements IStorage {
   private clients: Map<string, Client>;
   private adAccounts: Map<string, AdAccount>;
   private adCopySets: Map<string, AdCopySet>;
+  private workReports: Map<string, WorkReport>;
 
   constructor() {
     this.users = new Map();
@@ -75,6 +85,7 @@ export class MemStorage implements IStorage {
     this.clients = new Map();
     this.adAccounts = new Map();
     this.adCopySets = new Map();
+    this.workReports = new Map();
     
     // Create default admin user
     const adminId = randomUUID();
@@ -433,6 +444,52 @@ export class MemStorage implements IStorage {
     const updatedTargetSet = { ...targetSet, isActive: true, updatedAt: new Date() };
     this.adCopySets.set(setId, updatedTargetSet);
     return true;
+  }
+
+  // Work Report methods
+  async getWorkReports(userId?: string): Promise<WorkReport[]> {
+    const reports = Array.from(this.workReports.values());
+    const filteredReports = userId 
+      ? reports.filter(report => report.userId === userId)
+      : reports;
+    
+    return filteredReports.sort((a, b) => {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+  }
+
+  async getWorkReport(id: string): Promise<WorkReport | undefined> {
+    return this.workReports.get(id);
+  }
+
+  async createWorkReport(insertWorkReport: InsertWorkReport): Promise<WorkReport> {
+    const id = randomUUID();
+    const workReport: WorkReport = {
+      ...insertWorkReport,
+      id,
+      status: insertWorkReport.status || "submitted",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.workReports.set(id, workReport);
+    return workReport;
+  }
+
+  async updateWorkReport(id: string, updateData: Partial<InsertWorkReport>): Promise<WorkReport | undefined> {
+    const workReport = this.workReports.get(id);
+    if (!workReport) return undefined;
+    
+    const updatedWorkReport: WorkReport = {
+      ...workReport,
+      ...updateData,
+      updatedAt: new Date(),
+    };
+    this.workReports.set(id, updatedWorkReport);
+    return updatedWorkReport;
+  }
+
+  async deleteWorkReport(id: string): Promise<boolean> {
+    return this.workReports.delete(id);
   }
 }
 
