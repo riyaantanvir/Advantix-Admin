@@ -43,10 +43,27 @@ import {
   Target,
   TrendingUp,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Play,
+  Pause,
+  Plus,
+  Trash2,
+  Eye,
+  ExternalLink
 } from "lucide-react";
 import { format } from "date-fns";
-import type { Campaign, AdAccount, Client } from "@shared/schema";
+import type { Campaign, AdAccount, Client, AdCopySet, InsertAdCopySet } from "@shared/schema";
+import { insertAdCopySetSchema } from "@shared/schema";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 
 interface DailySpend {
@@ -81,6 +98,9 @@ export default function CampaignDetailsPage() {
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [editingSpend, setEditingSpend] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isCreateSetDialogOpen, setIsCreateSetDialogOpen] = useState(false);
+  const [isEditSetDialogOpen, setIsEditSetDialogOpen] = useState(false);
+  const [editingSet, setEditingSet] = useState<AdCopySet | null>(null);
   
   const campaignId = params?.id;
 
@@ -97,6 +117,12 @@ export default function CampaignDetailsPage() {
 
   const { data: adAccounts = [] } = useQuery<AdAccount[]>({
     queryKey: ["/api/ad-accounts"],
+  });
+
+  // Fetch ad copy sets for this campaign
+  const { data: adCopySets = [], isLoading: adCopySetsLoading } = useQuery<AdCopySet[]>({
+    queryKey: ["/api/campaigns", campaignId, "ad-copy-sets"],
+    enabled: !!campaignId,
   });
 
   // Mock daily spend data (in real app, this would come from API)
@@ -174,6 +200,30 @@ export default function CampaignDetailsPage() {
 
   const totalCalendarSpend = dailySpends.reduce((sum, day) => sum + day.amount, 0);
 
+  // Ad Copy Set form setup
+  const createAdCopyForm = useForm<InsertAdCopySet>({
+    resolver: zodResolver(insertAdCopySetSchema.omit({ campaignId: true })),
+    defaultValues: {
+      setName: "",
+      isActive: false,
+      age: "",
+      budget: "",
+      adType: "",
+      creativeLink: "",
+      headline: "",
+      description: "",
+      callToAction: "",
+      targetAudience: "",
+      placement: "",
+      schedule: "",
+      notes: "",
+    },
+  });
+
+  const editAdCopyForm = useForm<InsertAdCopySet>({
+    resolver: zodResolver(insertAdCopySetSchema.omit({ campaignId: true })),
+  });
+
   // Update campaign status mutation
   const updateCampaignStatusMutation = useMutation({
     mutationFn: async (status: string) => {
@@ -192,6 +242,98 @@ export default function CampaignDetailsPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to update campaign status.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create ad copy set mutation
+  const createAdCopySetMutation = useMutation({
+    mutationFn: async (data: InsertAdCopySet) => {
+      const response = await apiRequest("POST", `/api/campaigns/${campaignId}/ad-copy-sets`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "ad-copy-sets"] });
+      setIsCreateSetDialogOpen(false);
+      createAdCopyForm.reset();
+      toast({
+        title: "Success!",
+        description: "Ad copy set created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create ad copy set.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update ad copy set mutation
+  const updateAdCopySetMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertAdCopySet> }) => {
+      const response = await apiRequest("PUT", `/api/ad-copy-sets/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "ad-copy-sets"] });
+      setIsEditSetDialogOpen(false);
+      setEditingSet(null);
+      toast({
+        title: "Success!",
+        description: "Ad copy set updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update ad copy set.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Set active ad copy set mutation
+  const setActiveAdCopySetMutation = useMutation({
+    mutationFn: async ({ campaignId, setId }: { campaignId: string; setId: string }) => {
+      const response = await apiRequest("PUT", `/api/campaigns/${campaignId}/ad-copy-sets/${setId}/set-active`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "ad-copy-sets"] });
+      toast({
+        title: "Success!",
+        description: "Ad copy set is now active.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to set active ad copy set.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete ad copy set mutation
+  const deleteAdCopySetMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/ad-copy-sets/${id}`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "ad-copy-sets"] });
+      toast({
+        title: "Success!",
+        description: "Ad copy set deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete ad copy set.",
         variant: "destructive",
       });
     },
@@ -253,6 +395,44 @@ export default function CampaignDetailsPage() {
       });
     },
   });
+
+  const handleCreateAdCopySet = (data: InsertAdCopySet) => {
+    createAdCopySetMutation.mutate({ ...data, campaignId: campaignId! });
+  };
+
+  const handleEditAdCopySet = (set: AdCopySet) => {
+    setEditingSet(set);
+    editAdCopyForm.reset({
+      setName: set.setName,
+      isActive: set.isActive || false,
+      age: set.age || "",
+      budget: set.budget || "",
+      adType: set.adType || "",
+      creativeLink: set.creativeLink || "",
+      headline: set.headline || "",
+      description: set.description || "",
+      callToAction: set.callToAction || "",
+      targetAudience: set.targetAudience || "",
+      placement: set.placement || "",
+      schedule: set.schedule || "",
+      notes: set.notes || "",
+    });
+    setIsEditSetDialogOpen(true);
+  };
+
+  const handleUpdateAdCopySet = (data: InsertAdCopySet) => {
+    if (!editingSet) return;
+    updateAdCopySetMutation.mutate({ id: editingSet.id, data });
+  };
+
+  const handleSetActive = (setId: string) => {
+    if (!campaignId) return;
+    setActiveAdCopySetMutation.mutate({ campaignId, setId });
+  };
+
+  const handleDeleteSet = (setId: string) => {
+    deleteAdCopySetMutation.mutate(setId);
+  };
 
   const handleAddComment = () => {
     if (!newComment.trim()) {
@@ -375,6 +555,19 @@ export default function CampaignDetailsPage() {
           <div className="mb-6">
             <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">
               <button
+                onClick={() => setActiveTab("adcopy")}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
+                  activeTab === "adcopy"
+                    ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                )}
+                data-testid="tab-adcopy"
+              >
+                <FileText className="h-4 w-4" />
+                Ad Copy
+              </button>
+              <button
                 onClick={() => setActiveTab("summary")}
                 className={cn(
                   "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
@@ -399,19 +592,6 @@ export default function CampaignDetailsPage() {
               >
                 <Calendar className="h-4 w-4" />
                 Calendar View
-              </button>
-              <button
-                onClick={() => setActiveTab("history")}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
-                  activeTab === "history"
-                    ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                )}
-                data-testid="tab-history"
-              >
-                <History className="h-4 w-4" />
-                History
               </button>
             </div>
           </div>

@@ -7,10 +7,12 @@ import {
   insertClientSchema,
   insertUserWithRoleSchema,
   insertAdAccountSchema,
+  insertAdCopySetSchema,
   type Campaign,
   type Client,
   type User,
   type AdAccount,
+  type AdCopySet,
   UserRole 
 } from "@shared/schema";
 import { z } from "zod";
@@ -429,6 +431,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Delete ad account error:", error);
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ====== AD COPY SETS ROUTES ======
+  
+  // Get ad copy sets for a campaign
+  app.get("/api/campaigns/:campaignId/ad-copy-sets", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { campaignId } = req.params;
+      const adCopySets = await storage.getAdCopySets(campaignId);
+      res.json(adCopySets);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch ad copy sets" });
+    }
+  });
+
+  // Get single ad copy set
+  app.get("/api/ad-copy-sets/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const adCopySet = await storage.getAdCopySet(req.params.id);
+      if (!adCopySet) {
+        return res.status(404).json({ message: "Ad copy set not found" });
+      }
+      res.json(adCopySet);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch ad copy set" });
+    }
+  });
+
+  // Create new ad copy set
+  app.post("/api/campaigns/:campaignId/ad-copy-sets", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { campaignId } = req.params;
+      const validatedData = insertAdCopySetSchema.parse({
+        ...req.body,
+        campaignId,
+      });
+      
+      // Validate that campaign exists
+      const campaign = await storage.getCampaign(campaignId);
+      if (!campaign) {
+        return res.status(400).json({ message: "Campaign not found" });
+      }
+
+      const adCopySet = await storage.createAdCopySet(validatedData);
+      res.status(201).json(adCopySet);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create ad copy set" });
+    }
+  });
+
+  // Update ad copy set
+  app.put("/api/ad-copy-sets/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertAdCopySetSchema.partial().parse(req.body);
+      const adCopySet = await storage.updateAdCopySet(req.params.id, validatedData);
+      
+      if (!adCopySet) {
+        return res.status(404).json({ message: "Ad copy set not found" });
+      }
+      
+      res.json(adCopySet);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update ad copy set" });
+    }
+  });
+
+  // Set active ad copy set
+  app.put("/api/campaigns/:campaignId/ad-copy-sets/:id/set-active", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { campaignId, id } = req.params;
+      const success = await storage.setActiveAdCopySet(campaignId, id);
+      
+      if (!success) {
+        return res.status(400).json({ message: "Failed to set active ad copy set" });
+      }
+      
+      res.json({ message: "Ad copy set set as active" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to set active ad copy set" });
+    }
+  });
+
+  // Delete ad copy set
+  app.delete("/api/ad-copy-sets/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteAdCopySet(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Ad copy set not found" });
+      }
+      res.json({ message: "Ad copy set deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete ad copy set" });
     }
   });
 

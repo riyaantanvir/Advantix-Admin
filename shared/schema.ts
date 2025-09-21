@@ -100,6 +100,28 @@ export const salaries = pgTable("salaries", {
   }
 });
 
+// Ad Copy Sets for Campaign Management
+export const adCopySets = pgTable("ad_copy_sets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: "cascade" }).notNull(),
+  setName: text("set_name").notNull(),
+  isActive: boolean("is_active").default(false),
+  // Facebook Asset Level Details
+  age: text("age"),
+  budget: decimal("budget", { precision: 12, scale: 2 }),
+  adType: text("ad_type"),
+  creativeLink: text("creative_link"),
+  headline: text("headline"),
+  description: text("description"),
+  callToAction: text("call_to_action"),
+  targetAudience: text("target_audience"),
+  placement: text("placement"),
+  schedule: text("schedule"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Work Reports
 export const workReports = pgTable("work_reports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -164,6 +186,12 @@ export const insertWorkReportSchema = createInsertSchema(workReports).omit({
   updatedAt: true,
 });
 
+export const insertAdCopySetSchema = createInsertSchema(adCopySets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
@@ -190,3 +218,6 @@ export type Salary = typeof salaries.$inferSelect;
 
 export type InsertWorkReport = z.infer<typeof insertWorkReportSchema>;
 export type WorkReport = typeof workReports.$inferSelect;
+
+export type InsertAdCopySet = z.infer<typeof insertAdCopySetSchema>;
+export type AdCopySet = typeof adCopySets.$inferSelect;

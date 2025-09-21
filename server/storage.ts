@@ -9,6 +9,8 @@ import {
   type InsertClient,
   type AdAccount,
   type InsertAdAccount,
+  type AdCopySet,
+  type InsertAdCopySet,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -48,6 +50,14 @@ export interface IStorage {
   createAdAccount(adAccount: InsertAdAccount): Promise<AdAccount>;
   updateAdAccount(id: string, adAccount: Partial<InsertAdAccount>): Promise<AdAccount | undefined>;
   deleteAdAccount(id: string): Promise<boolean>;
+  
+  // Ad Copy Set methods
+  getAdCopySets(campaignId: string): Promise<AdCopySet[]>;
+  getAdCopySet(id: string): Promise<AdCopySet | undefined>;
+  createAdCopySet(adCopySet: InsertAdCopySet): Promise<AdCopySet>;
+  updateAdCopySet(id: string, adCopySet: Partial<InsertAdCopySet>): Promise<AdCopySet | undefined>;
+  deleteAdCopySet(id: string): Promise<boolean>;
+  setActiveAdCopySet(campaignId: string, setId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -56,6 +66,7 @@ export class MemStorage implements IStorage {
   private campaigns: Map<string, Campaign>;
   private clients: Map<string, Client>;
   private adAccounts: Map<string, AdAccount>;
+  private adCopySets: Map<string, AdCopySet>;
 
   constructor() {
     this.users = new Map();
@@ -63,11 +74,13 @@ export class MemStorage implements IStorage {
     this.campaigns = new Map();
     this.clients = new Map();
     this.adAccounts = new Map();
+    this.adCopySets = new Map();
     
     // Create default admin user
     const adminId = randomUUID();
     const adminUser: User = {
       id: adminId,
+      name: "Administrator",
       username: "Admin",
       password: "2604", // In production, this should be hashed
       role: UserRole.SUPER_ADMIN,
@@ -340,6 +353,86 @@ export class MemStorage implements IStorage {
 
   async deleteAdAccount(id: string): Promise<boolean> {
     return this.adAccounts.delete(id);
+  }
+  // Ad Copy Set methods
+  async getAdCopySets(campaignId: string): Promise<AdCopySet[]> {
+    return Array.from(this.adCopySets.values())
+      .filter(set => set.campaignId === campaignId)
+      .sort((a, b) => {
+        // Active sets first
+        if (a.isActive && !b.isActive) return -1;
+        if (!a.isActive && b.isActive) return 1;
+        // Then by creation date
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+  }
+
+  async getAdCopySet(id: string): Promise<AdCopySet | undefined> {
+    return this.adCopySets.get(id);
+  }
+
+  async createAdCopySet(insertAdCopySet: InsertAdCopySet): Promise<AdCopySet> {
+    const id = randomUUID();
+    const adCopySet: AdCopySet = {
+      ...insertAdCopySet,
+      id,
+      isActive: insertAdCopySet.isActive || false,
+      notes: insertAdCopySet.notes || null,
+      age: insertAdCopySet.age || null,
+      budget: insertAdCopySet.budget || null,
+      adType: insertAdCopySet.adType || null,
+      creativeLink: insertAdCopySet.creativeLink || null,
+      headline: insertAdCopySet.headline || null,
+      description: insertAdCopySet.description || null,
+      callToAction: insertAdCopySet.callToAction || null,
+      targetAudience: insertAdCopySet.targetAudience || null,
+      placement: insertAdCopySet.placement || null,
+      schedule: insertAdCopySet.schedule || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.adCopySets.set(id, adCopySet);
+    return adCopySet;
+  }
+
+  async updateAdCopySet(id: string, updateData: Partial<InsertAdCopySet>): Promise<AdCopySet | undefined> {
+    const adCopySet = this.adCopySets.get(id);
+    if (!adCopySet) return undefined;
+    
+    const updatedAdCopySet: AdCopySet = {
+      ...adCopySet,
+      ...updateData,
+      updatedAt: new Date(),
+    };
+    this.adCopySets.set(id, updatedAdCopySet);
+    return updatedAdCopySet;
+  }
+
+  async deleteAdCopySet(id: string): Promise<boolean> {
+    return this.adCopySets.delete(id);
+  }
+
+  async setActiveAdCopySet(campaignId: string, setId: string): Promise<boolean> {
+    // First, deactivate all sets for this campaign
+    const campaignSets = Array.from(this.adCopySets.values())
+      .filter(set => set.campaignId === campaignId);
+    
+    for (const set of campaignSets) {
+      if (set.isActive) {
+        const updatedSet = { ...set, isActive: false, updatedAt: new Date() };
+        this.adCopySets.set(set.id, updatedSet);
+      }
+    }
+
+    // Then activate the specified set
+    const targetSet = this.adCopySets.get(setId);
+    if (!targetSet || targetSet.campaignId !== campaignId) {
+      return false;
+    }
+
+    const updatedTargetSet = { ...targetSet, isActive: true, updatedAt: new Date() };
+    this.adCopySets.set(setId, updatedTargetSet);
+    return true;
   }
 }
 
