@@ -1,16 +1,19 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { format, startOfYear, endOfYear, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth } from "date-fns";
 import { CalendarIcon, Users, Megaphone, DollarSign, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Sidebar from "@/components/layout/Sidebar";
+import type { Client, AdAccount, Campaign } from "@shared/schema";
 
 export default function Home() {
-  const [dateFilter, setDateFilter] = useState("today");
+  const [dateFilter, setDateFilter] = useState("this_year");
   const [customDateRange, setCustomDateRange] = useState<{
     from?: Date;
     to?: Date;
@@ -21,13 +24,112 @@ export default function Home() {
   const userStr = localStorage.getItem("user");
   const user = userStr ? JSON.parse(userStr) : null;
 
-  // Mock data - in a real app, this would come from API based on the selected filter
-  const summaryData = {
-    totalClients: 124,
-    totalAdAccounts: 347,
-    totalCampaigns: 892,
-    totalSpend: 156750.50,
-  };
+  // Calculate date range based on selected filter
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    
+    switch (dateFilter) {
+      case "today":
+        return {
+          from: startOfDay(now),
+          to: endOfDay(now)
+        };
+      case "yesterday":
+        const yesterday = subDays(now, 1);
+        return {
+          from: startOfDay(yesterday),
+          to: endOfDay(yesterday)
+        };
+      case "this_month":
+        return {
+          from: startOfMonth(now),
+          to: endOfMonth(now)
+        };
+      case "this_year":
+        return {
+          from: startOfYear(now),
+          to: endOfYear(now)
+        };
+      case "custom":
+        return {
+          from: customDateRange.from || startOfYear(now),
+          to: customDateRange.to || endOfYear(now)
+        };
+      default:
+        return {
+          from: startOfYear(now),
+          to: endOfYear(now)
+        };
+    }
+  }, [dateFilter, customDateRange]);
+
+  // Check if user is authenticated
+  const isAuthenticated = !!user;
+
+  // Fetch real data from APIs
+  const { data: clients = [], isLoading: clientsLoading, error: clientsError } = useQuery({
+    queryKey: ["/api/clients"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: adAccounts = [], isLoading: adAccountsLoading, error: adAccountsError } = useQuery({
+    queryKey: ["/api/ad-accounts"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: campaigns = [], isLoading: campaignsLoading, error: campaignsError } = useQuery({
+    queryKey: ["/api/campaigns"],
+    enabled: isAuthenticated,
+  });
+
+  // Filter data based on selected date range and calculate summary
+  const summaryData = useMemo(() => {
+    if (!isAuthenticated) {
+      return {
+        totalClients: 0,
+        totalAdAccounts: 0,
+        totalCampaigns: 0,
+        totalSpend: 0,
+      };
+    }
+
+    const isWithinRange = (dateStr: string | Date | null | undefined) => {
+      if (!dateStr) return false;
+      try {
+        const date = new Date(dateStr);
+        return !isNaN(date.getTime()) && date >= dateRange.from && date <= dateRange.to;
+      } catch {
+        return false;
+      }
+    };
+
+    const filteredClients = (clients as Client[]).filter((client: Client) => 
+      isWithinRange(client.createdAt)
+    );
+    
+    const filteredAdAccounts = (adAccounts as AdAccount[]).filter((account: AdAccount) => 
+      isWithinRange(account.createdAt)
+    );
+    
+    const filteredCampaigns = (campaigns as Campaign[]).filter((campaign: Campaign) => 
+      isWithinRange(campaign.createdAt)
+    );
+
+    const totalSpend = filteredCampaigns.reduce((total: number, campaign: Campaign) => {
+      const spend = campaign.spend ? parseFloat(campaign.spend.toString()) : 0;
+      return total + (isNaN(spend) ? 0 : spend);
+    }, 0);
+
+    return {
+      totalClients: filteredClients.length,
+      totalAdAccounts: filteredAdAccounts.length,
+      totalCampaigns: filteredCampaigns.length,
+      totalSpend,
+    };
+  }, [clients, adAccounts, campaigns, dateRange, isAuthenticated]);
+
+  const isLoading = clientsLoading || adAccountsLoading || campaignsLoading;
+  const hasError = clientsError || adAccountsError || campaignsError;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -59,6 +161,8 @@ export default function Home() {
         return "Yesterday";
       case "this_month":
         return "This Month";
+      case "this_year":
+        return "This Year";
       default:
         return "Select date range";
     }
@@ -93,6 +197,7 @@ export default function Home() {
                     <SelectValue placeholder="Select period" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="this_year">This Year</SelectItem>
                     <SelectItem value="today">Today</SelectItem>
                     <SelectItem value="yesterday">Yesterday</SelectItem>
                     <SelectItem value="this_month">This Month</SelectItem>
@@ -159,7 +264,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="stat-total-clients">
-                  {summaryData.totalClients.toLocaleString()}
+                  {!isAuthenticated ? "Login required" : isLoading ? "..." : hasError ? "Error" : summaryData.totalClients.toLocaleString()}
                 </div>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   +12% from last period
@@ -177,7 +282,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="stat-total-ad-accounts">
-                  {summaryData.totalAdAccounts.toLocaleString()}
+                  {!isAuthenticated ? "Login required" : isLoading ? "..." : hasError ? "Error" : summaryData.totalAdAccounts.toLocaleString()}
                 </div>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   +8% from last period
@@ -195,7 +300,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="stat-total-campaigns">
-                  {summaryData.totalCampaigns.toLocaleString()}
+                  {!isAuthenticated ? "Login required" : isLoading ? "..." : hasError ? "Error" : summaryData.totalCampaigns.toLocaleString()}
                 </div>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   +15% from last period
@@ -213,7 +318,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="stat-total-spend">
-                  {formatCurrency(summaryData.totalSpend)}
+                  {!isAuthenticated ? "Login required" : isLoading ? "..." : hasError ? "Error" : formatCurrency(summaryData.totalSpend)}
                 </div>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   +5% from last period
