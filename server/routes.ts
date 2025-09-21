@@ -199,6 +199,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add campaign comment
+  app.post("/api/campaigns/:id/comments", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { comment } = req.body;
+      if (!comment || !comment.trim()) {
+        return res.status(400).json({ message: "Comment is required" });
+      }
+
+      const campaign = await storage.getCampaign(req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      // Add the new comment to existing comments
+      const existingComments = campaign.comments || "";
+      const newComments = existingComments 
+        ? `${existingComments}\n\n[${new Date().toISOString()}] ${req.user?.username}: ${comment.trim()}`
+        : `[${new Date().toISOString()}] ${req.user?.username}: ${comment.trim()}`;
+
+      const updatedCampaign = await storage.updateCampaign(req.params.id, {
+        comments: newComments
+      });
+
+      if (!updatedCampaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      res.json({ 
+        message: "Comment added successfully",
+        campaign: updatedCampaign
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to add comment" });
+    }
+  });
+
   // Delete campaign
   app.delete("/api/campaigns/:id", authenticate, async (req: Request, res: Response) => {
     try {
