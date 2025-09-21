@@ -36,9 +36,13 @@ export const sessions = pgTable("sessions", {
 export const campaigns = pgTable("campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  comments: text("comments"),
+  adAccount: text("ad_account").notNull(),
   clientId: varchar("client_id").references(() => clients.id, { onDelete: "set null" }),
   status: text("status").notNull().default("active"), // "active", "paused", "completed"
-  budget: decimal("budget", { precision: 12, scale: 2 }),
+  objective: text("objective").notNull(),
+  budget: decimal("budget", { precision: 12, scale: 2 }).notNull(),
   spend: decimal("spend", { precision: 12, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -51,6 +55,7 @@ export const clients = pgTable("clients", {
   email: text("email").unique(),
   phone: text("phone"),
   company: text("company"),
+  initialBalance: decimal("initial_balance", { precision: 12, scale: 2 }).default("0"),
   adAccountsCount: integer("ad_accounts_count").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -108,6 +113,8 @@ export const insertCampaignSchema = createInsertSchema(campaigns).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  startDate: z.coerce.date(),
 });
 
 export const insertClientSchema = createInsertSchema(clients).omit({

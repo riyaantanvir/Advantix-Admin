@@ -1,0 +1,936 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { 
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  Search, 
+  RefreshCw, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  ExternalLink,
+  Calendar
+} from "lucide-react";
+import { format } from "date-fns";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { z } from "zod";
+import { insertCampaignSchema, type Campaign, type Client } from "@shared/schema";
+import Sidebar from "@/components/layout/Sidebar";
+
+// Form schemas
+const campaignFormSchema = insertCampaignSchema.extend({
+  startDate: z.date({
+    required_error: "Start date is required",
+  }),
+});
+
+type CampaignFormData = z.infer<typeof campaignFormSchema>;
+
+// Status color mapping
+const statusColors = {
+  active: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300",
+  paused: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300",
+  completed: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300",
+  draft: "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300",
+};
+
+export default function CampaignsPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+  const { toast } = useToast();
+
+  // Form setup
+  const createForm = useForm<CampaignFormData>({
+    resolver: zodResolver(campaignFormSchema),
+    defaultValues: {
+      name: "",
+      startDate: new Date(),
+      comments: "",
+      adAccount: "",
+      objective: "",
+      budget: "0",
+      status: "active",
+      spend: "0",
+    },
+  });
+
+  const editForm = useForm<CampaignFormData>({
+    resolver: zodResolver(campaignFormSchema),
+  });
+
+  // Fetch campaigns
+  const { 
+    data: campaigns = [], 
+    isLoading: campaignsLoading, 
+    refetch: refetchCampaigns 
+  } = useQuery({
+    queryKey: ["/api/campaigns"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/campaigns");
+      const data = await response.json();
+      return data as Campaign[];
+    },
+  });
+
+  // Fetch clients
+  const { data: clients = [] } = useQuery({
+    queryKey: ["/api/clients"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/clients");
+      const data = await response.json();
+      return data as Client[];
+    },
+  });
+
+  // Create campaign mutation
+  const createCampaignMutation = useMutation({
+    mutationFn: async (data: CampaignFormData) => {
+      const response = await apiRequest("POST", "/api/campaigns", {
+        ...data,
+        startDate: data.startDate.toISOString(),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      setIsCreateDialogOpen(false);
+      createForm.reset();
+      toast({
+        title: "Success!",
+        description: "Campaign created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create campaign.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update campaign mutation
+  const updateCampaignMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<CampaignFormData> }) => {
+      const response = await apiRequest("PUT", `/api/campaigns/${id}`, {
+        ...data,
+        ...(data.startDate && { startDate: data.startDate.toISOString() }),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      setIsEditDialogOpen(false);
+      setEditingCampaign(null);
+      editForm.reset();
+      toast({
+        title: "Success!",
+        description: "Campaign updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update campaign.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete campaign mutation
+  const deleteCampaignMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/campaigns/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      toast({
+        title: "Success!",
+        description: "Campaign deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete campaign.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Filter campaigns based on search query
+  const filteredCampaigns = campaigns.filter((campaign) => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      campaign.name.toLowerCase().includes(searchLower) ||
+      campaign.adAccount.toLowerCase().includes(searchLower) ||
+      campaign.objective.toLowerCase().includes(searchLower) ||
+      (campaign.comments && campaign.comments.toLowerCase().includes(searchLower))
+    );
+  });
+
+  // Get client name by ID
+  const getClientName = (clientId: string | null) => {
+    if (!clientId) return "No Client";
+    const client = clients.find(c => c.id === clientId);
+    return client?.name || "Unknown Client";
+  };
+
+  // Get client initial balance by ID
+  const getClientInitialBalance = (clientId: string | null) => {
+    if (!clientId) return 0;
+    const client = clients.find(c => c.id === clientId);
+    return parseFloat(client?.initialBalance || "0");
+  };
+
+  // Calculate available balance for a client (aggregate across all campaigns)
+  const calculateAvailableBalance = (clientId: string | null) => {
+    if (!clientId) return 0;
+    
+    const initialBalance = getClientInitialBalance(clientId);
+    
+    // Sum up all spend across all campaigns for this client
+    const totalSpendForClient = campaigns
+      .filter(campaign => campaign.clientId === clientId)
+      .reduce((sum, campaign) => sum + parseFloat(campaign.spend || "0"), 0);
+    
+    return initialBalance - totalSpendForClient;
+  };
+
+  // Format currency
+  const formatCurrency = (amount: number | string) => {
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(numAmount);
+  };
+
+  // Handle edit campaign
+  const handleEdit = (campaign: Campaign) => {
+    setEditingCampaign(campaign);
+    editForm.reset({
+      name: campaign.name,
+      startDate: new Date(campaign.startDate),
+      comments: campaign.comments || "",
+      adAccount: campaign.adAccount,
+      clientId: campaign.clientId || "",
+      status: campaign.status,
+      objective: campaign.objective,
+      budget: campaign.budget || "0",
+      spend: campaign.spend || "0",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  // Auto-fill available balance when client is selected in create form
+  const handleClientChange = (clientId: string, form: typeof createForm | typeof editForm) => {
+    const client = clients.find(c => c.id === clientId);
+    form.setValue("clientId", clientId);
+    if (client) {
+      // This would set available balance, but since it's auto-calculated, we don't need to store it
+    }
+  };
+
+  return (
+    <Sidebar>
+      <div className="flex-1 overflow-auto">
+        <div className="p-6">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              Campaign Management
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Manage your advertising campaigns and track performance
+            </p>
+          </div>
+
+          {/* Top Bar */}
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex-1 min-w-64">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search campaigns..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-campaign-search"
+                    />
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => refetchCampaigns()}
+                  disabled={campaignsLoading}
+                  data-testid="button-refresh-campaigns"
+                >
+                  <RefreshCw className={cn("h-4 w-4 mr-2", campaignsLoading && "animate-spin")} />
+                  Refresh
+                </Button>
+                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-new-campaign">
+                      <Plus className="h-4 w-4 mr-2" />
+                      New Campaign
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Create New Campaign</DialogTitle>
+                      <DialogDescription>
+                        Add a new advertising campaign to your account.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Form {...createForm}>
+                      <form onSubmit={createForm.handleSubmit((data) => createCampaignMutation.mutate(data))}>
+                        <div className="space-y-4 max-h-96 overflow-y-auto">
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={createForm.control}
+                              name="name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Campaign Name</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} data-testid="input-campaign-name" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createForm.control}
+                              name="adAccount"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Ad Account</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} data-testid="input-ad-account" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={createForm.control}
+                              name="clientId"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Client</FormLabel>
+                                  <Select
+                                    onValueChange={(value) => handleClientChange(value, createForm)}
+                                    defaultValue={field.value || ""}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-client">
+                                        <SelectValue placeholder="Select a client" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {clients.map((client) => (
+                                        <SelectItem key={client.id} value={client.id}>
+                                          {client.name} (Balance: {formatCurrency(client.initialBalance || "0")})
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createForm.control}
+                              name="status"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Status</FormLabel>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-status">
+                                        <SelectValue placeholder="Select status" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="active">Active</SelectItem>
+                                      <SelectItem value="paused">Paused</SelectItem>
+                                      <SelectItem value="completed">Completed</SelectItem>
+                                      <SelectItem value="draft">Draft</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={createForm.control}
+                              name="objective"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Objective</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} placeholder="e.g., Brand Awareness, Conversions" data-testid="input-objective" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createForm.control}
+                              name="budget"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Budget</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      {...field} 
+                                      type="number" 
+                                      step="0.01" 
+                                      min="0"
+                                      placeholder="0.00"
+                                      data-testid="input-budget"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <FormField
+                            control={createForm.control}
+                            name="startDate"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col">
+                                <FormLabel>Start Date</FormLabel>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                          "w-full pl-3 text-left font-normal",
+                                          !field.value && "text-muted-foreground"
+                                        )}
+                                        data-testid="button-start-date"
+                                      >
+                                        {field.value ? (
+                                          format(field.value, "PPP")
+                                        ) : (
+                                          <span>Pick a date</span>
+                                        )}
+                                        <Calendar className="ml-auto h-4 w-4 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <CalendarComponent
+                                      mode="single"
+                                      selected={field.value}
+                                      onSelect={field.onChange}
+                                      disabled={(date) =>
+                                        date < new Date("1900-01-01")
+                                      }
+                                      initialFocus
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={createForm.control}
+                            name="comments"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Comments</FormLabel>
+                                <FormControl>
+                                  <Textarea 
+                                    {...field} 
+                                    value={field.value || ""}
+                                    placeholder="Add any additional notes..."
+                                    className="min-h-20"
+                                    data-testid="textarea-comments"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <DialogFooter className="mt-6">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsCreateDialogOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={createCampaignMutation.isPending}
+                            data-testid="button-save-campaign"
+                          >
+                            {createCampaignMutation.isPending ? "Creating..." : "Create Campaign"}
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Campaigns Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">
+                Campaigns ({filteredCampaigns.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Campaign Name</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>Comments</TableHead>
+                      <TableHead>Ad Account</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Objective</TableHead>
+                      <TableHead>Budget</TableHead>
+                      <TableHead>Available Balance</TableHead>
+                      <TableHead>Total Spend</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {campaignsLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={11} className="text-center py-8">
+                          <div className="flex items-center justify-center gap-2">
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Loading campaigns...
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredCampaigns.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={11} className="text-center py-8 text-gray-500">
+                          {searchQuery ? "No campaigns match your search." : "No campaigns found."}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredCampaigns.map((campaign) => {
+                        const availableBalance = calculateAvailableBalance(campaign.clientId);
+                        const clientName = getClientName(campaign.clientId);
+                        
+                        return (
+                          <TableRow 
+                            key={campaign.id} 
+                            className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                            data-testid={`campaign-row-${campaign.id}`}
+                          >
+                            <TableCell className="font-medium">
+                              {campaign.name}
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(campaign.startDate), "MMM dd, yyyy")}
+                            </TableCell>
+                            <TableCell>
+                              <div className="max-w-32 truncate" title={campaign.comments || ""}>
+                                {campaign.comments || "—"}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Button 
+                                variant="link" 
+                                className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800"
+                                onClick={() => {
+                                  // TODO: Navigate to Ad Account Details page
+                                  toast({
+                                    title: "Ad Account Details",
+                                    description: `Opening details for ${campaign.adAccount}`,
+                                  });
+                                }}
+                                data-testid={`link-ad-account-${campaign.id}`}
+                              >
+                                {campaign.adAccount}
+                                <ExternalLink className="h-3 w-3 ml-1" />
+                              </Button>
+                            </TableCell>
+                            <TableCell data-testid={`client-name-${campaign.id}`}>
+                              {clientName}
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                className={statusColors[campaign.status as keyof typeof statusColors]}
+                                data-testid={`status-badge-${campaign.id}`}
+                              >
+                                {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{campaign.objective}</TableCell>
+                            <TableCell data-testid={`budget-${campaign.id}`}>
+                              {formatCurrency(campaign.budget || "0")}
+                            </TableCell>
+                            <TableCell 
+                              className={cn(
+                                "font-medium",
+                                availableBalance < 0 
+                                  ? "text-red-600 dark:text-red-400" 
+                                  : "text-green-600 dark:text-green-400"
+                              )}
+                              data-testid={`available-balance-${campaign.id}`}
+                            >
+                              {formatCurrency(availableBalance)}
+                            </TableCell>
+                            <TableCell data-testid={`total-spend-${campaign.id}`}>
+                              {formatCurrency(campaign.spend || "0")}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEdit(campaign)}
+                                  data-testid={`button-edit-${campaign.id}`}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                      data-testid={`button-delete-${campaign.id}`}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Campaign</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete "{campaign.name}"? 
+                                        This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteCampaignMutation.mutate(campaign.id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                        data-testid={`confirm-delete-${campaign.id}`}
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Edit Campaign Dialog */}
+          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Edit Campaign</DialogTitle>
+                <DialogDescription>
+                  Update the campaign information below.
+                </DialogDescription>
+              </DialogHeader>
+              {editingCampaign && (
+                <Form {...editForm}>
+                  <form onSubmit={editForm.handleSubmit((data) => 
+                    updateCampaignMutation.mutate({ id: editingCampaign.id, data })
+                  )}>
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={editForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Campaign Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={editForm.control}
+                          name="adAccount"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Ad Account</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={editForm.control}
+                          name="clientId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Client</FormLabel>
+                              <Select
+                                onValueChange={(value) => handleClientChange(value, editForm)}
+                                defaultValue={field.value || ""}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a client" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {clients.map((client) => (
+                                    <SelectItem key={client.id} value={client.id}>
+                                      {client.name} (Balance: {formatCurrency(client.initialBalance || "0")})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={editForm.control}
+                          name="status"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Status</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select status" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="active">Active</SelectItem>
+                                  <SelectItem value="paused">Paused</SelectItem>
+                                  <SelectItem value="completed">Completed</SelectItem>
+                                  <SelectItem value="draft">Draft</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={editForm.control}
+                          name="objective"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Objective</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={editForm.control}
+                          name="budget"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Budget</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  type="number" 
+                                  step="0.01" 
+                                  min="0"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={editForm.control}
+                        name="startDate"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Start Date</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                      "w-full pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                  >
+                                    {field.value ? (
+                                      format(field.value, "PPP")
+                                    ) : (
+                                      <span>Pick a date</span>
+                                    )}
+                                    <Calendar className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <CalendarComponent
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  disabled={(date) =>
+                                    date < new Date("1900-01-01")
+                                  }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={editForm.control}
+                        name="comments"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Comments</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                {...field} 
+                                value={field.value || ""}
+                                placeholder="Add any additional notes..."
+                                className="min-h-20"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <DialogFooter className="mt-6">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsEditDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={updateCampaignMutation.isPending}
+                      >
+                        {updateCampaignMutation.isPending ? "Updating..." : "Update Campaign"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              )}
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+    </Sidebar>
+  );
+}
