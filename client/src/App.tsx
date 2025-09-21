@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import Login from "@/pages/login";
 import Home from "@/pages/home";
 import CampaignsPage from "@/pages/campaigns";
+import CampaignDetailsPage from "@/pages/campaign-details";
 import ClientsPage from "@/pages/clients";
 import AdAccountsPage from "@/pages/ad-accounts";
 import AdminPage from "@/pages/admin";
@@ -68,6 +69,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/campaigns/:id" component={() => <AuthenticatedRoute component={CampaignDetailsPage} />} />
       <Route path="/campaigns" component={() => <AuthenticatedRoute component={CampaignsPage} />} />
       <Route path="/clients" component={() => <AuthenticatedRoute component={ClientsPage} />} />
       <Route path="/ad-accounts" component={() => <AuthenticatedRoute component={AdAccountsPage} />} />

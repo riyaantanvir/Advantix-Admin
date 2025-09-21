@@ -636,7 +636,14 @@ export default function CampaignsPage() {
                             data-testid={`campaign-row-${campaign.id}`}
                           >
                             <TableCell className="font-medium">
-                              {campaign.name}
+                              <Button
+                                variant="link"
+                                className="p-0 h-auto font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400"
+                                onClick={() => setLocation(`/campaigns/${campaign.id}`)}
+                                data-testid={`link-campaign-${campaign.id}`}
+                              >
+                                {campaign.name}
+                              </Button>
                             </TableCell>
                             <TableCell>
                               {format(new Date(campaign.startDate), "MMM dd, yyyy")}
