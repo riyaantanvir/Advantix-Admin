@@ -85,6 +85,7 @@ type WorkReportFormData = z.infer<typeof workReportFormSchema>;
 
 export default function WorkReportsPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string>("all"); // For admin user filtering
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingWorkReport, setEditingWorkReport] = useState<WorkReport | null>(null);
@@ -231,11 +232,15 @@ export default function WorkReportsPage() {
     deleteMutation.mutate(id);
   };
 
-  // Filter work reports based on search term
-  const filteredWorkReports = workReports.filter((report) =>
-    report.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (report.description || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter work reports based on search term and selected user (for admins)
+  const filteredWorkReports = workReports.filter((report) => {
+    const matchesSearch = report.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (report.description || "").toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesUser = !isAdmin || !selectedUserId || selectedUserId === "all" || report.userId === selectedUserId;
+    
+    return matchesSearch && matchesUser;
+  });
 
   // Reset create form when dialog opens
   const handleCreateDialogOpen = () => {
@@ -315,16 +320,38 @@ export default function WorkReportsPage() {
 
           {/* Search and Actions */}
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search work reports..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search"
-              />
+            <div className="flex flex-col sm:flex-row gap-4 flex-1">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search work reports..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search"
+                />
+              </div>
+              
+              {/* User Filter for Admins */}
+              {isAdmin && (
+                <div className="min-w-[200px]">
+                  <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                    <SelectTrigger data-testid="select-user-filter">
+                      <SelectValue placeholder="Filter by user..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" data-testid="option-all-users">All Users</SelectItem>
+                      {users.map((user) => (
+                        <SelectItem key={user.id} value={user.id} data-testid={`option-user-${user.id}`}>
+                          {user.name || user.username}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
+            
             <div className="flex gap-2">
               <Button 
                 variant="outline" 
