@@ -312,36 +312,6 @@ export default function WorkReportsPage() {
             </Button>
           </div>
 
-          {/* Create Work Report Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Create Work Report
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center p-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-                <div className="text-center">
-                  <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    Submit Your Work Report
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    Click the button below to create a new work report with your hours and tasks.
-                  </p>
-                  <Button 
-                    onClick={handleCreateDialogOpen}
-                    variant="outline"
-                    data-testid="button-create-inline"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Work Report
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Search and Actions */}
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
