@@ -495,17 +495,37 @@ export class DatabaseStorage implements IStorage {
 
   // Page methods
   async getPages(): Promise<Page[]> {
-    return db.select().from(pages).orderBy(desc(pages.createdAt));
+    const result = await db.select().from(pages).orderBy(desc(pages.createdAt));
+    // Map database columns to expected frontend format
+    return result.map(page => ({
+      ...page,
+      pageKey: page.pageKey || (page as any).page_key,
+      displayName: page.displayName || (page as any).display_name,
+    }));
   }
 
   async getPage(id: string): Promise<Page | undefined> {
     const result = await db.select().from(pages).where(eq(pages.id, id)).limit(1);
-    return result[0];
+    const page = result[0];
+    if (!page) return undefined;
+    // Map database columns to expected frontend format
+    return {
+      ...page,
+      pageKey: page.pageKey || (page as any).page_key,
+      displayName: page.displayName || (page as any).display_name,
+    };
   }
 
   async getPageByKey(pageKey: string): Promise<Page | undefined> {
     const result = await db.select().from(pages).where(eq(pages.pageKey, pageKey)).limit(1);
-    return result[0];
+    const page = result[0];
+    if (!page) return undefined;
+    // Map database columns to expected frontend format
+    return {
+      ...page,
+      pageKey: page.pageKey || (page as any).page_key,
+      displayName: page.displayName || (page as any).display_name,
+    };
   }
 
   async createPage(insertPage: InsertPage): Promise<Page> {
