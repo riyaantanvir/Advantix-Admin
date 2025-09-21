@@ -62,6 +62,7 @@ export class MemStorage implements IStorage {
     this.sessions = new Map();
     this.campaigns = new Map();
     this.clients = new Map();
+    this.adAccounts = new Map();
     
     // Create default admin user
     const adminId = randomUUID();

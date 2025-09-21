@@ -90,6 +90,8 @@ export default function AdAccountsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingAdAccount, setEditingAdAccount] = useState<AdAccount | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [viewingAdAccount, setViewingAdAccount] = useState<AdAccount | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [platformFilter, setPlatformFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -331,6 +333,11 @@ export default function AdAccountsPage() {
     return platformData ? platformData.label : platform;
   };
 
+  const getPlatformLabel = (platform: string) => {
+    const platformData = PLATFORMS.find(p => p.value === platform);
+    return platformData ? platformData.label : platform;
+  };
+
   const calculateAvailableBalance = (adAccount: AdAccount) => {
     const spendLimit = parseFloat(adAccount.spendLimit || "0");
     const totalSpend = parseFloat(adAccount.totalSpend || "0");
@@ -404,6 +411,103 @@ export default function AdAccountsPage() {
     });
   };
 
+  const handleExportPDF = () => {
+    if (filteredAdAccounts.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No ad accounts to export",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create a simple HTML table for PDF generation
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Ad Accounts Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          .status-active { color: #16a34a; }
+          .status-suspended { color: #dc2626; }
+        </style>
+      </head>
+      <body>
+        <h1>Ad Accounts Report</h1>
+        <p>Generated on: ${new Date().toLocaleDateString()}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Account ID</th>
+              <th>Platform</th>
+              <th>Account Name</th>
+              <th>External Account ID</th>
+              <th>Linked Client</th>
+              <th>Status</th>
+              <th>Spend Limit</th>
+              <th>Total Spend</th>
+              <th>Available Balance</th>
+              <th>Created Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredAdAccounts.map(adAccount => {
+              const client = clients.find(c => c.id === adAccount.clientId);
+              const clientName = client ? client.clientName : "Unknown Client";
+              const platformLabel = PLATFORMS.find(p => p.value === adAccount.platform)?.label || adAccount.platform;
+              const availableBalance = parseFloat(adAccount.spendLimit || "0") - parseFloat(adAccount.totalSpend || "0");
+              const formattedSpendLimit = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(parseFloat(adAccount.spendLimit || "0"));
+              const formattedTotalSpend = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(parseFloat(adAccount.totalSpend || "0"));
+              const formattedAvailableBalance = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(availableBalance);
+              
+              return `
+              <tr>
+                <td>${adAccount.id}</td>
+                <td>${platformLabel}</td>
+                <td>${adAccount.accountName}</td>
+                <td>${adAccount.accountId}</td>
+                <td>${clientName}</td>
+                <td class="status-${adAccount.status}">${adAccount.status === 'active' ? 'Active' : 'Suspended'}</td>
+                <td>${formattedSpendLimit}</td>
+                <td>${formattedTotalSpend}</td>
+                <td>${formattedAvailableBalance}</td>
+                <td>${adAccount.createdAt ? new Date(adAccount.createdAt).toLocaleDateString() : "N/A"}</td>
+              </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    // Create a new window and print
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+        printWindow.close();
+      };
+    }
+
+    toast({
+      title: "Success",
+      description: "PDF export initiated - check your browser's print dialog",
+    });
+  };
+
+  const handleViewAdAccount = (adAccount: AdAccount) => {
+    setViewingAdAccount(adAccount);
+    setIsViewDialogOpen(true);
+  };
+
   return (
     <Sidebar>
       <div className="flex-1 flex flex-col">
@@ -439,6 +543,16 @@ export default function AdAccountsPage() {
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Export CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportPDF}
+                    disabled={filteredAdAccounts.length === 0}
+                    data-testid="button-export-pdf"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export PDF
                   </Button>
                   <Button
                     variant="outline"
@@ -677,6 +791,22 @@ export default function AdAccountsPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
+                                  onClick={() => handleViewAdAccount(adAccount)}
+                                  data-testid={`button-view-ad-account-${adAccount.id}`}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditAdAccount(adAccount)}
+                                  data-testid={`button-edit-ad-account-${adAccount.id}`}
+                                >
+                                  <Edit3 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
                                   onClick={() => handleToggleStatus(adAccount)}
                                   disabled={toggleAdAccountStatusMutation.isPending}
                                   data-testid={`button-toggle-status-${adAccount.id}`}
@@ -686,14 +816,6 @@ export default function AdAccountsPage() {
                                   ) : (
                                     <Play className="h-4 w-4" />
                                   )}
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEditAdAccount(adAccount)}
-                                  data-testid={`button-edit-ad-account-${adAccount.id}`}
-                                >
-                                  <Edit3 className="h-4 w-4" />
                                 </Button>
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
@@ -835,6 +957,124 @@ export default function AdAccountsPage() {
                 >
                   {updateAdAccountMutation.isPending ? "Updating..." : "Update Ad Account"}
                 </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* View Ad Account Dialog */}
+          <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Ad Account Details</DialogTitle>
+                <DialogDescription>
+                  View detailed information about this advertising account
+                </DialogDescription>
+              </DialogHeader>
+              {viewingAdAccount && (
+                <div className="grid gap-6 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Account ID</Label>
+                      <p className="font-mono text-sm">{viewingAdAccount.id}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Platform</Label>
+                      <Badge variant="outline" className="w-fit">
+                        {getPlatformIcon(viewingAdAccount.platform)}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Account Name</Label>
+                      <p className="font-medium">{viewingAdAccount.accountName}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">External Account ID</Label>
+                      <p className="font-mono text-sm">{viewingAdAccount.accountId}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Linked Client</Label>
+                      <p className="font-medium">{getClientName(viewingAdAccount.clientId)}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Status</Label>
+                      <Badge 
+                        variant={viewingAdAccount.status === 'active' ? "default" : "secondary"}
+                        className={viewingAdAccount.status === 'active' ? 
+                          "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : 
+                          "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+                        }
+                      >
+                        {viewingAdAccount.status === 'active' ? 'Active' : 'Suspended'}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Spend Limit</Label>
+                      <p className="text-lg font-semibold">{formatCurrency(viewingAdAccount.spendLimit)}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Total Spend</Label>
+                      <p className="text-lg font-semibold">{formatCurrency(viewingAdAccount.totalSpend || "0")}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Available Balance</Label>
+                      <p className={`text-lg font-semibold ${
+                        calculateAvailableBalance(viewingAdAccount) < 0 ? 'text-red-600' : 'text-green-600'
+                      }`}>
+                        {formatCurrency(calculateAvailableBalance(viewingAdAccount))}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {viewingAdAccount.notes && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Notes</Label>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 p-3 rounded">
+                        {viewingAdAccount.notes}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Created Date</Label>
+                      <p className="text-sm">
+                        {viewingAdAccount.createdAt ? new Date(viewingAdAccount.createdAt).toLocaleDateString() : "N/A"}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Last Updated</Label>
+                      <p className="text-sm">
+                        {viewingAdAccount.updatedAt ? new Date(viewingAdAccount.updatedAt).toLocaleDateString() : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+                  Close
+                </Button>
+                {viewingAdAccount && (
+                  <Button 
+                    onClick={() => {
+                      setIsViewDialogOpen(false);
+                      handleEditAdAccount(viewingAdAccount);
+                    }}
+                    data-testid="button-edit-from-view"
+                  >
+                    <Edit3 className="h-4 w-4 mr-2" />
+                    Edit Account
+                  </Button>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>

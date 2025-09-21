@@ -13,7 +13,8 @@ import {
   Settings,
   LogOut,
   User,
-  ChevronDown
+  ChevronDown,
+  Wallet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -109,6 +110,12 @@ export default function Sidebar({ children }: SidebarProps) {
       icon: Users, 
       label: "Client Management",
       testId: "nav-clients"
+    },
+    { 
+      href: "/ad-accounts", 
+      icon: Wallet, 
+      label: "Ad Accounts",
+      testId: "nav-ad-accounts"
     },
     { 
       href: "/salaries", 
