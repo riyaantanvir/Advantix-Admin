@@ -62,7 +62,7 @@ import {
   Clock,
   FileText
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -86,6 +86,9 @@ type WorkReportFormData = z.infer<typeof workReportFormSchema>;
 export default function WorkReportsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string>("all"); // For admin user filtering
+  const [timePeriod, setTimePeriod] = useState<string>("all"); // Time period filter
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingWorkReport, setEditingWorkReport] = useState<WorkReport | null>(null);
@@ -232,15 +235,57 @@ export default function WorkReportsPage() {
     deleteMutation.mutate(id);
   };
 
-  // Filter work reports based on search term and selected user (for admins)
+  // Get date range based on time period filter
+  const getDateRange = () => {
+    const now = new Date();
+    switch (timePeriod) {
+      case "this-month":
+        return {
+          start: startOfMonth(now),
+          end: endOfMonth(now),
+        };
+      case "last-month": {
+        const lastMonth = subMonths(now, 1);
+        return {
+          start: startOfMonth(lastMonth),
+          end: endOfMonth(lastMonth),
+        };
+      }
+      case "custom":
+        return {
+          start: customStartDate,
+          end: customEndDate,
+        };
+      default:
+        return { start: undefined, end: undefined };
+    }
+  };
+
+  // Filter work reports based on search term, selected user, and time period
   const filteredWorkReports = workReports.filter((report) => {
     const matchesSearch = report.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (report.description || "").toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesUser = !isAdmin || !selectedUserId || selectedUserId === "all" || report.userId === selectedUserId;
     
-    return matchesSearch && matchesUser;
+    // Time period filtering (only for admins)
+    let matchesTimePeriod = true;
+    if (isAdmin && timePeriod !== "all") {
+      const { start, end } = getDateRange();
+      if (start && end) {
+        const reportDate = new Date(report.date);
+        matchesTimePeriod = reportDate >= start && reportDate <= end;
+      } else if (timePeriod === "custom" && (!customStartDate || !customEndDate)) {
+        matchesTimePeriod = true; // Show all if custom dates not selected yet
+      }
+    }
+    
+    return matchesSearch && matchesUser && matchesTimePeriod;
   });
+
+  // Calculate total hours
+  const totalHours = filteredWorkReports.reduce((sum, report) => sum + parseFloat(report.hoursWorked.toString()), 0);
+  const totalHoursAllReports = workReports.reduce((sum, report) => sum + parseFloat(report.hoursWorked.toString()), 0);
 
   // Reset create form when dialog opens
   const handleCreateDialogOpen = () => {
@@ -348,6 +393,76 @@ export default function WorkReportsPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+
+              {/* Time Period Filter for Admins */}
+              {isAdmin && (
+                <div className="min-w-[200px]">
+                  <Select value={timePeriod} onValueChange={setTimePeriod}>
+                    <SelectTrigger data-testid="select-time-period">
+                      <SelectValue placeholder="Filter by time..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" data-testid="option-all-time">All Time</SelectItem>
+                      <SelectItem value="this-month" data-testid="option-this-month">This Month</SelectItem>
+                      <SelectItem value="last-month" data-testid="option-last-month">Last Month</SelectItem>
+                      <SelectItem value="custom" data-testid="option-custom">Custom Range</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Custom Date Range for Admins */}
+              {isAdmin && timePeriod === "custom" && (
+                <div className="flex gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[200px] justify-start text-left font-normal",
+                          !customStartDate && "text-muted-foreground"
+                        )}
+                        data-testid="button-start-date"
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {customStartDate ? format(customStartDate, "PPP") : "Start date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <CalendarComponent
+                        mode="single"
+                        selected={customStartDate}
+                        onSelect={setCustomStartDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[200px] justify-start text-left font-normal",
+                          !customEndDate && "text-muted-foreground"
+                        )}
+                        data-testid="button-end-date"
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {customEndDate ? format(customEndDate, "PPP") : "End date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <CalendarComponent
+                        mode="single"
+                        selected={customEndDate}
+                        onSelect={setCustomEndDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
             </div>
@@ -478,6 +593,32 @@ export default function WorkReportsPage() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              )}
+
+              {/* Total Hours Display */}
+              {filteredWorkReports.length > 0 && (
+                <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border-t">
+                  <div className="flex justify-between items-center text-sm">
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Filtered Hours: 
+                      </span>
+                      <span className="font-semibold text-gray-900 dark:text-white ml-2" data-testid="text-filtered-hours">
+                        {totalHours.toFixed(1)} hours
+                      </span>
+                    </div>
+                    {(timePeriod !== "all" || selectedUserId !== "all") && (
+                      <div>
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Total Hours (All): 
+                        </span>
+                        <span className="font-semibold text-gray-900 dark:text-white ml-2" data-testid="text-total-hours">
+                          {totalHoursAllReports.toFixed(1)} hours
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>
