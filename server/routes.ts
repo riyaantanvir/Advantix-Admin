@@ -82,6 +82,33 @@ async function requireAdminOrSuperAdmin(req: Request, res: Response, next: Funct
   next();
 }
 
+// Middleware factory to check page permissions
+function requirePagePermission(pageKey: string, action: 'view' | 'edit' | 'delete' = 'view') {
+  return async (req: Request, res: Response, next: Function) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    // Super Admin always has access
+    if (req.user.role === UserRole.SUPER_ADMIN) {
+      return next();
+    }
+
+    try {
+      const hasPermission = await storage.checkUserPagePermission(req.user.id, pageKey, action);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          message: `Access denied. You don't have ${action} permission for this page.`
+        });
+      }
+      next();
+    } catch (error) {
+      console.error("Permission check error:", error);
+      return res.status(500).json({ message: "Permission check failed" });
+    }
+  };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Login route
   app.post("/api/auth/login", async (req: Request, res: Response) => {
@@ -137,7 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Campaign Routes
   // Get all campaigns
-  app.get("/api/campaigns", authenticate, async (req: Request, res: Response) => {
+  app.get("/api/campaigns", authenticate, requirePagePermission('campaigns', 'view'), async (req: Request, res: Response) => {
     try {
       const campaigns = await storage.getCampaigns();
       res.json(campaigns);
@@ -148,7 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single campaign
-  app.get("/api/campaigns/:id", authenticate, async (req: Request, res: Response) => {
+  app.get("/api/campaigns/:id", authenticate, requirePagePermission('campaigns', 'view'), async (req: Request, res: Response) => {
     try {
       const campaign = await storage.getCampaign(req.params.id);
       if (!campaign) {
@@ -162,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new campaign
-  app.post("/api/campaigns", authenticate, async (req: Request, res: Response) => {
+  app.post("/api/campaigns", authenticate, requirePagePermission('campaigns', 'edit'), async (req: Request, res: Response) => {
     try {
       const validatedData = insertCampaignSchema.parse(req.body);
       
@@ -186,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update campaign
-  app.put("/api/campaigns/:id", authenticate, async (req: Request, res: Response) => {
+  app.put("/api/campaigns/:id", authenticate, requirePagePermission('campaigns', 'edit'), async (req: Request, res: Response) => {
     try {
       const validatedData = insertCampaignSchema.partial().parse(req.body);
       
@@ -213,7 +240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add campaign comment
-  app.post("/api/campaigns/:id/comments", authenticate, async (req: Request, res: Response) => {
+  app.post("/api/campaigns/:id/comments", authenticate, requirePagePermission('campaigns', 'edit'), async (req: Request, res: Response) => {
     try {
       const { comment } = req.body;
       if (!comment || !comment.trim()) {
@@ -249,7 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete campaign
-  app.delete("/api/campaigns/:id", authenticate, async (req: Request, res: Response) => {
+  app.delete("/api/campaigns/:id", authenticate, requirePagePermission('campaigns', 'delete'), async (req: Request, res: Response) => {
     try {
       const deleted = await storage.deleteCampaign(req.params.id);
       if (!deleted) {
@@ -264,7 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Client Routes
   // Get all clients
-  app.get("/api/clients", authenticate, async (req: Request, res: Response) => {
+  app.get("/api/clients", authenticate, requirePagePermission('clients', 'view'), async (req: Request, res: Response) => {
     try {
       const clients = await storage.getClients();
       res.json(clients);
@@ -275,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single client
-  app.get("/api/clients/:id", authenticate, async (req: Request, res: Response) => {
+  app.get("/api/clients/:id", authenticate, requirePagePermission('clients', 'view'), async (req: Request, res: Response) => {
     try {
       const client = await storage.getClient(req.params.id);
       if (!client) {
@@ -289,7 +316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new client
-  app.post("/api/clients", authenticate, async (req: Request, res: Response) => {
+  app.post("/api/clients", authenticate, requirePagePermission('clients', 'edit'), async (req: Request, res: Response) => {
     try {
       const validatedData = insertClientSchema.parse(req.body);
       const client = await storage.createClient(validatedData);
@@ -304,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update client
-  app.put("/api/clients/:id", authenticate, async (req: Request, res: Response) => {
+  app.put("/api/clients/:id", authenticate, requirePagePermission('clients', 'edit'), async (req: Request, res: Response) => {
     try {
       const validatedData = insertClientSchema.partial().parse(req.body);
       const client = await storage.updateClient(req.params.id, validatedData);
@@ -322,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete client
-  app.delete("/api/clients/:id", authenticate, async (req: Request, res: Response) => {
+  app.delete("/api/clients/:id", authenticate, requirePagePermission('clients', 'delete'), async (req: Request, res: Response) => {
     try {
       const deleted = await storage.deleteClient(req.params.id);
       if (!deleted) {
@@ -396,7 +423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Ad Accounts Routes
   // Get all ad accounts
-  app.get("/api/ad-accounts", authenticate, async (req: Request, res: Response) => {
+  app.get("/api/ad-accounts", authenticate, requirePagePermission('ad_accounts', 'view'), async (req: Request, res: Response) => {
     try {
       const adAccounts = await storage.getAdAccounts();
       res.json(adAccounts);
@@ -407,7 +434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single ad account
-  app.get("/api/ad-accounts/:id", authenticate, async (req: Request, res: Response) => {
+  app.get("/api/ad-accounts/:id", authenticate, requirePagePermission('ad_accounts', 'view'), async (req: Request, res: Response) => {
     try {
       const adAccount = await storage.getAdAccount(req.params.id);
       if (!adAccount) {
@@ -421,7 +448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new ad account
-  app.post("/api/ad-accounts", authenticate, async (req: Request, res: Response) => {
+  app.post("/api/ad-accounts", authenticate, requirePagePermission('ad_accounts', 'edit'), async (req: Request, res: Response) => {
     try {
       const validatedData = insertAdAccountSchema.parse(req.body);
       
@@ -443,7 +470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update ad account
-  app.put("/api/ad-accounts/:id", authenticate, async (req: Request, res: Response) => {
+  app.put("/api/ad-accounts/:id", authenticate, requirePagePermission('ad_accounts', 'edit'), async (req: Request, res: Response) => {
     try {
       const validatedData = insertAdAccountSchema.partial().parse(req.body);
       
@@ -470,7 +497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete ad account
-  app.delete("/api/ad-accounts/:id", authenticate, async (req: Request, res: Response) => {
+  app.delete("/api/ad-accounts/:id", authenticate, requirePagePermission('ad_accounts', 'delete'), async (req: Request, res: Response) => {
     try {
       const deleted = await storage.deleteAdAccount(req.params.id);
       if (!deleted) {
@@ -486,7 +513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ====== AD COPY SETS ROUTES ======
   
   // Get ad copy sets for a campaign
-  app.get("/api/campaigns/:campaignId/ad-copy-sets", authenticate, async (req: Request, res: Response) => {
+  app.get("/api/campaigns/:campaignId/ad-copy-sets", authenticate, requirePagePermission('campaigns', 'view'), async (req: Request, res: Response) => {
     try {
       const { campaignId } = req.params;
       const adCopySets = await storage.getAdCopySets(campaignId);
@@ -497,7 +524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single ad copy set
-  app.get("/api/ad-copy-sets/:id", authenticate, async (req: Request, res: Response) => {
+  app.get("/api/ad-copy-sets/:id", authenticate, requirePagePermission('campaigns', 'view'), async (req: Request, res: Response) => {
     try {
       const adCopySet = await storage.getAdCopySet(req.params.id);
       if (!adCopySet) {
@@ -510,7 +537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new ad copy set
-  app.post("/api/campaigns/:campaignId/ad-copy-sets", authenticate, async (req: Request, res: Response) => {
+  app.post("/api/campaigns/:campaignId/ad-copy-sets", authenticate, requirePagePermission('campaigns', 'edit'), async (req: Request, res: Response) => {
     try {
       const { campaignId } = req.params;
       const validatedData = insertAdCopySetSchema.parse({
@@ -535,7 +562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update ad copy set
-  app.put("/api/ad-copy-sets/:id", authenticate, async (req: Request, res: Response) => {
+  app.put("/api/ad-copy-sets/:id", authenticate, requirePagePermission('campaigns', 'edit'), async (req: Request, res: Response) => {
     try {
       const validatedData = insertAdCopySetSchema.partial().parse(req.body);
       const adCopySet = await storage.updateAdCopySet(req.params.id, validatedData);
@@ -554,7 +581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Set active ad copy set
-  app.put("/api/campaigns/:campaignId/ad-copy-sets/:id/set-active", authenticate, async (req: Request, res: Response) => {
+  app.put("/api/campaigns/:campaignId/ad-copy-sets/:id/set-active", authenticate, requirePagePermission('campaigns', 'edit'), async (req: Request, res: Response) => {
     try {
       const { campaignId, id } = req.params;
       const success = await storage.setActiveAdCopySet(campaignId, id);
@@ -570,7 +597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete ad copy set
-  app.delete("/api/ad-copy-sets/:id", authenticate, async (req: Request, res: Response) => {
+  app.delete("/api/ad-copy-sets/:id", authenticate, requirePagePermission('campaigns', 'delete'), async (req: Request, res: Response) => {
     try {
       const deleted = await storage.deleteAdCopySet(req.params.id);
       if (!deleted) {
@@ -585,7 +612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Work Report Routes
   
   // Get work reports - users see only their own, admins see all
-  app.get("/api/work-reports", authenticate, async (req: Request, res: Response) => {
+  app.get("/api/work-reports", authenticate, requirePagePermission('work_reports', 'view'), async (req: Request, res: Response) => {
     try {
       let workReports: WorkReport[];
       
@@ -604,7 +631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single work report - check ownership or admin access
-  app.get("/api/work-reports/:id", authenticate, async (req: Request, res: Response) => {
+  app.get("/api/work-reports/:id", authenticate, requirePagePermission('work_reports', 'view'), async (req: Request, res: Response) => {
     try {
       const workReport = await storage.getWorkReport(req.params.id);
       if (!workReport) {
@@ -626,7 +653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new work report
-  app.post("/api/work-reports", authenticate, async (req: Request, res: Response) => {
+  app.post("/api/work-reports", authenticate, requirePagePermission('work_reports', 'edit'), async (req: Request, res: Response) => {
     try {
       let validatedData;
       
@@ -655,7 +682,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update work report - check ownership or admin access
-  app.put("/api/work-reports/:id", authenticate, async (req: Request, res: Response) => {
+  app.put("/api/work-reports/:id", authenticate, requirePagePermission('work_reports', 'edit'), async (req: Request, res: Response) => {
     try {
       const existingReport = await storage.getWorkReport(req.params.id);
       if (!existingReport) {
@@ -688,7 +715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete work report - check ownership or admin access
-  app.delete("/api/work-reports/:id", authenticate, async (req: Request, res: Response) => {
+  app.delete("/api/work-reports/:id", authenticate, requirePagePermission('work_reports', 'delete'), async (req: Request, res: Response) => {
     try {
       const existingReport = await storage.getWorkReport(req.params.id);
       if (!existingReport) {
