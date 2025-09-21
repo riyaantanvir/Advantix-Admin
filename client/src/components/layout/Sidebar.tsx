@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
   DropdownMenu,
@@ -97,46 +97,99 @@ export default function Sidebar({ children }: SidebarProps) {
       href: "/", 
       icon: LayoutDashboard, 
       label: "Dashboard",
-      testId: "nav-dashboard"
+      testId: "nav-dashboard",
+      pageKey: "dashboard"
     },
     { 
       href: "/campaigns", 
       icon: Megaphone, 
       label: "Campaign Management",
-      testId: "nav-campaigns"
+      testId: "nav-campaigns",
+      pageKey: "campaigns"
     },
     { 
       href: "/clients", 
       icon: Users, 
       label: "Client Management",
-      testId: "nav-clients"
+      testId: "nav-clients",
+      pageKey: "clients"
     },
     { 
       href: "/ad-accounts", 
       icon: Wallet, 
       label: "Ad Accounts",
-      testId: "nav-ad-accounts"
-    },
-    { 
-      href: "/salaries", 
-      icon: DollarSign, 
-      label: "Salary Management",
-      testId: "nav-salaries"
+      testId: "nav-ad-accounts",
+      pageKey: "ad_accounts"
     },
     { 
       href: "/work-reports", 
       icon: FileText, 
       label: "Work Reports",
-      testId: "nav-work-reports"
+      testId: "nav-work-reports",
+      pageKey: "work_reports"
     },
     { 
       href: "/admin", 
       icon: Settings, 
       label: "Admin Panel",
       testId: "nav-admin",
-      adminOnly: true
+      pageKey: "admin",
+      superAdminOnly: true
     },
   ];
+
+  // Check permissions for all menu items at top level (Rules of Hooks compliance)
+  const dashboardPermission = useQuery({
+    queryKey: [`/api/permissions/check/dashboard`],
+    enabled: !!user && user.role !== 'super_admin',
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const campaignsPermission = useQuery({
+    queryKey: [`/api/permissions/check/campaigns`],
+    enabled: !!user && user.role !== 'super_admin',
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const clientsPermission = useQuery({
+    queryKey: [`/api/permissions/check/clients`],
+    enabled: !!user && user.role !== 'super_admin',
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const adAccountsPermission = useQuery({
+    queryKey: [`/api/permissions/check/ad_accounts`],
+    enabled: !!user && user.role !== 'super_admin',
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const workReportsPermission = useQuery({
+    queryKey: [`/api/permissions/check/work_reports`],
+    enabled: !!user && user.role !== 'super_admin',
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Helper function to get permission for each page
+  const getPermissionForPage = (pageKey: string) => {
+    switch (pageKey) {
+      case 'dashboard': return dashboardPermission.data;
+      case 'campaigns': return campaignsPermission.data;
+      case 'clients': return clientsPermission.data;
+      case 'ad_accounts': return adAccountsPermission.data;
+      case 'work_reports': return workReportsPermission.data;
+      default: return false;
+    }
+  };
 
   const isActive = (href: string) => {
     if (href === "/") {
@@ -180,10 +233,22 @@ export default function Sidebar({ children }: SidebarProps) {
             const Icon = item.icon;
             const active = isActive(item.href);
             
-            // Hide Admin Panel for regular admins
-            if (item.adminOnly && user?.role !== "super_admin") {
+            // Hide pages for users without permission
+            if (item.superAdminOnly && user?.role !== "super_admin") {
               return null;
             }
+            
+            // Check individual permission for non-super-admin-only pages
+            const hasPermission = getPermissionForPage(item.pageKey);
+            
+            // Super Admin always has access
+            const canAccess = user?.role === 'super_admin' || hasPermission;
+            
+            // Hide page if user doesn't have permission
+            if (!item.superAdminOnly && user?.role !== 'super_admin' && !canAccess) {
+              return null;
+            }
+            // This avoids calling admin-only endpoints from the sidebar
 
             const menuButton = (
               <Link 

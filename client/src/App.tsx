@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Login from "@/pages/login";
 import Home from "@/pages/home";
 import CampaignsPage from "@/pages/campaigns";
@@ -66,17 +67,105 @@ function AuthenticatedRoute({ component: Component }: { component: React.Compone
   return <Component />;
 }
 
+// Protected route with permission checking
+function ProtectedRoute({ component: Component, pageKey }: { component: React.ComponentType, pageKey: string }) {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const checkAuth = () => {
+      const token = localStorage.getItem("authToken");
+      const userStr = localStorage.getItem("user");
+      setIsAuthenticated(!!token);
+      setUser(userStr ? JSON.parse(userStr) : null);
+    };
+
+    checkAuth();
+
+    // Listen for auth changes
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "authToken" || e.key === "user") {
+        checkAuth();
+      }
+    };
+
+    const handleAuthChange = () => {
+      checkAuth();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("auth-change", handleAuthChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("auth-change", handleAuthChange);
+    };
+  }, []);
+
+  // Check page permissions
+  const { data: hasPermission, isLoading: permissionLoading, isError } = useQuery({
+    queryKey: [`/api/permissions/check/${pageKey}`],
+    enabled: !!isAuthenticated && !!user,
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+  });
+
+  if (isAuthenticated === null || (isAuthenticated && permissionLoading)) {
+    // Loading state
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  // Super Admin has access to everything
+  if (user?.role === 'super_admin') {
+    return <Component />;
+  }
+
+  // Check if user has permission for this page
+  if (isError || !hasPermission) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-8">
+          <div className="text-red-500 text-6xl mb-4">🔒</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600 mb-4">
+            You don't have permission to access this page. Please contact your administrator if you believe this is an error.
+          </p>
+          <button 
+            onClick={() => window.history.back()} 
+            className="text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <Component />;
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      <Route path="/campaigns/:id" component={() => <AuthenticatedRoute component={CampaignDetailsPage} />} />
-      <Route path="/campaigns" component={() => <AuthenticatedRoute component={CampaignsPage} />} />
-      <Route path="/clients" component={() => <AuthenticatedRoute component={ClientsPage} />} />
-      <Route path="/ad-accounts" component={() => <AuthenticatedRoute component={AdAccountsPage} />} />
-      <Route path="/work-reports" component={() => <AuthenticatedRoute component={WorkReportsPage} />} />
-      <Route path="/admin" component={() => <AuthenticatedRoute component={AdminPage} />} />
-      <Route path="/" component={() => <AuthenticatedRoute component={Home} />} />
+      <Route path="/campaigns/:id" component={() => <ProtectedRoute component={CampaignDetailsPage} pageKey="campaigns" />} />
+      <Route path="/campaigns" component={() => <ProtectedRoute component={CampaignsPage} pageKey="campaigns" />} />
+      <Route path="/clients" component={() => <ProtectedRoute component={ClientsPage} pageKey="clients" />} />
+      <Route path="/ad-accounts" component={() => <ProtectedRoute component={AdAccountsPage} pageKey="ad_accounts" />} />
+      <Route path="/work-reports" component={() => <ProtectedRoute component={WorkReportsPage} pageKey="work_reports" />} />
+      <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} pageKey="admin" />} />
+      <Route path="/" component={() => <ProtectedRoute component={Home} pageKey="dashboard" />} />
       <Route component={NotFound} />
     </Switch>
   );
