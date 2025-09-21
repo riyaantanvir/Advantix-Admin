@@ -10,6 +10,7 @@ import CampaignsPage from "@/pages/campaigns";
 import CampaignDetailsPage from "@/pages/campaign-details";
 import ClientsPage from "@/pages/clients";
 import AdAccountsPage from "@/pages/ad-accounts";
+import WorkReportsPage from "@/pages/work-reports";
 import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 
@@ -73,6 +74,7 @@ function Router() {
       <Route path="/campaigns" component={() => <AuthenticatedRoute component={CampaignsPage} />} />
       <Route path="/clients" component={() => <AuthenticatedRoute component={ClientsPage} />} />
       <Route path="/ad-accounts" component={() => <AuthenticatedRoute component={AdAccountsPage} />} />
+      <Route path="/work-reports" component={() => <AuthenticatedRoute component={WorkReportsPage} />} />
       <Route path="/admin" component={() => <AuthenticatedRoute component={AdminPage} />} />
       <Route path="/" component={() => <AuthenticatedRoute component={Home} />} />
       <Route component={NotFound} />

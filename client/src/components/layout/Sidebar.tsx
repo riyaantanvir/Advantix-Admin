@@ -124,10 +124,10 @@ export default function Sidebar({ children }: SidebarProps) {
       testId: "nav-salaries"
     },
     { 
-      href: "/reports", 
+      href: "/work-reports", 
       icon: FileText, 
       label: "Work Reports",
-      testId: "nav-reports"
+      testId: "nav-work-reports"
     },
     { 
       href: "/admin", 

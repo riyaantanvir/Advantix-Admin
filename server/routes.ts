@@ -8,11 +8,13 @@ import {
   insertUserWithRoleSchema,
   insertAdAccountSchema,
   insertAdCopySetSchema,
+  insertWorkReportSchema,
   type Campaign,
   type Client,
   type User,
   type AdAccount,
   type AdCopySet,
+  type WorkReport,
   UserRole 
 } from "@shared/schema";
 import { z } from "zod";
@@ -65,6 +67,14 @@ async function authenticate(req: Request, res: Response, next: Function) {
 async function requireSuperAdmin(req: Request, res: Response, next: Function) {
   if (!req.user || req.user.role !== UserRole.SUPER_ADMIN) {
     return res.status(403).json({ message: "Super Admin access required" });
+  }
+  next();
+}
+
+// Middleware to check Admin or Super Admin role
+async function requireAdminOrSuperAdmin(req: Request, res: Response, next: Function) {
+  if (!req.user || (req.user.role !== UserRole.ADMIN && req.user.role !== UserRole.SUPER_ADMIN)) {
+    return res.status(403).json({ message: "Admin access required" });
   }
   next();
 }
@@ -566,6 +576,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Ad copy set deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete ad copy set" });
+    }
+  });
+
+  // Work Report Routes
+  
+  // Get work reports - users see only their own, admins see all
+  app.get("/api/work-reports", authenticate, async (req: Request, res: Response) => {
+    try {
+      let workReports: WorkReport[];
+      
+      if (req.user!.role === UserRole.ADMIN || req.user!.role === UserRole.SUPER_ADMIN) {
+        // Admin/Super Admin can see all work reports
+        workReports = await storage.getWorkReports();
+      } else {
+        // Regular users see only their own work reports
+        workReports = await storage.getWorkReports(req.user!.id);
+      }
+      
+      res.json(workReports);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch work reports" });
+    }
+  });
+
+  // Get single work report - check ownership or admin access
+  app.get("/api/work-reports/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const workReport = await storage.getWorkReport(req.params.id);
+      if (!workReport) {
+        return res.status(404).json({ message: "Work report not found" });
+      }
+      
+      // Check if user can access this work report
+      const isAdmin = req.user!.role === UserRole.ADMIN || req.user!.role === UserRole.SUPER_ADMIN;
+      const isOwner = workReport.userId === req.user!.id;
+      
+      if (!isAdmin && !isOwner) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(workReport);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch work report" });
+    }
+  });
+
+  // Create new work report
+  app.post("/api/work-reports", authenticate, async (req: Request, res: Response) => {
+    try {
+      let validatedData;
+      
+      if (req.user!.role === UserRole.ADMIN || req.user!.role === UserRole.SUPER_ADMIN) {
+        // Admin can create work reports for any user (if userId is provided)
+        validatedData = insertWorkReportSchema.parse({
+          ...req.body,
+          userId: req.body.userId || req.user!.id // Default to current user if not specified
+        });
+      } else {
+        // Regular users can only create work reports for themselves
+        validatedData = insertWorkReportSchema.parse({
+          ...req.body,
+          userId: req.user!.id // Force current user
+        });
+      }
+      
+      const workReport = await storage.createWorkReport(validatedData);
+      res.status(201).json(workReport);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create work report" });
+    }
+  });
+
+  // Update work report - check ownership or admin access
+  app.put("/api/work-reports/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const existingReport = await storage.getWorkReport(req.params.id);
+      if (!existingReport) {
+        return res.status(404).json({ message: "Work report not found" });
+      }
+      
+      // Check if user can update this work report
+      const isAdmin = req.user!.role === UserRole.ADMIN || req.user!.role === UserRole.SUPER_ADMIN;
+      const isOwner = existingReport.userId === req.user!.id;
+      
+      if (!isAdmin && !isOwner) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const validatedData = insertWorkReportSchema.partial().parse(req.body);
+      
+      // Prevent non-admin users from changing userId
+      if (!isAdmin && validatedData.userId && validatedData.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Cannot change work report owner" });
+      }
+      
+      const workReport = await storage.updateWorkReport(req.params.id, validatedData);
+      res.json(workReport);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update work report" });
+    }
+  });
+
+  // Delete work report - check ownership or admin access
+  app.delete("/api/work-reports/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const existingReport = await storage.getWorkReport(req.params.id);
+      if (!existingReport) {
+        return res.status(404).json({ message: "Work report not found" });
+      }
+      
+      // Check if user can delete this work report
+      const isAdmin = req.user!.role === UserRole.ADMIN || req.user!.role === UserRole.SUPER_ADMIN;
+      const isOwner = existingReport.userId === req.user!.id;
+      
+      if (!isAdmin && !isOwner) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const deleted = await storage.deleteWorkReport(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Work report not found" });
+      }
+      
+      res.json({ message: "Work report deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete work report" });
     }
   });
 
