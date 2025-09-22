@@ -41,7 +41,7 @@ export default function FinanceExpenses() {
     resolver: zodResolver(insertFinanceExpenseSchema),
     defaultValues: {
       type: "expense",
-      projectId: "",
+      projectId: "none",
       amount: "",
       currency: "BDT",
       date: new Date(),
@@ -122,10 +122,16 @@ export default function FinanceExpenses() {
   });
 
   const onSubmit = (data: InsertFinanceExpense) => {
+    // Convert "none" to null for the API
+    const submitData = {
+      ...data,
+      projectId: data.projectId === "none" ? null : data.projectId
+    };
+    
     if (editingExpense) {
-      updateExpenseMutation.mutate({ id: editingExpense.id, data });
+      updateExpenseMutation.mutate({ id: editingExpense.id, data: submitData });
     } else {
-      createExpenseMutation.mutate(data);
+      createExpenseMutation.mutate(submitData);
     }
   };
 
@@ -133,7 +139,7 @@ export default function FinanceExpenses() {
     setEditingExpense(expense);
     form.reset({
       type: expense.type,
-      projectId: expense.projectId || "",
+      projectId: expense.projectId || "none",
       amount: expense.amount,
       currency: expense.currency,
       date: new Date(expense.date),
@@ -148,7 +154,7 @@ export default function FinanceExpenses() {
   };
 
   const getProjectName = (projectId: string | null) => {
-    if (!projectId) return "General";
+    if (!projectId || projectId === "none") return "General";
     const project = projects?.find(p => p.id === projectId);
     return project?.name || "Unknown Project";
   };
@@ -257,7 +263,7 @@ export default function FinanceExpenses() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">General (No Project)</SelectItem>
+                            <SelectItem value="none">General (No Project)</SelectItem>
                             {projects?.map((project) => (
                               <SelectItem key={project.id} value={project.id}>
                                 {project.name}
