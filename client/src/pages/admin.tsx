@@ -436,7 +436,7 @@ function UserManagement() {
                                 <AlertDialogTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    size="sm"
+  
                                     className="text-red-600 hover:text-red-700"
                                     data-testid={`button-delete-user-${user.id}`}
                                   >
@@ -646,77 +646,82 @@ function AccessControl() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {/* Desktop/Tablet View */}
-          <div className="hidden md:block">
-            <div className="max-h-[70vh] overflow-y-auto overflow-x-auto border-t">
-              <Table>
-                <TableHeader className="sticky top-0 bg-white dark:bg-gray-900 z-10 shadow-sm">
+          {/* Desktop View - Full Table with Proper Scrolling */}
+          <div className="hidden lg:block">
+            <div className="h-[calc(100vh-24rem)] min-h-[400px] max-h-[600px] overflow-auto border-t relative">
+              <Table className="relative">
+                <TableHeader className="sticky top-0 bg-white dark:bg-gray-900 z-30 shadow-sm border-b">
                   <TableRow>
-                    <TableHead className="w-48 bg-white dark:bg-gray-900 sticky left-0 z-20 border-r">Page</TableHead>
+                    <TableHead className="w-56 bg-white dark:bg-gray-900 sticky left-0 z-40 border-r shadow-sm">
+                      <div className="font-semibold">Page</div>
+                    </TableHead>
                     {roles.map(role => (
-                      <TableHead key={role} className="text-center min-w-32 bg-white dark:bg-gray-900">
-                        <div className="flex flex-col items-center">
-                          <Shield className="w-4 h-4 mb-1" />
-                          {getRoleDisplayName(role)}
+                      <TableHead key={role} className="text-center min-w-[200px] bg-white dark:bg-gray-900 px-4">
+                        <div className="flex flex-col items-center gap-1">
+                          <Shield className="w-4 h-4" />
+                          <span className="font-medium">{getRoleDisplayName(role)}</span>
                         </div>
                       </TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pages.map(page => (
-                    <TableRow key={page.id}>
-                      <TableCell className="font-medium bg-white dark:bg-gray-900 sticky left-0 z-10 border-r">
-                        <div className="flex flex-col">
-                          <span className="font-semibold">{page.displayName}</span>
-                          <span className="text-sm text-gray-500">{page.path}</span>
+                  {pages.map((page, index) => (
+                    <TableRow key={page.id} className={index % 2 === 0 ? "bg-gray-50/50 dark:bg-gray-800/50" : ""}>
+                      <TableCell className="font-medium bg-white dark:bg-gray-900 sticky left-0 z-20 border-r shadow-sm">
+                        <div className="flex flex-col py-2 pr-4">
+                          <span className="font-semibold text-sm">{page.displayName}</span>
+                          <span className="text-xs text-gray-500">{page.path}</span>
                           {page.description && (
-                            <span className="text-xs text-gray-400 mt-1">{page.description}</span>
+                            <span className="text-xs text-gray-400 mt-1 line-clamp-2">{page.description}</span>
                           )}
                         </div>
                       </TableCell>
                       {roles.map(role => {
                         const permission = getPermissionForRoleAndPage(role, page.id);
                         if (!permission) return (
-                          <TableCell key={role} className="text-center text-gray-400">
-                            No permission found
+                          <TableCell key={role} className="text-center text-gray-400 px-4">
+                            <div className="py-4">No permission found</div>
                           </TableCell>
                         );
 
                         return (
-                          <TableCell key={role} className="text-center">
-                            <div className="space-y-2 py-2">
+                          <TableCell key={role} className="text-center px-4">
+                            <div className="grid grid-cols-3 gap-2 py-3">
                               {/* View Permission */}
-                              <div className="flex items-center justify-center space-x-2">
+                              <div className="flex flex-col items-center space-y-1">
                                 <Switch
                                   checked={permission.canView ?? false}
                                   onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'view', checked)}
                                   disabled={updatePermissionMutation.isPending}
                                   data-testid={`switch-view-${role}-${page.pageKey}`}
+
                                 />
-                                <span className="text-xs text-gray-600">View</span>
+                                <span className="text-xs text-gray-600 font-medium">View</span>
                               </div>
                               
                               {/* Edit Permission */}
-                              <div className="flex items-center justify-center space-x-2">
+                              <div className="flex flex-col items-center space-y-1">
                                 <Switch
                                   checked={permission.canEdit ?? false}
                                   onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'edit', checked)}
                                   disabled={updatePermissionMutation.isPending || !permission.canView}
                                   data-testid={`switch-edit-${role}-${page.pageKey}`}
+
                                 />
-                                <span className="text-xs text-gray-600">Edit</span>
+                                <span className="text-xs text-gray-600 font-medium">Edit</span>
                               </div>
                               
                               {/* Delete Permission */}
-                              <div className="flex items-center justify-center space-x-2">
+                              <div className="flex flex-col items-center space-y-1">
                                 <Switch
                                   checked={permission.canDelete ?? false}
                                   onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'delete', checked)}
                                   disabled={updatePermissionMutation.isPending || !permission.canView}
                                   data-testid={`switch-delete-${role}-${page.pageKey}`}
+
                                 />
-                                <span className="text-xs text-gray-600">Delete</span>
+                                <span className="text-xs text-gray-600 font-medium">Delete</span>
                               </div>
                             </div>
                           </TableCell>
@@ -729,11 +734,91 @@ function AccessControl() {
             </div>
           </div>
 
-          {/* Mobile View - Stack roles vertically */}
+          {/* Tablet View - Horizontally Scrollable */}
+          <div className="hidden md:block lg:hidden">
+            <div className="h-[calc(100vh-24rem)] min-h-[400px] max-h-[500px] overflow-auto border-t">
+              <div className="min-w-[800px]">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-white dark:bg-gray-900 z-10 shadow-sm">
+                    <TableRow>
+                      <TableHead className="w-48 bg-white dark:bg-gray-900 sticky left-0 z-20 border-r">Page</TableHead>
+                      {roles.map(role => (
+                        <TableHead key={role} className="text-center min-w-[150px] bg-white dark:bg-gray-900">
+                          <div className="flex flex-col items-center">
+                            <Shield className="w-4 h-4 mb-1" />
+                            {getRoleDisplayName(role)}
+                          </div>
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pages.map(page => (
+                      <TableRow key={page.id}>
+                        <TableCell className="font-medium bg-white dark:bg-gray-900 sticky left-0 z-10 border-r">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-sm">{page.displayName}</span>
+                            <span className="text-xs text-gray-500">{page.path}</span>
+                          </div>
+                        </TableCell>
+                        {roles.map(role => {
+                          const permission = getPermissionForRoleAndPage(role, page.id);
+                          if (!permission) return (
+                            <TableCell key={role} className="text-center text-gray-400">
+                              No permission found
+                            </TableCell>
+                          );
+
+                          return (
+                            <TableCell key={role} className="text-center">
+                              <div className="flex justify-center space-x-1 py-2">
+                                <div className="flex flex-col items-center space-y-1">
+                                  <Switch
+                                    checked={permission.canView ?? false}
+                                    onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'view', checked)}
+                                    disabled={updatePermissionMutation.isPending}
+                                    data-testid={`switch-view-${role}-${page.pageKey}`}
+  
+                                  />
+                                  <span className="text-xs">V</span>
+                                </div>
+                                <div className="flex flex-col items-center space-y-1">
+                                  <Switch
+                                    checked={permission.canEdit ?? false}
+                                    onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'edit', checked)}
+                                    disabled={updatePermissionMutation.isPending || !permission.canView}
+                                    data-testid={`switch-edit-${role}-${page.pageKey}`}
+  
+                                  />
+                                  <span className="text-xs">E</span>
+                                </div>
+                                <div className="flex flex-col items-center space-y-1">
+                                  <Switch
+                                    checked={permission.canDelete ?? false}
+                                    onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'delete', checked)}
+                                    disabled={updatePermissionMutation.isPending || !permission.canView}
+                                    data-testid={`switch-delete-${role}-${page.pageKey}`}
+  
+                                  />
+                                  <span className="text-xs">D</span>
+                                </div>
+                              </div>
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile View - Stacked Cards */}
           <div className="md:hidden">
-            <div className="max-h-[70vh] overflow-y-auto p-4 space-y-6">
+            <div className="h-[calc(100vh-20rem)] min-h-[400px] overflow-y-auto p-4 space-y-4">
               {pages.map(page => (
-                <div key={page.id} className="border rounded-lg p-4 space-y-4">
+                <div key={page.id} className="border rounded-lg p-4 space-y-4 bg-white dark:bg-gray-800">
                   <div className="border-b pb-3">
                     <h3 className="font-semibold text-lg">{page.displayName}</h3>
                     <p className="text-sm text-gray-500">{page.path}</p>
@@ -742,7 +827,7 @@ function AccessControl() {
                     )}
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     {roles.map(role => {
                       const permission = getPermissionForRoleAndPage(role, page.id);
                       if (!permission) return (
@@ -753,43 +838,43 @@ function AccessControl() {
                       );
 
                       return (
-                        <div key={role} className="border rounded p-3">
+                        <div key={role} className="border rounded p-3 bg-gray-50 dark:bg-gray-700">
                           <div className="font-medium text-center mb-3 flex items-center justify-center gap-1">
                             <Shield className="w-4 h-4" />
                             {getRoleDisplayName(role)}
                           </div>
-                          <div className="space-y-3">
+                          <div className="grid grid-cols-3 gap-3">
                             {/* View Permission */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-600">View</span>
+                            <div className="flex flex-col items-center space-y-2">
                               <Switch
                                 checked={permission.canView ?? false}
                                 onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'view', checked)}
                                 disabled={updatePermissionMutation.isPending}
                                 data-testid={`switch-view-${role}-${page.pageKey}`}
                               />
+                              <span className="text-sm text-gray-600 text-center">View</span>
                             </div>
                             
                             {/* Edit Permission */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-600">Edit</span>
+                            <div className="flex flex-col items-center space-y-2">
                               <Switch
                                 checked={permission.canEdit ?? false}
                                 onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'edit', checked)}
                                 disabled={updatePermissionMutation.isPending || !permission.canView}
                                 data-testid={`switch-edit-${role}-${page.pageKey}`}
                               />
+                              <span className="text-sm text-gray-600 text-center">Edit</span>
                             </div>
                             
                             {/* Delete Permission */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-600">Delete</span>
+                            <div className="flex flex-col items-center space-y-2">
                               <Switch
                                 checked={permission.canDelete ?? false}
                                 onCheckedChange={(checked) => handlePermissionToggle(permission.id, 'delete', checked)}
                                 disabled={updatePermissionMutation.isPending || !permission.canView}
                                 data-testid={`switch-delete-${role}-${page.pageKey}`}
                               />
+                              <span className="text-sm text-gray-600 text-center">Delete</span>
                             </div>
                           </div>
                         </div>
