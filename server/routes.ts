@@ -1147,14 +1147,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expenses = await storage.getFinanceExpenses();
       const exchangeRate = await storage.getExchangeRate();
       
-      // Calculate totals
+      // Calculate totals for payments
       const totalPaymentsUSD = payments.reduce((sum: number, payment: FinancePayment) => sum + parseFloat(payment.amount), 0);
       const totalPaymentsBDT = payments.reduce((sum: number, payment: FinancePayment) => sum + parseFloat(payment.convertedAmount), 0);
-      const totalExpensesBDT = expenses.filter((e: FinanceExpense) => e.type === 'expense').reduce((sum: number, expense: FinanceExpense) => sum + parseFloat(expense.amount), 0);
+      
+      // Calculate totals for expenses (both expense and salary types)
+      const totalExpensesBDT = expenses.reduce((sum: number, expense: FinanceExpense) => sum + parseFloat(expense.amount), 0);
+      const totalExpensesUSD = totalExpensesBDT / exchangeRate;
+      
+      // Calculate Available Balance
+      const availableBalanceUSD = totalPaymentsUSD - totalExpensesUSD;
+      const availableBalanceBDT = totalPaymentsBDT - totalExpensesBDT;
+      
+      // Legacy calculations for backwards compatibility
+      const expensesOnlyBDT = expenses.filter((e: FinanceExpense) => e.type === 'expense').reduce((sum: number, expense: FinanceExpense) => sum + parseFloat(expense.amount), 0);
       const totalSalariesBDT = expenses.filter((e: FinanceExpense) => e.type === 'salary').reduce((sum: number, expense: FinanceExpense) => sum + parseFloat(expense.amount), 0);
       const totalFundUSD = totalPaymentsUSD;
       const totalFundBDT = totalPaymentsBDT;
-      const netBalanceBDT = totalPaymentsBDT - totalExpensesBDT - totalSalariesBDT;
+      const netBalanceBDT = totalPaymentsBDT - expensesOnlyBDT - totalSalariesBDT;
       
       // Group payments by month for chart
       const paymentsByMonth = payments.reduce((acc: Record<string, number>, payment: FinancePayment) => {
@@ -1177,13 +1187,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         summary: {
+          totalPaymentsUSD,
+          totalPaymentsBDT,
+          totalExpensesUSD,
+          totalExpensesBDT,
+          availableBalanceUSD,
+          availableBalanceBDT,
+          exchangeRate,
+          // Legacy fields for backwards compatibility
           totalFundUSD,
           totalFundBDT,
-          totalPaymentsUSD,
-          totalExpensesBDT,
-          totalSalariesBDT,
+          totalSalariesBDT: totalSalariesBDT,
           netBalanceBDT,
-          exchangeRate,
         },
         charts: {
           paymentsByMonth,
