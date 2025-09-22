@@ -16,6 +16,14 @@ import {
   type InsertPage,
   type RolePermission,
   type InsertRolePermission,
+  type FinanceProject,
+  type InsertFinanceProject,
+  type FinancePayment,
+  type InsertFinancePayment,
+  type FinanceExpense,
+  type InsertFinanceExpense,
+  type FinanceSetting,
+  type InsertFinanceSetting,
   UserRole,
   users,
   sessions,
@@ -25,7 +33,11 @@ import {
   adCopySets,
   workReports,
   pages,
-  rolePermissions
+  rolePermissions,
+  financeProjects,
+  financePayments,
+  financeExpenses,
+  financeSettings
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, and, desc } from "drizzle-orm";
@@ -55,6 +67,16 @@ export class DatabaseStorage implements IStorage {
           password: "2604", // In production, this should be hashed
           role: UserRole.SUPER_ADMIN,
           isActive: true,
+        });
+      }
+
+      // Initialize default exchange rate if not exists
+      const existingExchangeRate = await this.getFinanceSetting("usd_to_bdt_rate");
+      if (!existingExchangeRate) {
+        await this.setFinanceSetting({
+          key: "usd_to_bdt_rate",
+          value: "110",
+          description: "USD to BDT exchange rate",
         });
       }
 
@@ -627,5 +649,152 @@ export class DatabaseStorage implements IStorage {
       default:
         return false;
     }
+  }
+
+  // Finance Project methods
+  async getFinanceProjects(): Promise<FinanceProject[]> {
+    return await db.select().from(financeProjects).orderBy(desc(financeProjects.createdAt));
+  }
+
+  async getFinanceProject(id: string): Promise<FinanceProject | undefined> {
+    const results = await db.select().from(financeProjects).where(eq(financeProjects.id, id));
+    return results[0];
+  }
+
+  async createFinanceProject(project: InsertFinanceProject): Promise<FinanceProject> {
+    const newProject = {
+      ...project,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(financeProjects).values(newProject);
+    return newProject as FinanceProject;
+  }
+
+  async updateFinanceProject(id: string, project: Partial<InsertFinanceProject>): Promise<FinanceProject | undefined> {
+    const updatedProject = { ...project, updatedAt: new Date() };
+    await db.update(financeProjects).set(updatedProject).where(eq(financeProjects.id, id));
+    return this.getFinanceProject(id);
+  }
+
+  async deleteFinanceProject(id: string): Promise<boolean> {
+    const result = await db.delete(financeProjects).where(eq(financeProjects.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Finance Payment methods
+  async getFinancePayments(projectId?: string): Promise<FinancePayment[]> {
+    if (projectId) {
+      return await db.select().from(financePayments)
+        .where(eq(financePayments.projectId, projectId))
+        .orderBy(desc(financePayments.createdAt));
+    }
+    return await db.select().from(financePayments).orderBy(desc(financePayments.createdAt));
+  }
+
+  async getFinancePayment(id: string): Promise<FinancePayment | undefined> {
+    const results = await db.select().from(financePayments).where(eq(financePayments.id, id));
+    return results[0];
+  }
+
+  async createFinancePayment(payment: InsertFinancePayment): Promise<FinancePayment> {
+    const newPayment = {
+      ...payment,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(financePayments).values(newPayment);
+    return newPayment as FinancePayment;
+  }
+
+  async updateFinancePayment(id: string, payment: Partial<InsertFinancePayment>): Promise<FinancePayment | undefined> {
+    const updatedPayment = { ...payment, updatedAt: new Date() };
+    await db.update(financePayments).set(updatedPayment).where(eq(financePayments.id, id));
+    return this.getFinancePayment(id);
+  }
+
+  async deleteFinancePayment(id: string): Promise<boolean> {
+    const result = await db.delete(financePayments).where(eq(financePayments.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Finance Expense methods
+  async getFinanceExpenses(projectId?: string): Promise<FinanceExpense[]> {
+    if (projectId) {
+      return await db.select().from(financeExpenses)
+        .where(eq(financeExpenses.projectId, projectId))
+        .orderBy(desc(financeExpenses.createdAt));
+    }
+    return await db.select().from(financeExpenses).orderBy(desc(financeExpenses.createdAt));
+  }
+
+  async getFinanceExpense(id: string): Promise<FinanceExpense | undefined> {
+    const results = await db.select().from(financeExpenses).where(eq(financeExpenses.id, id));
+    return results[0];
+  }
+
+  async createFinanceExpense(expense: InsertFinanceExpense): Promise<FinanceExpense> {
+    const newExpense = {
+      ...expense,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(financeExpenses).values(newExpense);
+    return newExpense as FinanceExpense;
+  }
+
+  async updateFinanceExpense(id: string, expense: Partial<InsertFinanceExpense>): Promise<FinanceExpense | undefined> {
+    const updatedExpense = { ...expense, updatedAt: new Date() };
+    await db.update(financeExpenses).set(updatedExpense).where(eq(financeExpenses.id, id));
+    return this.getFinanceExpense(id);
+  }
+
+  async deleteFinanceExpense(id: string): Promise<boolean> {
+    const result = await db.delete(financeExpenses).where(eq(financeExpenses.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Finance Setting methods
+  async getFinanceSetting(key: string): Promise<FinanceSetting | undefined> {
+    const results = await db.select().from(financeSettings).where(eq(financeSettings.key, key));
+    return results[0];
+  }
+
+  async setFinanceSetting(setting: InsertFinanceSetting): Promise<FinanceSetting> {
+    const existingSetting = await this.getFinanceSetting(setting.key);
+    
+    if (existingSetting) {
+      // Update existing setting
+      const updatedSetting = { ...setting, updatedAt: new Date() };
+      await db.update(financeSettings).set(updatedSetting).where(eq(financeSettings.key, setting.key));
+      return { ...existingSetting, ...updatedSetting };
+    } else {
+      // Create new setting
+      const newSetting = {
+        ...setting,
+        id: randomUUID(),
+        updatedAt: new Date(),
+      };
+      await db.insert(financeSettings).values(newSetting);
+      return newSetting as FinanceSetting;
+    }
+  }
+
+  async getExchangeRate(): Promise<number> {
+    const setting = await this.getFinanceSetting("usd_to_bdt_rate");
+    if (setting) {
+      return parseFloat(setting.value);
+    }
+    // Default exchange rate if not set
+    const defaultRate = {
+      key: "usd_to_bdt_rate",
+      value: "110",
+      description: "USD to BDT exchange rate",
+    };
+    await this.setFinanceSetting(defaultRate);
+    return 110;
   }
 }

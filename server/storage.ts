@@ -1067,5 +1067,5 @@ export class MemStorage implements IStorage {
 
 import { DatabaseStorage } from './database-storage';
 
-// Use MemStorage for finance module - DatabaseStorage doesn't have finance methods yet
-export const storage: IStorage = new MemStorage();
+// Use DatabaseStorage for permanent data storage - now includes all finance methods
+export const storage: IStorage = new DatabaseStorage();
