@@ -2,6 +2,13 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    // Handle 401 errors by clearing auth data and triggering auth refresh
+    if (res.status === 401) {
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("user");
+      // Trigger auth change event to update UI
+      window.dispatchEvent(new Event("auth-change"));
+    }
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
@@ -54,8 +61,16 @@ export const getQueryFn: <T>(options: {
       credentials: "include",
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    if (res.status === 401) {
+      // Handle 401 errors by clearing auth data and triggering auth refresh
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("user");
+      // Trigger auth change event to update UI
+      window.dispatchEvent(new Event("auth-change"));
+      
+      if (unauthorizedBehavior === "returnNull") {
+        return null;
+      }
     }
 
     await throwIfResNotOk(res);
