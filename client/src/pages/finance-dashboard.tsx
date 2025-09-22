@@ -11,13 +11,18 @@ import Sidebar from "@/components/layout/Sidebar";
 
 interface DashboardData {
   summary: {
+    totalPaymentsUSD: number;
+    totalPaymentsBDT: number;
+    totalExpensesUSD: number;
+    totalExpensesBDT: number;
+    availableBalanceUSD: number;
+    availableBalanceBDT: number;
+    exchangeRate: number;
+    // Legacy fields for backwards compatibility
     totalFundUSD: number;
     totalFundBDT: number;
-    totalPaymentsUSD: number;
-    totalExpensesBDT: number;
     totalSalariesBDT: number;
     netBalanceBDT: number;
-    exchangeRate: number;
   };
   charts: {
     paymentsByMonth: Record<string, number>;
@@ -53,49 +58,31 @@ export default function FinanceDashboard() {
 
     return [
       {
-        title: "Total Fund (USD)",
-        value: formatCurrency(summary.totalFundUSD, "USD"),
-        description: `≈ ${formatCurrency(summary.totalFundBDT, "BDT")}`,
-        icon: DollarSign,
-        trend: summary.totalFundUSD > 0 ? "up" : "neutral",
-        bgColor: "bg-green-50 dark:bg-green-900/10",
-        iconColor: "text-green-600 dark:text-green-400",
-      },
-      {
-        title: "Total Client Payments",
+        title: "Total Client Payments (USD)",
         value: formatCurrency(summary.totalPaymentsUSD, "USD"),
-        description: `${dashboardData.counts.totalPayments} payments`,
+        description: `≈ ${formatCurrency(summary.totalPaymentsBDT, "BDT")}`,
         icon: TrendingUp,
-        trend: "up",
+        trend: summary.totalPaymentsUSD > 0 ? "up" : "neutral",
         bgColor: "bg-blue-50 dark:bg-blue-900/10",
         iconColor: "text-blue-600 dark:text-blue-400",
       },
       {
         title: "Total Expenses (BDT)",
         value: formatCurrency(summary.totalExpensesBDT, "BDT"),
-        description: "Business expenses",
+        description: `≈ ${formatCurrency(summary.totalExpensesUSD, "USD")}`,
         icon: TrendingDown,
         trend: "down",
         bgColor: "bg-red-50 dark:bg-red-900/10",
         iconColor: "text-red-600 dark:text-red-400",
       },
       {
-        title: "Salary Expense (BDT)",
-        value: formatCurrency(summary.totalSalariesBDT, "BDT"),
-        description: "Employee salaries",
-        icon: Calculator,
-        trend: "down",
-        bgColor: "bg-orange-50 dark:bg-orange-900/10",
-        iconColor: "text-orange-600 dark:text-orange-400",
-      },
-      {
-        title: "Net Balance",
-        value: formatCurrency(summary.netBalanceBDT, "BDT"),
-        description: summary.netBalanceBDT >= 0 ? "Positive balance" : "Negative balance",
-        icon: Building2,
-        trend: summary.netBalanceBDT >= 0 ? "up" : "down",
-        bgColor: summary.netBalanceBDT >= 0 ? "bg-emerald-50 dark:bg-emerald-900/10" : "bg-red-50 dark:bg-red-900/10",
-        iconColor: summary.netBalanceBDT >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
+        title: "Available Balance (USD)",
+        value: formatCurrency(summary.availableBalanceUSD, "USD"),
+        description: `≈ ${formatCurrency(summary.availableBalanceBDT, "BDT")}`,
+        icon: DollarSign,
+        trend: summary.availableBalanceUSD >= 0 ? "up" : "down",
+        bgColor: summary.availableBalanceUSD >= 0 ? "bg-emerald-50 dark:bg-emerald-900/10" : "bg-red-50 dark:bg-red-900/10",
+        iconColor: summary.availableBalanceUSD >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
       },
     ];
   }, [dashboardData]);
@@ -105,8 +92,8 @@ export default function FinanceDashboard() {
       <div className="container mx-auto p-6">
         <div className="space-y-4">
           <div className="h-8 bg-gray-200 rounded animate-pulse" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {[...Array(5)].map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
               <div key={i} className="h-32 bg-gray-200 rounded animate-pulse" />
             ))}
           </div>
@@ -152,7 +139,7 @@ export default function FinanceDashboard() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {summaryCards.map((card, index) => {
           const Icon = card.icon;
           return (
@@ -175,6 +162,74 @@ export default function FinanceDashboard() {
           );
         })}
       </div>
+
+      {/* Available Balance Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calculator className="h-5 w-5" />
+            Available Balance
+          </CardTitle>
+          <CardDescription>
+            Total Client Payments - Total Expenses
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* USD Column */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-gray-700 dark:text-gray-300">USD Currency</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Total Client Payments</span>
+                    <span className="text-sm font-semibold text-green-600" data-testid="text-total-payments-usd">
+                      {formatCurrency(dashboardData?.summary.totalPaymentsUSD || 0, "USD")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Total Expenses</span>
+                    <span className="text-sm font-semibold text-red-600" data-testid="text-total-expenses-usd">
+                      -{formatCurrency(dashboardData?.summary.totalExpensesUSD || 0, "USD")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-3 bg-gray-50 dark:bg-gray-800 px-3 rounded-lg">
+                    <span className="font-semibold text-gray-900 dark:text-white">Available Balance</span>
+                    <span className={`font-bold text-lg ${(dashboardData?.summary.availableBalanceUSD || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`} data-testid="text-available-balance-usd">
+                      {formatCurrency(dashboardData?.summary.availableBalanceUSD || 0, "USD")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* BDT Column */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-gray-700 dark:text-gray-300">BDT Currency</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Total Client Payments</span>
+                    <span className="text-sm font-semibold text-green-600" data-testid="text-total-payments-bdt">
+                      {formatCurrency(dashboardData?.summary.totalPaymentsBDT || 0, "BDT")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Total Expenses</span>
+                    <span className="text-sm font-semibold text-red-600" data-testid="text-total-expenses-bdt">
+                      -{formatCurrency(dashboardData?.summary.totalExpensesBDT || 0, "BDT")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-3 bg-gray-50 dark:bg-gray-800 px-3 rounded-lg">
+                    <span className="font-semibold text-gray-900 dark:text-white">Available Balance</span>
+                    <span className={`font-bold text-lg ${(dashboardData?.summary.availableBalanceBDT || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`} data-testid="text-available-balance-bdt">
+                      {formatCurrency(dashboardData?.summary.availableBalanceBDT || 0, "BDT")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Exchange Rate */}
       <Card>
