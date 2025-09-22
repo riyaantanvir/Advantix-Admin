@@ -17,6 +17,14 @@ import {
   type InsertPage,
   type RolePermission,
   type InsertRolePermission,
+  type FinanceProject,
+  type InsertFinanceProject,
+  type FinancePayment,
+  type InsertFinancePayment,
+  type FinanceExpense,
+  type InsertFinanceExpense,
+  type FinanceSetting,
+  type InsertFinanceSetting,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -88,6 +96,32 @@ export interface IStorage {
   updateRolePermission(id: string, permission: Partial<InsertRolePermission>): Promise<RolePermission | undefined>;
   deleteRolePermission(id: string): Promise<boolean>;
   checkUserPagePermission(userId: string, pageKey: string, action: 'view' | 'edit' | 'delete'): Promise<boolean>;
+
+  // Finance Project methods
+  getFinanceProjects(): Promise<FinanceProject[]>;
+  getFinanceProject(id: string): Promise<FinanceProject | undefined>;
+  createFinanceProject(project: InsertFinanceProject): Promise<FinanceProject>;
+  updateFinanceProject(id: string, project: Partial<InsertFinanceProject>): Promise<FinanceProject | undefined>;
+  deleteFinanceProject(id: string): Promise<boolean>;
+
+  // Finance Payment methods
+  getFinancePayments(projectId?: string): Promise<FinancePayment[]>;
+  getFinancePayment(id: string): Promise<FinancePayment | undefined>;
+  createFinancePayment(payment: InsertFinancePayment): Promise<FinancePayment>;
+  updateFinancePayment(id: string, payment: Partial<InsertFinancePayment>): Promise<FinancePayment | undefined>;
+  deleteFinancePayment(id: string): Promise<boolean>;
+
+  // Finance Expense methods
+  getFinanceExpenses(projectId?: string): Promise<FinanceExpense[]>;
+  getFinanceExpense(id: string): Promise<FinanceExpense | undefined>;
+  createFinanceExpense(expense: InsertFinanceExpense): Promise<FinanceExpense>;
+  updateFinanceExpense(id: string, expense: Partial<InsertFinanceExpense>): Promise<FinanceExpense | undefined>;
+  deleteFinanceExpense(id: string): Promise<boolean>;
+
+  // Finance Settings methods
+  getFinanceSetting(key: string): Promise<FinanceSetting | undefined>;
+  setFinanceSetting(setting: InsertFinanceSetting): Promise<FinanceSetting>;
+  getExchangeRate(): Promise<number>; // Helper to get USD to BDT rate
 }
 
 export class MemStorage implements IStorage {
@@ -100,6 +134,10 @@ export class MemStorage implements IStorage {
   private workReports: Map<string, WorkReport>;
   private pages: Map<string, Page>;
   private rolePermissions: Map<string, RolePermission>;
+  private financeProjects: Map<string, FinanceProject>;
+  private financePayments: Map<string, FinancePayment>;
+  private financeExpenses: Map<string, FinanceExpense>;
+  private financeSettings: Map<string, FinanceSetting>;
 
   constructor() {
     this.users = new Map();
@@ -111,6 +149,13 @@ export class MemStorage implements IStorage {
     this.workReports = new Map();
     this.pages = new Map();
     this.rolePermissions = new Map();
+    this.financeProjects = new Map();
+    this.financePayments = new Map();
+    this.financeExpenses = new Map();
+    this.financeSettings = new Map();
+    
+    // Initialize default finance settings
+    this.initializeFinanceSettings();
     
     // Create default admin user
     const adminId = randomUUID();
@@ -174,9 +219,10 @@ export class MemStorage implements IStorage {
     };
     this.clients.set(client3Id, client3);
 
-    // Initialize default pages
+    // Initialize default pages and sample finance data
     this.initializeDefaultPages();
     this.initializeDefaultPermissions();
+    this.initializeSampleFinanceData();
   }
 
   private initializeDefaultPages() {
@@ -747,8 +793,279 @@ export class MemStorage implements IStorage {
         return false;
     }
   }
+
+  private initializeFinanceSettings() {
+    // Default USD to BDT exchange rate
+    const exchangeRateId = randomUUID();
+    const exchangeRate: FinanceSetting = {
+      id: exchangeRateId,
+      key: "usd_to_bdt_rate",
+      value: "110.00", // Default rate
+      description: "USD to BDT conversion rate",
+      updatedAt: new Date(),
+    };
+    this.financeSettings.set(exchangeRateId, exchangeRate);
+  }
+
+  private initializeSampleFinanceData() {
+    const clientIds = Array.from(this.clients.keys());
+    if (clientIds.length === 0) return;
+    
+    // Create sample projects
+    const project1Id = randomUUID();
+    const project1: FinanceProject = {
+      id: project1Id,
+      name: "Digital Marketing Campaign Q1",
+      clientId: clientIds[0],
+      startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      budget: "5000.00",
+      expense: "120000.00",
+      status: "active",
+      notes: "Major campaign for Q1 2024",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.financeProjects.set(project1Id, project1);
+
+    const project2Id = randomUUID();
+    const project2: FinanceProject = {
+      id: project2Id,
+      name: "Social Media Management",
+      clientId: clientIds[1],
+      startDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
+      budget: "3000.00",
+      expense: "75000.00",
+      status: "active",
+      notes: "Ongoing social media management project",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.financeProjects.set(project2Id, project2);
+
+    // Create sample payments
+    const payment1Id = randomUUID();
+    const payment1: FinancePayment = {
+      id: payment1Id,
+      clientId: clientIds[0],
+      projectId: project1Id,
+      amount: "2500.00",
+      conversionRate: "110.00",
+      convertedAmount: "275000.00",
+      currency: "USD",
+      date: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+      notes: "First installment payment",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.financePayments.set(payment1Id, payment1);
+
+    // Create sample expenses
+    const expense1Id = randomUUID();
+    const expense1: FinanceExpense = {
+      id: expense1Id,
+      type: "expense",
+      projectId: project1Id,
+      amount: "25000.00",
+      currency: "BDT",
+      date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+      notes: "Ad spend for Facebook campaigns",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.financeExpenses.set(expense1Id, expense1);
+
+    const salary1Id = randomUUID();
+    const salary1: FinanceExpense = {
+      id: salary1Id,
+      type: "salary",
+      projectId: project1Id,
+      amount: "50000.00",
+      currency: "BDT",
+      date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+      notes: "Monthly salary for project manager",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.financeExpenses.set(salary1Id, salary1);
+  }
+
+  // Finance Project methods
+  async getFinanceProjects(): Promise<FinanceProject[]> {
+    return Array.from(this.financeProjects.values()).sort((a, b) => {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+  }
+
+  async getFinanceProject(id: string): Promise<FinanceProject | undefined> {
+    return this.financeProjects.get(id);
+  }
+
+  async createFinanceProject(insertProject: InsertFinanceProject): Promise<FinanceProject> {
+    const id = randomUUID();
+    const project: FinanceProject = {
+      ...insertProject,
+      id,
+      status: insertProject.status || "active",
+      expense: insertProject.expense || "0",
+      notes: insertProject.notes || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.financeProjects.set(id, project);
+    return project;
+  }
+
+  async updateFinanceProject(id: string, updateData: Partial<InsertFinanceProject>): Promise<FinanceProject | undefined> {
+    const project = this.financeProjects.get(id);
+    if (!project) return undefined;
+    
+    const updatedProject: FinanceProject = {
+      ...project,
+      ...updateData,
+      updatedAt: new Date(),
+    };
+    this.financeProjects.set(id, updatedProject);
+    return updatedProject;
+  }
+
+  async deleteFinanceProject(id: string): Promise<boolean> {
+    return this.financeProjects.delete(id);
+  }
+
+  // Finance Payment methods
+  async getFinancePayments(projectId?: string): Promise<FinancePayment[]> {
+    const payments = Array.from(this.financePayments.values());
+    const filteredPayments = projectId 
+      ? payments.filter(payment => payment.projectId === projectId)
+      : payments;
+    
+    return filteredPayments.sort((a, b) => {
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+  }
+
+  async getFinancePayment(id: string): Promise<FinancePayment | undefined> {
+    return this.financePayments.get(id);
+  }
+
+  async createFinancePayment(insertPayment: InsertFinancePayment): Promise<FinancePayment> {
+    const id = randomUUID();
+    const payment: FinancePayment = {
+      ...insertPayment,
+      id,
+      currency: insertPayment.currency || "USD",
+      notes: insertPayment.notes || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.financePayments.set(id, payment);
+    return payment;
+  }
+
+  async updateFinancePayment(id: string, updateData: Partial<InsertFinancePayment>): Promise<FinancePayment | undefined> {
+    const payment = this.financePayments.get(id);
+    if (!payment) return undefined;
+    
+    const updatedPayment: FinancePayment = {
+      ...payment,
+      ...updateData,
+      updatedAt: new Date(),
+    };
+    this.financePayments.set(id, updatedPayment);
+    return updatedPayment;
+  }
+
+  async deleteFinancePayment(id: string): Promise<boolean> {
+    return this.financePayments.delete(id);
+  }
+
+  // Finance Expense methods
+  async getFinanceExpenses(projectId?: string): Promise<FinanceExpense[]> {
+    const expenses = Array.from(this.financeExpenses.values());
+    const filteredExpenses = projectId 
+      ? expenses.filter(expense => expense.projectId === projectId)
+      : expenses;
+    
+    return filteredExpenses.sort((a, b) => {
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+  }
+
+  async getFinanceExpense(id: string): Promise<FinanceExpense | undefined> {
+    return this.financeExpenses.get(id);
+  }
+
+  async createFinanceExpense(insertExpense: InsertFinanceExpense): Promise<FinanceExpense> {
+    const id = randomUUID();
+    const expense: FinanceExpense = {
+      ...insertExpense,
+      id,
+      currency: insertExpense.currency || "BDT",
+      projectId: insertExpense.projectId || null,
+      notes: insertExpense.notes || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.financeExpenses.set(id, expense);
+    return expense;
+  }
+
+  async updateFinanceExpense(id: string, updateData: Partial<InsertFinanceExpense>): Promise<FinanceExpense | undefined> {
+    const expense = this.financeExpenses.get(id);
+    if (!expense) return undefined;
+    
+    const updatedExpense: FinanceExpense = {
+      ...expense,
+      ...updateData,
+      updatedAt: new Date(),
+    };
+    this.financeExpenses.set(id, updatedExpense);
+    return updatedExpense;
+  }
+
+  async deleteFinanceExpense(id: string): Promise<boolean> {
+    return this.financeExpenses.delete(id);
+  }
+
+  // Finance Settings methods
+  async getFinanceSetting(key: string): Promise<FinanceSetting | undefined> {
+    return Array.from(this.financeSettings.values()).find(setting => setting.key === key);
+  }
+
+  async setFinanceSetting(insertSetting: InsertFinanceSetting): Promise<FinanceSetting> {
+    // Check if setting already exists
+    const existing = await this.getFinanceSetting(insertSetting.key);
+    if (existing) {
+      // Update existing setting
+      const updated: FinanceSetting = {
+        ...existing,
+        value: insertSetting.value,
+        description: insertSetting.description || existing.description,
+        updatedAt: new Date(),
+      };
+      this.financeSettings.set(existing.id, updated);
+      return updated;
+    } else {
+      // Create new setting
+      const id = randomUUID();
+      const setting: FinanceSetting = {
+        ...insertSetting,
+        id,
+        description: insertSetting.description || null,
+        updatedAt: new Date(),
+      };
+      this.financeSettings.set(id, setting);
+      return setting;
+    }
+  }
+
+  async getExchangeRate(): Promise<number> {
+    const setting = await this.getFinanceSetting("usd_to_bdt_rate");
+    return setting ? parseFloat(setting.value) : 110.0; // Default rate
+  }
 }
 
 import { DatabaseStorage } from './database-storage';
 
-export const storage = new DatabaseStorage();
+// Use MemStorage for finance module - DatabaseStorage doesn't have finance methods yet
+export const storage: IStorage = new MemStorage();

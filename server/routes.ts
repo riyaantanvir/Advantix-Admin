@@ -10,6 +10,10 @@ import {
   insertAdCopySetSchema,
   insertWorkReportSchema,
   insertRolePermissionSchema,
+  insertFinanceProjectSchema,
+  insertFinancePaymentSchema,
+  insertFinanceExpenseSchema,
+  insertFinanceSettingSchema,
   type Campaign,
   type Client,
   type User,
@@ -18,6 +22,10 @@ import {
   type WorkReport,
   type Page,
   type RolePermission,
+  type FinanceProject,
+  type FinancePayment,
+  type FinanceExpense,
+  type FinanceSetting,
   UserRole 
 } from "@shared/schema";
 import { z } from "zod";
@@ -839,6 +847,358 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ hasPermission });
     } catch (error) {
       res.status(500).json({ message: "Failed to check permission" });
+    }
+  });
+
+  // Finance Routes
+  
+  // Finance Projects
+  app.get("/api/finance/projects", authenticate, requirePagePermission('finance', 'view'), async (req: Request, res: Response) => {
+    try {
+      const projects = await storage.getFinanceProjects();
+      res.json(projects);
+    } catch (error) {
+      console.error("Get finance projects error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/finance/projects/:id", authenticate, requirePagePermission('finance', 'view'), async (req: Request, res: Response) => {
+    try {
+      const project = await storage.getFinanceProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      res.json(project);
+    } catch (error) {
+      console.error("Get finance project error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/finance/projects", authenticate, requirePagePermission('finance', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertFinanceProjectSchema.parse(req.body);
+      
+      // Validate that client exists
+      const client = await storage.getClient(validatedData.clientId);
+      if (!client) {
+        return res.status(400).json({ message: "Client not found" });
+      }
+      
+      const project = await storage.createFinanceProject(validatedData);
+      res.status(201).json(project);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Create finance project error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put("/api/finance/projects/:id", authenticate, requirePagePermission('finance', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertFinanceProjectSchema.partial().parse(req.body);
+      
+      // Validate that client exists if clientId is being updated
+      if (validatedData.clientId) {
+        const client = await storage.getClient(validatedData.clientId);
+        if (!client) {
+          return res.status(400).json({ message: "Client not found" });
+        }
+      }
+      
+      const project = await storage.updateFinanceProject(req.params.id, validatedData);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      res.json(project);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Update finance project error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/finance/projects/:id", authenticate, requirePagePermission('finance', 'delete'), async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteFinanceProject(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      res.json({ message: "Project deleted successfully" });
+    } catch (error) {
+      console.error("Delete finance project error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Finance Payments
+  app.get("/api/finance/payments", authenticate, requirePagePermission('finance', 'view'), async (req: Request, res: Response) => {
+    try {
+      const { projectId } = req.query;
+      const payments = await storage.getFinancePayments(projectId as string);
+      res.json(payments);
+    } catch (error) {
+      console.error("Get finance payments error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/finance/payments/:id", authenticate, requirePagePermission('finance', 'view'), async (req: Request, res: Response) => {
+    try {
+      const payment = await storage.getFinancePayment(req.params.id);
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      res.json(payment);
+    } catch (error) {
+      console.error("Get finance payment error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/finance/payments", authenticate, requirePagePermission('finance', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertFinancePaymentSchema.parse(req.body);
+      
+      // Validate that client and project exist
+      const client = await storage.getClient(validatedData.clientId);
+      if (!client) {
+        return res.status(400).json({ message: "Client not found" });
+      }
+      
+      const project = await storage.getFinanceProject(validatedData.projectId);
+      if (!project) {
+        return res.status(400).json({ message: "Project not found" });
+      }
+      
+      const payment = await storage.createFinancePayment(validatedData);
+      res.status(201).json(payment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Create finance payment error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put("/api/finance/payments/:id", authenticate, requirePagePermission('finance', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertFinancePaymentSchema.partial().parse(req.body);
+      
+      const payment = await storage.updateFinancePayment(req.params.id, validatedData);
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      res.json(payment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Update finance payment error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/finance/payments/:id", authenticate, requirePagePermission('finance', 'delete'), async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteFinancePayment(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      res.json({ message: "Payment deleted successfully" });
+    } catch (error) {
+      console.error("Delete finance payment error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Finance Expenses
+  app.get("/api/finance/expenses", authenticate, requirePagePermission('finance', 'view'), async (req: Request, res: Response) => {
+    try {
+      const { projectId } = req.query;
+      const expenses = await storage.getFinanceExpenses(projectId as string);
+      res.json(expenses);
+    } catch (error) {
+      console.error("Get finance expenses error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/finance/expenses/:id", authenticate, requirePagePermission('finance', 'view'), async (req: Request, res: Response) => {
+    try {
+      const expense = await storage.getFinanceExpense(req.params.id);
+      if (!expense) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+      res.json(expense);
+    } catch (error) {
+      console.error("Get finance expense error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/finance/expenses", authenticate, requirePagePermission('finance', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertFinanceExpenseSchema.parse(req.body);
+      
+      // Validate that project exists if projectId is provided
+      if (validatedData.projectId) {
+        const project = await storage.getFinanceProject(validatedData.projectId);
+        if (!project) {
+          return res.status(400).json({ message: "Project not found" });
+        }
+      }
+      
+      const expense = await storage.createFinanceExpense(validatedData);
+      res.status(201).json(expense);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Create finance expense error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put("/api/finance/expenses/:id", authenticate, requirePagePermission('finance', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertFinanceExpenseSchema.partial().parse(req.body);
+      
+      const expense = await storage.updateFinanceExpense(req.params.id, validatedData);
+      if (!expense) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+      res.json(expense);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Update finance expense error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/finance/expenses/:id", authenticate, requirePagePermission('finance', 'delete'), async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteFinanceExpense(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+      res.json({ message: "Expense deleted successfully" });
+    } catch (error) {
+      console.error("Delete finance expense error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Finance Settings
+  app.get("/api/finance/settings/:key", authenticate, requirePagePermission('finance', 'view'), async (req: Request, res: Response) => {
+    try {
+      const setting = await storage.getFinanceSetting(req.params.key);
+      if (!setting) {
+        return res.status(404).json({ message: "Setting not found" });
+      }
+      res.json(setting);
+    } catch (error) {
+      console.error("Get finance setting error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/finance/settings", authenticate, requirePagePermission('finance', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertFinanceSettingSchema.parse(req.body);
+      const setting = await storage.setFinanceSetting(validatedData);
+      res.json(setting);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Set finance setting error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get exchange rate
+  app.get("/api/finance/exchange-rate", authenticate, requirePagePermission('finance', 'view'), async (req: Request, res: Response) => {
+    try {
+      const rate = await storage.getExchangeRate();
+      res.json({ rate });
+    } catch (error) {
+      console.error("Get exchange rate error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Finance Dashboard Analytics
+  app.get("/api/finance/dashboard", authenticate, requirePagePermission('finance', 'view'), async (req: Request, res: Response) => {
+    try {
+      const { period = 'month' } = req.query;
+      
+      // Get all data for calculations
+      const projects = await storage.getFinanceProjects();
+      const payments = await storage.getFinancePayments();
+      const expenses = await storage.getFinanceExpenses();
+      const exchangeRate = await storage.getExchangeRate();
+      
+      // Calculate totals
+      const totalPaymentsUSD = payments.reduce((sum: number, payment: FinancePayment) => sum + parseFloat(payment.amount), 0);
+      const totalPaymentsBDT = payments.reduce((sum: number, payment: FinancePayment) => sum + parseFloat(payment.convertedAmount), 0);
+      const totalExpensesBDT = expenses.filter((e: FinanceExpense) => e.type === 'expense').reduce((sum: number, expense: FinanceExpense) => sum + parseFloat(expense.amount), 0);
+      const totalSalariesBDT = expenses.filter((e: FinanceExpense) => e.type === 'salary').reduce((sum: number, expense: FinanceExpense) => sum + parseFloat(expense.amount), 0);
+      const totalFundUSD = totalPaymentsUSD;
+      const totalFundBDT = totalPaymentsBDT;
+      const netBalanceBDT = totalPaymentsBDT - totalExpensesBDT - totalSalariesBDT;
+      
+      // Group payments by month for chart
+      const paymentsByMonth = payments.reduce((acc: Record<string, number>, payment: FinancePayment) => {
+        const month = new Date(payment.date).toLocaleString('default', { month: 'short', year: 'numeric' });
+        acc[month] = (acc[month] || 0) + parseFloat(payment.amount);
+        return acc;
+      }, {});
+      
+      // Group expenses by month for chart
+      const expensesByMonth = expenses.reduce((acc: Record<string, { expenses: number, salaries: number }>, expense: FinanceExpense) => {
+        const month = new Date(expense.date).toLocaleString('default', { month: 'short', year: 'numeric' });
+        if (!acc[month]) acc[month] = { expenses: 0, salaries: 0 };
+        if (expense.type === 'expense') {
+          acc[month].expenses += parseFloat(expense.amount);
+        } else {
+          acc[month].salaries += parseFloat(expense.amount);
+        }
+        return acc;
+      }, {});
+      
+      res.json({
+        summary: {
+          totalFundUSD,
+          totalFundBDT,
+          totalPaymentsUSD,
+          totalExpensesBDT,
+          totalSalariesBDT,
+          netBalanceBDT,
+          exchangeRate,
+        },
+        charts: {
+          paymentsByMonth,
+          expensesByMonth,
+        },
+        counts: {
+          totalProjects: projects.length,
+          activeProjects: projects.filter((p: FinanceProject) => p.status === 'active').length,
+          totalPayments: payments.length,
+          totalExpenses: expenses.length,
+        }
+      });
+    } catch (error) {
+      console.error("Get finance dashboard error:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 

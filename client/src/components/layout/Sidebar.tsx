@@ -14,7 +14,13 @@ import {
   LogOut,
   User,
   ChevronDown,
-  Wallet
+  Wallet,
+  PieChart,
+  Briefcase,
+  CreditCard,
+  Calculator,
+  BarChart3,
+  Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -128,6 +134,50 @@ export default function Sidebar({ children }: SidebarProps) {
       testId: "nav-work-reports",
       pageKey: "work_reports"
     },
+    {
+      label: "Advantix Finance",
+      icon: Building2,
+      testId: "nav-finance",
+      pageKey: "finance",
+      isSection: true,
+      subItems: [
+        {
+          href: "/finance/dashboard",
+          icon: PieChart,
+          label: "Advantix Dashboard",
+          testId: "nav-finance-dashboard",
+          pageKey: "finance"
+        },
+        {
+          href: "/finance/projects",
+          icon: Briefcase,
+          label: "Projects",
+          testId: "nav-finance-projects",
+          pageKey: "finance"
+        },
+        {
+          href: "/finance/payments",
+          icon: CreditCard,
+          label: "Payments",
+          testId: "nav-finance-payments",
+          pageKey: "finance"
+        },
+        {
+          href: "/finance/expenses",
+          icon: Calculator,
+          label: "Expenses & Salaries",
+          testId: "nav-finance-expenses",
+          pageKey: "finance"
+        },
+        {
+          href: "/finance/reports",
+          icon: BarChart3,
+          label: "Reports",
+          testId: "nav-finance-reports",
+          pageKey: "finance"
+        }
+      ]
+    },
     { 
       href: "/admin", 
       icon: Settings, 
@@ -231,12 +281,85 @@ export default function Sidebar({ children }: SidebarProps) {
         <nav className="flex-1 p-4 space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const active = isActive(item.href);
             
             // Hide pages for users without permission
             if (item.superAdminOnly && user?.role !== "super_admin") {
               return null;
             }
+            
+            // Handle section items with sub-menus (like Advantix Finance)
+            if (item.isSection && item.subItems) {
+              if (isCollapsed) {
+                // Collapsed view - show dropdown with sub-items
+                return (
+                  <DropdownMenu key={item.label}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            className="w-full justify-center px-2"
+                            data-testid={item.testId}
+                          >
+                            <Icon className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>{item.label}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent side="right" align="start">
+                      {item.subItems.map((subItem) => (
+                        <DropdownMenuItem key={subItem.href} asChild>
+                          <Link href={subItem.href}>
+                            <subItem.icon className="h-4 w-4 mr-2" />
+                            {subItem.label}
+                          </Link>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              } else {
+                // Expanded view - show section header and sub-items
+                return (
+                  <div key={item.label} className="space-y-1">
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      {item.label}
+                    </div>
+                    {item.subItems.map((subItem) => {
+                      const SubIcon = subItem.icon;
+                      const active = isActive(subItem.href);
+                      
+                      return (
+                        <Link 
+                          href={subItem.href}
+                          key={subItem.href}
+                        >
+                          <Button
+                            variant={active ? "secondary" : "ghost"}
+                            className={cn(
+                              "w-full justify-start gap-3 transition-colors pl-6",
+                              active && "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800"
+                            )}
+                            data-testid={subItem.testId}
+                          >
+                            <SubIcon className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{subItem.label}</span>
+                          </Button>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                );
+              }
+            }
+
+            // Handle regular menu items
+            if (!item.href) return null;
+            
+            const active = isActive(item.href);
             
             // Check individual permission for non-super-admin-only pages
             const hasPermission = getPermissionForPage(item.pageKey);

@@ -13,6 +13,11 @@ import ClientsPage from "@/pages/clients";
 import AdAccountsPage from "@/pages/ad-accounts";
 import WorkReportsPage from "@/pages/work-reports";
 import AdminPage from "@/pages/admin";
+import FinanceDashboard from "@/pages/finance-dashboard";
+import FinanceProjects from "@/pages/finance-projects";
+import FinancePayments from "@/pages/finance-payments";
+import FinanceExpenses from "@/pages/finance-expenses";
+import FinanceReports from "@/pages/finance-reports";
 import NotFound from "@/pages/not-found";
 
 function AuthenticatedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -164,6 +169,11 @@ function Router() {
       <Route path="/clients" component={() => <ProtectedRoute component={ClientsPage} pageKey="clients" />} />
       <Route path="/ad-accounts" component={() => <ProtectedRoute component={AdAccountsPage} pageKey="ad_accounts" />} />
       <Route path="/work-reports" component={() => <ProtectedRoute component={WorkReportsPage} pageKey="work_reports" />} />
+      <Route path="/finance/dashboard" component={() => <ProtectedRoute component={FinanceDashboard} pageKey="finance" />} />
+      <Route path="/finance/projects" component={() => <ProtectedRoute component={FinanceProjects} pageKey="finance" />} />
+      <Route path="/finance/payments" component={() => <ProtectedRoute component={FinancePayments} pageKey="finance" />} />
+      <Route path="/finance/expenses" component={() => <ProtectedRoute component={FinanceExpenses} pageKey="finance" />} />
+      <Route path="/finance/reports" component={() => <ProtectedRoute component={FinanceReports} pageKey="finance" />} />
       <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} pageKey="admin" />} />
       <Route path="/" component={() => <ProtectedRoute component={Home} pageKey="dashboard" />} />
       <Route component={NotFound} />

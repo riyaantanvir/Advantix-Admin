@@ -246,6 +246,89 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+// Finance Management Tables
+
+// Projects for finance tracking
+export const financeProjects = pgTable("finance_projects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "restrict" }).notNull(),
+  startDate: timestamp("start_date").notNull(),
+  budget: decimal("budget", { precision: 12, scale: 2 }).notNull(), // USD
+  expense: decimal("expense", { precision: 12, scale: 2 }).default("0"), // BDT
+  status: text("status").notNull().default("active"), // "active", "closed"
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Payments from clients
+export const financePayments = pgTable("finance_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "restrict" }).notNull(),
+  projectId: varchar("project_id").references(() => financeProjects.id, { onDelete: "restrict" }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(), // USD
+  conversionRate: decimal("conversion_rate", { precision: 8, scale: 4 }).notNull(), // USD to BDT rate
+  convertedAmount: decimal("converted_amount", { precision: 12, scale: 2 }).notNull(), // BDT
+  currency: text("currency").notNull().default("USD"),
+  date: timestamp("date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Expenses and Salaries
+export const financeExpenses = pgTable("finance_expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // "expense", "salary"
+  projectId: varchar("project_id").references(() => financeProjects.id, { onDelete: "restrict" }),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(), // BDT
+  currency: text("currency").notNull().default("BDT"),
+  date: timestamp("date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Settings for exchange rates and configurations
+export const financeSettings = pgTable("finance_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(), // "usd_to_bdt_rate", etc.
+  value: text("value").notNull(),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Insert schemas for finance tables
+export const insertFinanceProjectSchema = createInsertSchema(financeProjects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  startDate: z.coerce.date(),
+});
+
+export const insertFinancePaymentSchema = createInsertSchema(financePayments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  date: z.coerce.date(),
+});
+
+export const insertFinanceExpenseSchema = createInsertSchema(financeExpenses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  date: z.coerce.date(),
+});
+
+export const insertFinanceSettingSchema = createInsertSchema(financeSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertUserWithRole = z.infer<typeof insertUserWithRoleSchema>;
@@ -276,3 +359,16 @@ export type Page = typeof pages.$inferSelect;
 
 export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
 export type RolePermission = typeof rolePermissions.$inferSelect;
+
+// Finance types
+export type InsertFinanceProject = z.infer<typeof insertFinanceProjectSchema>;
+export type FinanceProject = typeof financeProjects.$inferSelect;
+
+export type InsertFinancePayment = z.infer<typeof insertFinancePaymentSchema>;
+export type FinancePayment = typeof financePayments.$inferSelect;
+
+export type InsertFinanceExpense = z.infer<typeof insertFinanceExpenseSchema>;
+export type FinanceExpense = typeof financeExpenses.$inferSelect;
+
+export type InsertFinanceSetting = z.infer<typeof insertFinanceSettingSchema>;
+export type FinanceSetting = typeof financeSettings.$inferSelect;
