@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertFinanceExpenseSchema, type FinanceExpense, type FinanceProject, type InsertFinanceExpense } from "@shared/schema";
-import { Plus, Edit, Trash2, MoreHorizontal, DollarSign, Calendar, Building, Calculator, TrendingDown } from "lucide-react";
+import { Plus, Edit, Trash2, MoreHorizontal, DollarSign, Calendar, Building, Calculator, TrendingDown, Upload, FileSpreadsheet } from "lucide-react";
 import { formatDistance } from "date-fns";
 import Sidebar from "@/components/layout/Sidebar";
 
@@ -24,6 +24,9 @@ export default function FinanceExpenses() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<FinanceExpense | null>(null);
   const [activeTab, setActiveTab] = useState("all");
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Fetch expenses
@@ -121,6 +124,49 @@ export default function FinanceExpenses() {
     },
   });
 
+  // CSV Import mutation
+  const importCsvMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('csvFile', file);
+      
+      const response = await fetch('/api/finance/expenses/import-csv', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Import failed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/dashboard"] });
+      setIsImportDialogOpen(false);
+      setCsvFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      toast({
+        title: "Success",
+        description: `Successfully imported ${result.imported} expenses/salaries. ${result.errors || 0} errors.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to import CSV file.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: InsertFinanceExpense) => {
     // Convert "none" to null for the API
     const submitData = {
@@ -132,6 +178,27 @@ export default function FinanceExpenses() {
       updateExpenseMutation.mutate({ id: editingExpense.id, data: submitData });
     } else {
       createExpenseMutation.mutate(submitData);
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+        setCsvFile(file);
+      } else {
+        toast({
+          title: "Error",
+          description: "Please select a valid CSV file.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleImportCsv = () => {
+    if (csvFile) {
+      importCsvMutation.mutate(csvFile);
     }
   };
 
@@ -204,20 +271,100 @@ export default function FinanceExpenses() {
           </p>
         </div>
         
-        <Dialog open={isCreateDialogOpen || !!editingExpense} onOpenChange={(open) => {
-          if (!open) {
-            setIsCreateDialogOpen(false);
-            setEditingExpense(null);
-            form.reset();
-          }
-        }}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-expense">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Expense/Salary
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
+        <div className="flex gap-2">
+          <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} data-testid="button-import-csv">
+                <Upload className="h-4 w-4 mr-2" />
+                Import CSV
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Import Expenses from CSV</DialogTitle>
+                <DialogDescription>
+                  Upload a CSV file to bulk import expenses and salaries. Make sure your CSV follows the required format.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6">
+                  <div className="text-center">
+                    <FileSpreadsheet className="mx-auto h-12 w-12 text-gray-400" />
+                    <div className="mt-4">
+                      <label htmlFor="csv-upload" className="cursor-pointer">
+                        <span className="mt-2 block text-sm font-medium text-gray-900 dark:text-white">
+                          {csvFile ? csvFile.name : "Choose CSV file"}
+                        </span>
+                      </label>
+                      <input
+                        id="csv-upload"
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      CSV files only
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                  <h4 className="font-medium text-sm mb-2">Required CSV Format:</h4>
+                  <code className="text-xs bg-white dark:bg-gray-900 p-2 rounded block">
+                    type,amount,currency,date,notes,projectId
+                    <br />
+                    expense,1500,BDT,2025-01-15,Office supplies,
+                    <br />
+                    salary,50000,BDT,2025-01-15,Monthly salary,project-id
+                  </code>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                    • type: "expense" or "salary"<br />
+                    • amount: numeric value<br />
+                    • currency: "USD" or "BDT"<br />
+                    • date: YYYY-MM-DD format<br />
+                    • notes: description (optional)<br />
+                    • projectId: project ID or empty for general
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => {
+                    setIsImportDialogOpen(false);
+                    setCsvFile(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleImportCsv}
+                    disabled={!csvFile || importCsvMutation.isPending}
+                  >
+                    {importCsvMutation.isPending ? "Importing..." : "Import CSV"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isCreateDialogOpen || !!editingExpense} onOpenChange={(open) => {
+            if (!open) {
+              setIsCreateDialogOpen(false);
+              setEditingExpense(null);
+              form.reset();
+            }
+          }}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-expense">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Expense/Salary
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle>
                 {editingExpense ? "Edit Entry" : "Add New Entry"}
@@ -350,6 +497,7 @@ export default function FinanceExpenses() {
             </Form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Summary Cards */}

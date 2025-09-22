@@ -1,6 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import multer from "multer";
+import { parse } from "csv-parse/sync";
 import { 
   loginSchema, 
   insertCampaignSchema, 
@@ -116,6 +118,21 @@ function requirePagePermission(pageKey: string, action: 'view' | 'edit' | 'delet
     }
   };
 }
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed'), false);
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Login route
@@ -1093,6 +1110,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Expense deleted successfully" });
     } catch (error) {
       console.error("Delete finance expense error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // CSV Import for expenses
+  app.post("/api/finance/expenses/import-csv", authenticate, requirePagePermission('finance', 'edit'), upload.single('csvFile'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No CSV file uploaded" });
+      }
+
+      const csvContent = req.file.buffer.toString('utf-8');
+      
+      // Parse CSV data
+      const records = parse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
+
+      let imported = 0;
+      let errors: string[] = [];
+
+      // Process each record
+      for (let i = 0; i < records.length; i++) {
+        const record = records[i];
+        const rowNumber = i + 2; // +2 because first row is header and arrays are 0-indexed
+
+        try {
+          // Validate required fields
+          if (!record.type || !record.amount || !record.currency || !record.date) {
+            errors.push(`Row ${rowNumber}: Missing required fields (type, amount, currency, date)`);
+            continue;
+          }
+
+          // Validate type
+          if (!['expense', 'salary'].includes(record.type)) {
+            errors.push(`Row ${rowNumber}: Type must be 'expense' or 'salary'`);
+            continue;
+          }
+
+          // Validate currency
+          if (!['USD', 'BDT'].includes(record.currency)) {
+            errors.push(`Row ${rowNumber}: Currency must be 'USD' or 'BDT'`);
+            continue;
+          }
+
+          // Validate amount
+          const amount = parseFloat(record.amount);
+          if (isNaN(amount) || amount <= 0) {
+            errors.push(`Row ${rowNumber}: Amount must be a positive number`);
+            continue;
+          }
+
+          // Validate date format
+          const date = new Date(record.date);
+          if (isNaN(date.getTime())) {
+            errors.push(`Row ${rowNumber}: Date must be in YYYY-MM-DD format`);
+            continue;
+          }
+
+          // Validate projectId if provided
+          let projectId: string | null = null;
+          if (record.projectId && record.projectId.trim() !== '') {
+            const project = await storage.getFinanceProject(record.projectId.trim());
+            if (!project) {
+              errors.push(`Row ${rowNumber}: Project ID '${record.projectId}' not found`);
+              continue;
+            }
+            projectId = record.projectId.trim();
+          }
+
+          // Create expense data
+          const expenseData = {
+            type: record.type as 'expense' | 'salary',
+            projectId,
+            amount: amount.toString(),
+            currency: record.currency as 'USD' | 'BDT',
+            date,
+            notes: record.notes || '',
+          };
+
+          // Validate with schema
+          const validatedData = insertFinanceExpenseSchema.parse(expenseData);
+          
+          // Create the expense
+          await storage.createFinanceExpense(validatedData);
+          imported++;
+
+        } catch (validationError) {
+          if (validationError instanceof z.ZodError) {
+            errors.push(`Row ${rowNumber}: ${validationError.errors.map(e => e.message).join(', ')}`);
+          } else {
+            errors.push(`Row ${rowNumber}: ${validationError instanceof Error ? validationError.message : 'Unknown error'}`);
+          }
+        }
+      }
+
+      res.json({
+        message: `Import completed. ${imported} expenses imported successfully.`,
+        imported,
+        errors: errors.length,
+        errorDetails: errors,
+      });
+
+    } catch (error) {
+      console.error("CSV Import error:", error);
+      if (error instanceof Error && error.message === 'Only CSV files are allowed') {
+        return res.status(400).json({ message: "Only CSV files are allowed" });
+      }
       res.status(500).json({ message: "Internal server error" });
     }
   });
