@@ -227,7 +227,7 @@ export default function Login() {
                   type="button"
                   onClick={() => toast({
                     title: "Password Reset",
-                    description: "For demo purposes: Use default credentials Admin/2604. In production, this would send a reset email.",
+                    description: "In production, this would send a reset email to your registered email address.",
                     duration: 5000,
                   })}
                   className="text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors duration-200"
@@ -240,12 +240,6 @@ export default function Login() {
           </CardContent>
         </Card>
 
-        {/* Footer Info */}
-        <div className="text-center mt-6">
-          <p className="text-xs text-gray-500">
-            For testing: Admin / 2604
-          </p>
-        </div>
       </div>
     </div>
   );
