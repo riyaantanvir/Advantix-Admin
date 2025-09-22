@@ -306,6 +306,8 @@ export const insertFinanceProjectSchema = createInsertSchema(financeProjects).om
   updatedAt: true,
 }).extend({
   startDate: z.coerce.date(),
+  budget: z.coerce.number().min(0, "Budget must be a positive number"),
+  expense: z.coerce.number().min(0, "Expense must be a positive number").optional(),
 });
 
 export const insertFinancePaymentSchema = createInsertSchema(financePayments).omit({
