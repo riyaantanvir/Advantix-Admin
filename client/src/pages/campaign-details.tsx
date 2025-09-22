@@ -133,8 +133,8 @@ export default function CampaignDetailsPage() {
     const days = [];
     const today = new Date();
     
-    // Show 30 days for full calendar context but only last 5 + today are editable
-    for (let i = 29; i >= 0; i--) {
+    // Show only today and previous 3 days (4 days total)
+    for (let i = 3; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       const isToday = date.toDateString() === today.toDateString();
@@ -225,11 +225,8 @@ export default function CampaignDetailsPage() {
   // Mutation to sync calendar spend to campaign
   const syncCampaignSpendMutation = useMutation({
     mutationFn: async (newSpend: number) => {
-      return apiRequest(`/api/campaigns/${campaignId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spend: newSpend.toString() }),
-      });
+      const response = await apiRequest("PUT", `/api/campaigns/${campaignId}`, { spend: newSpend.toString() });
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId] });
