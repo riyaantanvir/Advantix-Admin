@@ -40,7 +40,7 @@ export default function FinanceDashboard() {
   const [timePeriod, setTimePeriod] = useState("month");
 
   const { data: dashboardData, isLoading } = useQuery<DashboardData>({
-    queryKey: ["/api/finance/dashboard", { period: timePeriod }],
+    queryKey: [`/api/finance/dashboard?period=${timePeriod}`],
   });
 
   const formatCurrency = (amount: number, currency: "USD" | "BDT") => {
