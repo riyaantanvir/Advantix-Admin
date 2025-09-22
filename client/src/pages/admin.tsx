@@ -668,7 +668,7 @@ function AccessControl() {
                 <TableBody>
                   {pages.map((page, index) => (
                     <TableRow key={page.id} className={index % 2 === 0 ? "bg-gray-50/50 dark:bg-gray-800/50" : ""}>
-                      <TableCell className="font-medium bg-white dark:bg-gray-900 sticky left-0 z-20 border-r shadow-sm">
+                      <TableCell className="font-medium bg-white dark:bg-gray-900 sticky left-0 z-20 border-r shadow-sm w-56">
                         <div className="flex flex-col py-2 pr-4">
                           <span className="font-semibold text-sm">{page.displayName}</span>
                           <span className="text-xs text-gray-500">{page.path}</span>
@@ -755,7 +755,7 @@ function AccessControl() {
                   <TableBody>
                     {pages.map(page => (
                       <TableRow key={page.id}>
-                        <TableCell className="font-medium bg-white dark:bg-gray-900 sticky left-0 z-10 border-r">
+                        <TableCell className="font-medium bg-white dark:bg-gray-900 sticky left-0 z-10 border-r w-48">
                           <div className="flex flex-col">
                             <span className="font-semibold text-sm">{page.displayName}</span>
                             <span className="text-xs text-gray-500">{page.path}</span>
