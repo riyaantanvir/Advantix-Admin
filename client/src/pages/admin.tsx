@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock } from "lucide-react";
+import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign } from "lucide-react";
 import type { User, InsertUserWithRole, Page, RolePermission } from "@shared/schema";
 
 interface UserFormData {
@@ -906,6 +906,211 @@ function AccessControl() {
   );
 }
 
+function FinanceAccessControl() {
+  const { toast } = useToast();
+  
+  // Fetch all users
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
+  // Fetch finance page and role permissions
+  const { data: pages = [] } = useQuery<Page[]>({
+    queryKey: ["/api/pages"],
+  });
+
+  const { data: rolePermissions = [], refetch: refetchPermissions } = useQuery<RolePermission[]>({
+    queryKey: ["/api/role-permissions"],
+  });
+
+  // Find the finance page
+  const financePage = pages.find(p => p.pageKey === 'finance');
+
+  // Update permission mutation
+  const updatePermissionMutation = useMutation({
+    mutationFn: async ({ userId, hasAccess }: { userId: string, hasAccess: boolean }) => {
+      const user = users.find(u => u.id === userId);
+      if (!user || !financePage) return;
+
+      // Find existing permission for this user's role and finance page
+      const existingPermission = rolePermissions.find(p => 
+        p.role === user.role && p.pageId === financePage.id
+      );
+
+      if (existingPermission) {
+        // Update existing permission
+        const response = await apiRequest("PUT", `/api/role-permissions/${existingPermission.id}`, {
+          canView: hasAccess,
+          canEdit: hasAccess,
+          canDelete: hasAccess,
+        });
+        return response.json();
+      } else if (hasAccess) {
+        // Create new permission
+        const response = await apiRequest("POST", "/api/role-permissions", {
+          role: user.role,
+          pageId: financePage.id,
+          canView: true,
+          canEdit: true,
+          canDelete: true,
+        });
+        return response.json();
+      }
+    },
+    onSuccess: () => {
+      refetchPermissions();
+      toast({
+        title: "Success",
+        description: "Finance access updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update finance access",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Helper to check if user has finance access
+  const getUserFinanceAccess = (user: User) => {
+    if (!financePage) return false;
+    if (user.role === 'super_admin') return true; // Super admins always have access
+    
+    const permission = rolePermissions.find(p => 
+      p.role === user.role && p.pageId === financePage.id
+    );
+    return permission?.canView ?? false;
+  };
+
+  const handleAccessToggle = (userId: string, hasAccess: boolean) => {
+    updatePermissionMutation.mutate({ userId, hasAccess });
+  };
+
+  if (usersLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2 text-gray-600 dark:text-gray-400">Loading users...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <DollarSign className="w-6 h-6" />
+            Advantix Finance Access Control
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Control which users can access the Finance module and all its features
+          </p>
+        </div>
+      </div>
+
+      {/* Users Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Manage Finance Access</CardTitle>
+          <CardDescription>
+            Grant or revoke access to Advantix Finance for specific users. Users with access will see all Finance submenus (Dashboard, Projects, Payments, Expenses & Salaries, Reports).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Finance Access</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => {
+                const hasAccess = getUserFinanceAccess(user);
+                
+                return (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{user.name}</div>
+                        <div className="text-sm text-gray-500">@{user.username}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant={user.role === 'super_admin' ? 'default' : 'secondary'}
+                        className={user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' : ''}
+                      >
+                        {user.role === 'super_admin' ? 'Super Admin' : 
+                         user.role === 'admin' ? 'Admin' :
+                         user.role === 'manager' ? 'Manager' : 'User'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={user.isActive ? "default" : "secondary"}>
+                        {user.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={hasAccess ? "default" : "secondary"}>
+                        {hasAccess ? "Granted" : "Denied"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {user.role === 'super_admin' ? (
+                          <span className="text-sm text-gray-500">Always has access</span>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={hasAccess}
+                              onCheckedChange={(checked) => handleAccessToggle(user.id, checked)}
+                              disabled={updatePermissionMutation.isPending}
+                              data-testid={`switch-finance-access-${user.id}`}
+                            />
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                              {hasAccess ? "Granted" : "Denied"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Information Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5" />
+            How Finance Access Works
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+            <p>• <strong>Granted Access:</strong> User can see and access all Finance features including Dashboard, Projects, Payments, Expenses & Salaries, and Reports</p>
+            <p>• <strong>Denied Access:</strong> User cannot see any Finance menu items or access any Finance pages</p>
+            <p>• <strong>Super Admin:</strong> Always has full access to all Finance features regardless of settings</p>
+            <p>• <strong>Role-based:</strong> Access is granted per user role (all users with the same role share the same access level)</p>
+            <p>• Changes take effect immediately and will be reflected in the user's sidebar menu</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   return (
     <Sidebar>
@@ -924,7 +1129,7 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="users" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsList className="grid w-full grid-cols-3 max-w-2xl">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 User Management
@@ -932,6 +1137,10 @@ export default function AdminPage() {
               <TabsTrigger value="access" className="flex items-center gap-2">
                 <Lock className="w-4 h-4" />
                 Access Control
+              </TabsTrigger>
+              <TabsTrigger value="finance" className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Finance Access
               </TabsTrigger>
             </TabsList>
 
@@ -941,6 +1150,10 @@ export default function AdminPage() {
 
             <TabsContent value="access">
               <AccessControl />
+            </TabsContent>
+
+            <TabsContent value="finance">
+              <FinanceAccessControl />
             </TabsContent>
           </Tabs>
         </div>
