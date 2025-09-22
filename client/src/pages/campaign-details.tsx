@@ -795,22 +795,25 @@ export default function CampaignDetailsPage() {
                     <div className="space-y-2">
                       {campaign?.comments ? (
                         (() => {
-                          const comments = campaign.comments.split('\n\n').map((commentEntry, index) => {
-                            const match = commentEntry.match(/\[(.+?)\] (.+?): (.+)/);
-                            if (match) {
-                              const [, timestamp, username, comment] = match;
-                              return {
-                                id: index,
-                                timestamp,
-                                username,
-                                comment
-                              };
-                            }
-                            return null;
-                          }).filter(Boolean).reverse(); // Show newest first
+                          const parsedComments = campaign.comments.split('\n\n')
+                            .map((commentEntry, index) => {
+                              const match = commentEntry.match(/\[(.+?)\] (.+?): (.+)/);
+                              if (match) {
+                                const [, timestamp, username, comment] = match;
+                                return {
+                                  id: index,
+                                  timestamp,
+                                  username,
+                                  comment
+                                };
+                              }
+                              return null;
+                            })
+                            .filter((comment): comment is NonNullable<typeof comment> => comment !== null)
+                            .reverse(); // Show newest first
                           
-                          const firstThree = comments.slice(0, 3);
-                          const remaining = comments.slice(3);
+                          const firstThree = parsedComments.slice(0, 3);
+                          const remaining = parsedComments.slice(3);
                           
                           return (
                             <>
