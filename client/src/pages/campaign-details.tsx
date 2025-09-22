@@ -680,308 +680,194 @@ export default function CampaignDetailsPage() {
 
           {/* Tab Content */}
           {activeTab === "summary" && (
-            <div className="space-y-6">
-              {/* Campaign Info Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <Card className="rounded-xl shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      Campaign Status
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Select
-                      value={campaign.status}
-                      onValueChange={(value) => updateCampaignStatusMutation.mutate(value)}
-                      disabled={updateCampaignStatusMutation.isPending}
-                    >
-                      <SelectTrigger data-testid="select-campaign-status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="paused">Paused</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="draft">Draft</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-xl shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      Client
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-lg font-semibold">{getClientName(campaign.clientId)}</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-xl shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      Ad Account
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-lg font-semibold">{getAdAccountName(campaign.adAccountId)}</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-xl shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      Objective
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-blue-600" />
-                      <p className="text-lg font-semibold">{campaign.objective}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-xl shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      Budget
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-green-600" />
-                      <p className="text-lg font-semibold">{formatCurrency(campaign.budget || "0")}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-xl shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      Available Balance
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className={`h-4 w-4 ${availableBalance < 0 ? 'text-red-600' : 'text-green-600'}`} />
-                      <p className={`text-lg font-semibold ${availableBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {formatCurrency(availableBalance)}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
+            <div className="space-y-4">
+              {/* Campaign Status at the very top */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Campaign Status</h3>
+                <Select
+                  value={campaign.status}
+                  onValueChange={(value) => updateCampaignStatusMutation.mutate(value)}
+                  disabled={updateCampaignStatusMutation.isPending}
+                >
+                  <SelectTrigger className="w-40" data-testid="select-campaign-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Total Spend Card */}
-              <Card className="rounded-xl shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-blue-600" />
-                    Updated Total Spend
-                  </CardTitle>
-                  <CardDescription>
-                    Live spending total calculated from Calendar View data
-                  </CardDescription>
+              {/* Quick Summary - 2 Column Layout */}
+              <Card className="rounded-lg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-medium">Quick Summary</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-blue-600">
-                    {formatCurrency(totalCalendarSpend)}
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Left Column */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Client</label>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white mt-1">{getClientName(campaign.clientId)}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Ad Account</label>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white mt-1">{getAdAccountName(campaign.adAccountId)}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Objective</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Target className="h-3 w-3 text-blue-600" />
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">{campaign.objective}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Budget</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <DollarSign className="h-3 w-3 text-green-600" />
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(campaign.budget || "0")}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Available Balance</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <TrendingUp className={`h-3 w-3 ${availableBalance < 0 ? 'text-red-600' : 'text-green-600'}`} />
+                          <p className={`text-sm font-semibold ${availableBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {formatCurrency(availableBalance)}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Updated Total Spend</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <DollarSign className="h-3 w-3 text-blue-600" />
+                          <p className="text-sm font-semibold text-blue-600">{formatCurrency(totalCalendarSpend)}</p>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Live from Calendar • Last updated: {format(new Date(), "HH:mm")}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Live total from Calendar View - Last updated: {format(new Date(), "MMM dd, yyyy 'at' HH:mm")}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Syncs automatically to Campaign Management
-                  </p>
                 </CardContent>
               </Card>
 
               {/* Comments Section */}
-              <Card className="rounded-xl shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5 text-green-600" />
+              <Card className="rounded-lg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base font-medium">
+                    <MessageSquare className="h-4 w-4 text-green-600" />
                     Campaign Comments
                   </CardTitle>
-                  <CardDescription>
-                    Add comments that sync automatically with Campaign Management
-                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="new-comment">Add a comment</Label>
+                  <div className="space-y-3">
+                    {/* Add Comment Form - Compact */}
+                    <div className="flex gap-2">
                       <Textarea
-                        id="new-comment"
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
-                        placeholder="Enter your comment here..."
-                        rows={3}
+                        placeholder="Add a comment..."
+                        rows={2}
+                        className="flex-1 text-sm"
                         data-testid="textarea-new-comment"
                       />
+                      <Button 
+                        onClick={handleAddComment}
+                        disabled={addCommentMutation.isPending || !newComment.trim()}
+                        size="sm"
+                        className="self-end"
+                        data-testid="button-add-comment"
+                      >
+                        {addCommentMutation.isPending ? "Adding..." : "Add"}
+                      </Button>
                     </div>
-                    <Button 
-                      onClick={handleAddComment}
-                      disabled={addCommentMutation.isPending || !newComment.trim()}
-                      size="sm"
-                      data-testid="button-add-comment"
-                    >
-                      {addCommentMutation.isPending ? "Adding..." : "Add Comment"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* History Section - Merged into Summary Tab */}
-              <div className="space-y-6">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                  <History className="h-5 w-5 text-purple-600" />
-                  Campaign History
-                </h3>
-                
-                {/* Comments History */}
-                <Card className="rounded-xl shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <MessageSquare className="h-4 w-4 text-green-600" />
-                      Comments History
-                    </CardTitle>
-                    <CardDescription>
-                      All comments and notes added to this campaign
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                    
+                    {/* Comments List - Show first 3, then scrollable */}
+                    <div className="space-y-2">
                       {campaign?.comments ? (
-                        campaign.comments.split('\n\n').map((commentEntry, index) => {
-                          // Parse comment format: [timestamp] username: comment
-                          const match = commentEntry.match(/\[(.+?)\] (.+?): (.+)/);
-                          if (match) {
-                            const [, timestamp, username, comment] = match;
-                            return (
-                              <div 
-                                key={index}
-                                className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                data-testid={`comment-history-${index}`}
-                              >
-                                <MessageSquare className="h-4 w-4 text-green-600 mt-1 flex-shrink-0" />
-                                <div className="flex-1">
-                                  <p className="text-sm text-gray-900 dark:text-white">{comment}</p>
-                                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-600 dark:text-gray-400">
-                                    <span>{format(new Date(timestamp), "MMM dd, yyyy 'at' HH:mm")}</span>
-                                    <span>•</span>
-                                    <span>{username}</span>
+                        (() => {
+                          const comments = campaign.comments.split('\n\n').map((commentEntry, index) => {
+                            const match = commentEntry.match(/\[(.+?)\] (.+?): (.+)/);
+                            if (match) {
+                              const [, timestamp, username, comment] = match;
+                              return {
+                                id: index,
+                                timestamp,
+                                username,
+                                comment
+                              };
+                            }
+                            return null;
+                          }).filter(Boolean).reverse(); // Show newest first
+                          
+                          const firstThree = comments.slice(0, 3);
+                          const remaining = comments.slice(3);
+                          
+                          return (
+                            <>
+                              {/* First 3 comments - always visible */}
+                              {firstThree.map((comment) => (
+                                <div 
+                                  key={comment.id}
+                                  className="flex items-start gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800"
+                                  data-testid={`comment-visible-${comment.id}`}
+                                >
+                                  <MessageSquare className="h-3 w-3 text-green-600 mt-1 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-gray-900 dark:text-white">{comment.comment}</p>
+                                    <div className="flex items-center gap-1 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                      <span>{format(new Date(comment.timestamp), "MMM dd, HH:mm")}</span>
+                                      <span>•</span>
+                                      <span>{comment.username}</span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }).filter(Boolean).reverse() // Show newest first
+                              ))}
+                              
+                              {/* Remaining comments - scrollable area */}
+                              {remaining.length > 0 && (
+                                <div className="max-h-24 overflow-y-auto space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                                  {remaining.map((comment) => (
+                                    <div 
+                                      key={comment.id}
+                                      className="flex items-start gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800"
+                                      data-testid={`comment-scroll-${comment.id}`}
+                                    >
+                                      <MessageSquare className="h-3 w-3 text-green-600 mt-1 flex-shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs text-gray-900 dark:text-white">{comment.comment}</p>
+                                        <div className="flex items-center gap-1 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                          <span>{format(new Date(comment.timestamp), "MMM dd, HH:mm")}</span>
+                                          <span>•</span>
+                                          <span>{comment.username}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()
                       ) : (
-                        <p className="text-gray-600 dark:text-gray-400 text-center py-4">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
                           No comments yet
                         </p>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </CardContent>
+              </Card>
 
-                {/* Change History */}
-                <Card className="rounded-xl shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Edit3 className="h-4 w-4 text-blue-600" />
-                      Change History
-                    </CardTitle>
-                    <CardDescription>
-                      Changes made to campaign settings and configuration
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
-                      {campaignHistory
-                        .filter(item => item.type === "edit")
-                        .slice(0, 10)
-                        .map((item) => (
-                          <div 
-                            key={item.id} 
-                            className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            data-testid={`change-history-${item.id}`}
-                          >
-                            <Edit3 className="h-4 w-4 text-blue-600 mt-1 flex-shrink-0" />
-                            <div className="flex-1">
-                              <p className="text-sm text-gray-900 dark:text-white">
-                                <span className="font-medium">{item.field}</span> changed from{" "}
-                                <span className="px-1 py-0.5 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 rounded text-xs">{item.oldValue}</span> to{" "}
-                                <span className="px-1 py-0.5 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 rounded text-xs">{item.newValue}</span>
-                              </p>
-                              <div className="flex items-center gap-2 mt-1 text-xs text-gray-600 dark:text-gray-400">
-                                <span>{format(new Date(item.date), "MMM dd, yyyy 'at' HH:mm")}</span>
-                                <span>•</span>
-                                <span>Changed by {item.user}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      {campaignHistory.filter(item => item.type === "edit").length === 0 && (
-                        <p className="text-gray-600 dark:text-gray-400 text-center py-4">
-                          No changes yet
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* System Updates */}
-                <Card className="rounded-xl shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <History className="h-4 w-4 text-purple-600" />
-                      System Updates
-                    </CardTitle>
-                    <CardDescription>
-                      Automatic updates and system-generated changes
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
-                      {campaignHistory
-                        .filter(item => item.type === "system")
-                        .slice(0, 10)
-                        .map((item) => (
-                          <div 
-                            key={item.id} 
-                            className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            data-testid={`system-history-${item.id}`}
-                          >
-                            <History className="h-4 w-4 text-purple-600 mt-1 flex-shrink-0" />
-                            <div className="flex-1">
-                              <p className="text-sm text-gray-900 dark:text-white">
-                                <span className="font-medium">{item.field}</span> automatically updated from{" "}
-                                <span className="px-1 py-0.5 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 rounded text-xs">{item.oldValue}</span> to{" "}
-                                <span className="px-1 py-0.5 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 rounded text-xs">{item.newValue}</span>
-                              </p>
-                              <div className="flex items-center gap-2 mt-1 text-xs text-gray-600 dark:text-gray-400">
-                                <span>{format(new Date(item.date), "MMM dd, yyyy 'at' HH:mm")}</span>
-                                <span>•</span>
-                                <span>System</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      {campaignHistory.filter(item => item.type === "system").length === 0 && (
-                        <p className="text-gray-600 dark:text-gray-400 text-center py-4">
-                          No system updates yet
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             </div>
           )}
 
