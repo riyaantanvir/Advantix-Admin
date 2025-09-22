@@ -229,6 +229,14 @@ export default function Sidebar({ children }: SidebarProps) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const financePermission = useQuery({
+    queryKey: [`/api/permissions/check/finance`],
+    enabled: !!user && user.role !== 'super_admin',
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Helper function to get permission for each page
   const getPermissionForPage = (pageKey: string) => {
     switch (pageKey) {
@@ -237,6 +245,7 @@ export default function Sidebar({ children }: SidebarProps) {
       case 'clients': return clientsPermission.data;
       case 'ad_accounts': return adAccountsPermission.data;
       case 'work_reports': return workReportsPermission.data;
+      case 'finance': return financePermission.data;
       default: return false;
     }
   };
@@ -289,6 +298,14 @@ export default function Sidebar({ children }: SidebarProps) {
             
             // Handle section items with sub-menus (like Advantix Finance)
             if (item.isSection && item.subItems) {
+              // Check permission for the section
+              const hasPermission = getPermissionForPage(item.pageKey);
+              const canAccess = user?.role === 'super_admin' || hasPermission;
+              
+              // Hide section if user doesn't have permission
+              if (!canAccess) {
+                return null;
+              }
               if (isCollapsed) {
                 // Collapsed view - show dropdown with sub-items
                 return (
