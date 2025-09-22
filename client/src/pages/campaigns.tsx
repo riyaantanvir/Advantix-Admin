@@ -251,7 +251,18 @@ export default function CampaignsPage() {
     return client?.clientName || "Unknown Client";
   };
 
-  // Get ad account available balance
+  // Get campaign available balance (using individual campaign spend instead of ad account total)
+  const getCampaignAvailableBalance = (adAccountId: string | null, campaignSpend: string | null) => {
+    if (!adAccountId) return 0;
+    const adAccount = adAccounts.find(a => a.id === adAccountId);
+    if (!adAccount) return 0;
+    const spendLimit = parseFloat(adAccount.spendLimit || "0");
+    const currentCampaignSpend = parseFloat(campaignSpend || "0");
+    // Calculate available balance using individual campaign spend (synced from Calendar View)
+    return spendLimit - currentCampaignSpend;
+  };
+
+  // Keep original function for ad account selection dialogs
   const getAdAccountAvailableBalance = (adAccountId: string | null) => {
     if (!adAccountId) return 0;
     const adAccount = adAccounts.find(a => a.id === adAccountId);
@@ -628,7 +639,7 @@ export default function CampaignsPage() {
                       </TableRow>
                     ) : (
                       filteredCampaigns.map((campaign) => {
-                        const availableBalance = getAdAccountAvailableBalance(campaign.adAccountId);
+                        const availableBalance = getCampaignAvailableBalance(campaign.adAccountId, campaign.spend);
                         const clientName = getClientName(campaign.clientId);
                         
                         return (
