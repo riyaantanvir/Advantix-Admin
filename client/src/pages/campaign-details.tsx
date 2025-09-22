@@ -215,11 +215,42 @@ export default function CampaignDetailsPage() {
     }
   }, 0);
 
-  // Update campaign spend when calendar changes (this would sync to backend)
+  // Mutation to sync calendar spend to campaign
+  const syncCampaignSpendMutation = useMutation({
+    mutationFn: async (newSpend: number) => {
+      return apiRequest(`/api/campaigns/${campaignId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spend: newSpend.toString() }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] }); // Refresh campaign list
+      toast({
+        title: "Success",
+        description: "Campaign spending synchronized successfully.",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Failed to sync campaign spend:", error);
+      toast({
+        title: "Error",
+        description: "Failed to sync campaign spending.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Auto-sync campaign spend when calendar changes
   useEffect(() => {
     if (campaign && totalCalendarSpend !== parseFloat(campaign.spend || '0')) {
-      // In real app, this would call an API to update the campaign spend
-      console.log('Syncing total spend to campaign:', totalCalendarSpend);
+      // Debounce the sync to avoid too many API calls
+      const timeoutId = setTimeout(() => {
+        syncCampaignSpendMutation.mutate(totalCalendarSpend);
+      }, 1000); // 1 second debounce
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [totalCalendarSpend, campaign]);
 
@@ -561,7 +592,16 @@ export default function CampaignDetailsPage() {
     );
   }
 
-  const availableBalance = getAdAccountAvailableBalance(campaign.adAccountId);
+  // Calculate Available Balance using Calendar View spending data
+  // Available Balance = Spend Limit - Current Total Spending (from Calendar)
+  const availableBalance = (() => {
+    if (!campaign.adAccountId) return 0;
+    const adAccount = adAccounts.find(a => a.id === campaign.adAccountId);
+    if (!adAccount) return 0;
+    const spendLimit = parseFloat(adAccount.spendLimit || "0");
+    // Use calendar spend instead of ad account total spend
+    return spendLimit - totalCalendarSpend;
+  })();
 
   return (
     <Sidebar>
