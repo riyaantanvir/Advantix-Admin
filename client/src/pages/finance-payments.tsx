@@ -17,6 +17,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertFinancePaymentSchema, type FinancePayment, type Client, type FinanceProject, type InsertFinancePayment } from "@shared/schema";
 import { Plus, Edit, Trash2, MoreHorizontal, DollarSign, Calendar, Building, ArrowUpDown } from "lucide-react";
 import { formatDistance } from "date-fns";
+import Sidebar from "@/components/layout/Sidebar";
 
 export default function FinancePayments() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -210,7 +211,9 @@ export default function FinancePayments() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6" data-testid="page-finance-payments">
+    <Sidebar>
+      <div className="flex-1 overflow-auto">
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-finance-payments">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -506,6 +509,8 @@ export default function FinancePayments() {
           )}
         </CardContent>
       </Card>
-    </div>
+        </div>
+      </div>
+    </Sidebar>
   );
 }

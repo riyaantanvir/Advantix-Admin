@@ -18,6 +18,7 @@ import { insertFinanceProjectSchema, type FinanceProject, type Client, type Inse
 import { Plus, Edit, Trash2, MoreHorizontal, Eye, Building, DollarSign, Calendar } from "lucide-react";
 import { Link } from "wouter";
 import { formatDistance } from "date-fns";
+import Sidebar from "@/components/layout/Sidebar";
 
 export default function FinanceProjects() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -173,7 +174,9 @@ export default function FinanceProjects() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6" data-testid="page-finance-projects">
+    <Sidebar>
+      <div className="flex-1 overflow-auto">
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-finance-projects">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -443,6 +446,8 @@ export default function FinanceProjects() {
           )}
         </CardContent>
       </Card>
-    </div>
+        </div>
+      </div>
+    </Sidebar>
   );
 }

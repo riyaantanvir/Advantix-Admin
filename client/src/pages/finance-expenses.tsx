@@ -18,6 +18,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertFinanceExpenseSchema, type FinanceExpense, type FinanceProject, type InsertFinanceExpense } from "@shared/schema";
 import { Plus, Edit, Trash2, MoreHorizontal, DollarSign, Calendar, Building, Calculator, TrendingDown } from "lucide-react";
 import { formatDistance } from "date-fns";
+import Sidebar from "@/components/layout/Sidebar";
 
 export default function FinanceExpenses() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -185,7 +186,9 @@ export default function FinanceExpenses() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6" data-testid="page-finance-expenses">
+    <Sidebar>
+      <div className="flex-1 overflow-auto">
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-finance-expenses">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -498,6 +501,8 @@ export default function FinanceExpenses() {
           )}
         </CardContent>
       </Card>
-    </div>
+        </div>
+      </div>
+    </Sidebar>
   );
 }

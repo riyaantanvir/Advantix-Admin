@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { DollarSign, TrendingUp, TrendingDown, Calculator, Building2, ArrowUpDown } from "lucide-react";
 import { formatDistance } from "date-fns";
+import Sidebar from "@/components/layout/Sidebar";
 
 interface DashboardData {
   summary: {
@@ -119,7 +120,9 @@ export default function FinanceDashboard() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6" data-testid="page-finance-dashboard">
+    <Sidebar>
+      <div className="flex-1 overflow-auto">
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-finance-dashboard">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -294,6 +297,8 @@ export default function FinanceDashboard() {
           </CardContent>
         </Card>
       </div>
-    </div>
+        </div>
+      </div>
+    </Sidebar>
   );
 }

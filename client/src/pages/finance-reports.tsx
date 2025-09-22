@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Download, Filter, Building, DollarSign, Calendar, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
 import { formatDistance } from "date-fns";
 import { type FinanceProject, type FinancePayment, type FinanceExpense, type Client } from "@shared/schema";
+import Sidebar from "@/components/layout/Sidebar";
 
 interface ReportData {
   projects: FinanceProject[];
@@ -204,7 +205,9 @@ export default function FinanceReports() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6" data-testid="page-finance-reports">
+    <Sidebar>
+      <div className="flex-1 overflow-auto">
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-finance-reports">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -495,6 +498,8 @@ export default function FinanceReports() {
           )}
         </CardContent>
       </Card>
-    </div>
+        </div>
+      </div>
+    </Sidebar>
   );
 }
