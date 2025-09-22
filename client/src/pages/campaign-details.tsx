@@ -126,19 +126,26 @@ export default function CampaignDetailsPage() {
   });
 
   // Mock daily spend data (in real app, this would come from API)
-  const [dailySpends, setDailySpends] = useState<DailySpend[]>(() => {
+  const [dailySpends, setDailySpends] = useState<DailySpend[]>([]);
+  
+  // Initialize daily spends when component mounts or campaign data changes
+  useEffect(() => {
     const days = [];
+    const today = new Date();
+    
     // Show 30 days for full calendar context but only last 5 + today are editable
     for (let i = 29; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
+      const isToday = date.toDateString() === today.toDateString();
+      
       days.push({
         date: date.toISOString().split('T')[0],
-        amount: Math.random() * 200 + 50, // Random amount for demo
+        amount: isToday ? (campaign ? parseFloat(campaign.budget || '0') : 0) : 0, // Only today gets budget, others are 0
       });
     }
-    return days;
-  });
+    setDailySpends(days);
+  }, [campaign]); // Re-run when campaign data is loaded
 
   // Mock campaign history (in real app, this would come from API)
   const [campaignHistory] = useState<CampaignHistory[]>([
