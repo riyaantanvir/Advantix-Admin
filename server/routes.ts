@@ -1135,7 +1135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Process each record
       for (let i = 0; i < records.length; i++) {
-        const record = records[i];
+        const record = records[i] as any; // Type assertion to fix unknown type
         const rowNumber = i + 2; // +2 because first row is header and arrays are 0-indexed
 
         try {
