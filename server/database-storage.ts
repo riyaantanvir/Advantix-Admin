@@ -80,46 +80,7 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
-      // Check if sample clients exist
-      const existingClients = await db.select().from(clients).limit(1);
-      if (existingClients.length === 0) {
-        // Create sample clients
-        await db.insert(clients).values([
-          {
-            id: randomUUID(),
-            clientName: "TechCorp Solutions",
-            businessName: "TechCorp Inc.",
-            contactPerson: "John Smith",
-            email: "contact@techcorp.com",
-            phone: "+1-555-0123",
-            address: "123 Tech Street, Silicon Valley, CA",
-            notes: "Enterprise client with multiple campaigns",
-            status: "active",
-          },
-          {
-            id: randomUUID(),
-            clientName: "Marketing Pro",
-            businessName: "Marketing Pro LLC",
-            contactPerson: "Sarah Johnson",
-            email: "hello@marketingpro.com",
-            phone: "+1-555-0456",
-            address: "456 Marketing Ave, New York, NY",
-            notes: "High-volume advertising client",
-            status: "active",
-          },
-          {
-            id: randomUUID(),
-            clientName: "Digital Dynamics",
-            businessName: "Digital Dynamics Corp",
-            contactPerson: "Mike Chen",
-            email: "info@digitaldynamics.net",
-            phone: "+1-555-0789",
-            address: "789 Digital Blvd, Austin, TX",
-            notes: "Tech startup focusing on social media",
-            status: "active",
-          },
-        ]);
-      }
+      // Sample clients are no longer created automatically to preserve user data
 
       // Initialize default pages if not exist
       const existingPages = await db.select().from(pages).limit(1);
@@ -668,16 +629,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFinanceProject(project: InsertFinanceProject): Promise<FinanceProject> {
-    const newProject = {
-      ...project,
-      id: randomUUID(),
-      budget: project.budget.toString(), // Convert number to string for decimal
-      expense: project.expense ? project.expense.toString() : "0", // Convert number to string for decimal
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    await db.insert(financeProjects).values(newProject);
-    return newProject as FinanceProject;
+    try {
+      const newProject = {
+        ...project,
+        id: randomUUID(),
+        budget: project.budget.toString(), // Convert number to string for decimal
+        expense: project.expense ? project.expense.toString() : "0", // Convert number to string for decimal
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await db.insert(financeProjects).values(newProject);
+      console.log(`[DB] Created finance project: ${newProject.name} (ID: ${newProject.id})`);
+      return newProject as FinanceProject;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to create finance project:`, error);
+      throw new Error(`Failed to create finance project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async updateFinanceProject(id: string, project: Partial<InsertFinanceProject>): Promise<FinanceProject | undefined> {
@@ -712,14 +679,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFinancePayment(payment: InsertFinancePayment): Promise<FinancePayment> {
-    const newPayment = {
-      ...payment,
-      id: randomUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    await db.insert(financePayments).values(newPayment);
-    return newPayment as FinancePayment;
+    try {
+      const newPayment = {
+        ...payment,
+        id: randomUUID(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await db.insert(financePayments).values(newPayment);
+      console.log(`[DB] Created finance payment: ${newPayment.amount} ${newPayment.currency} (ID: ${newPayment.id})`);
+      return newPayment as FinancePayment;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to create finance payment:`, error);
+      throw new Error(`Failed to create finance payment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async updateFinancePayment(id: string, payment: Partial<InsertFinancePayment>): Promise<FinancePayment | undefined> {
@@ -749,14 +722,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFinanceExpense(expense: InsertFinanceExpense): Promise<FinanceExpense> {
-    const newExpense = {
-      ...expense,
-      id: randomUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    await db.insert(financeExpenses).values(newExpense);
-    return newExpense as FinanceExpense;
+    try {
+      const newExpense = {
+        ...expense,
+        id: randomUUID(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await db.insert(financeExpenses).values(newExpense);
+      console.log(`[DB] Created finance expense: ${newExpense.amount} ${newExpense.currency} (ID: ${newExpense.id})`);
+      return newExpense as FinanceExpense;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to create finance expense:`, error);
+      throw new Error(`Failed to create finance expense: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async updateFinanceExpense(id: string, expense: Partial<InsertFinanceExpense>): Promise<FinanceExpense | undefined> {
