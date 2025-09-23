@@ -913,8 +913,9 @@ export class MemStorage implements IStorage {
     const project: FinanceProject = {
       ...insertProject,
       id,
+      budget: insertProject.budget.toString(), // Convert number to string
+      expense: insertProject.expense ? insertProject.expense.toString() : "0", // Convert number to string
       status: insertProject.status || "active",
-      expense: insertProject.expense || "0",
       notes: insertProject.notes || null,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -930,6 +931,8 @@ export class MemStorage implements IStorage {
     const updatedProject: FinanceProject = {
       ...project,
       ...updateData,
+      budget: updateData.budget ? updateData.budget.toString() : project.budget,
+      expense: updateData.expense ? updateData.expense.toString() : project.expense,
       updatedAt: new Date(),
     };
     this.financeProjects.set(id, updatedProject);
@@ -1042,7 +1045,7 @@ export class MemStorage implements IStorage {
 
   async getAllFinanceSettings(): Promise<FinanceSetting[]> {
     return Array.from(this.financeSettings.values()).sort((a, b) => {
-      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
     });
   }
 

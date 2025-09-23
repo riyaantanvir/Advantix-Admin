@@ -671,6 +671,8 @@ export class DatabaseStorage implements IStorage {
     const newProject = {
       ...project,
       id: randomUUID(),
+      budget: project.budget.toString(), // Convert number to string for decimal
+      expense: project.expense ? project.expense.toString() : "0", // Convert number to string for decimal
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -679,7 +681,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateFinanceProject(id: string, project: Partial<InsertFinanceProject>): Promise<FinanceProject | undefined> {
-    const updatedProject = { ...project, updatedAt: new Date() };
+    const updatedProject = { 
+      ...project, 
+      budget: project.budget ? project.budget.toString() : undefined,
+      expense: project.expense ? project.expense.toString() : undefined,
+      updatedAt: new Date() 
+    };
     await db.update(financeProjects).set(updatedProject).where(eq(financeProjects.id, id));
     return this.getFinanceProject(id);
   }
@@ -772,7 +779,7 @@ export class DatabaseStorage implements IStorage {
   async getAllFinanceSettings(): Promise<FinanceSetting[]> {
     return db.select()
       .from(financeSettings)
-      .orderBy(desc(financeSettings.createdAt));
+      .orderBy(desc(financeSettings.updatedAt));
   }
 
   async setFinanceSetting(setting: InsertFinanceSetting): Promise<FinanceSetting> {
