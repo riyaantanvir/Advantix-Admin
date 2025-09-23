@@ -130,10 +130,17 @@ export default function FinanceExpenses() {
       const formData = new FormData();
       formData.append('csvFile', file);
       
-      // Use fetch with session-based authentication
+      // Get token from localStorage like other API calls
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      
       const response = await fetch('/api/finance/expenses/import-csv', {
         method: 'POST',
-        credentials: 'include', // This ensures session cookies are sent
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: formData,
       });
       
