@@ -1114,8 +1114,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // CSV Import for expenses
-  app.post("/api/finance/expenses/import-csv", authenticate, requirePagePermission('finance', 'edit'), upload.single('csvFile'), async (req: Request, res: Response) => {
+  // CSV Preview for expenses (Step 1: Show data before importing)
+  app.post("/api/finance/expenses/import-csv/preview", authenticate, requirePagePermission('finance', 'edit'), upload.single('csvFile'), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No CSV file uploaded" });
@@ -1130,13 +1130,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         trim: true,
       });
 
-      let imported = 0;
+      let validRecords: any[] = [];
       let errors: string[] = [];
 
-      // Process each record
+      // Process each record for preview
       for (let i = 0; i < records.length; i++) {
-        const record = records[i] as any; // Type assertion to fix unknown type
-        const rowNumber = i + 2; // +2 because first row is header and arrays are 0-indexed
+        const record = records[i] as any;
+        const rowNumber = i + 2;
 
         try {
           // Validate required fields
@@ -1145,35 +1145,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          // Validate type (case-insensitive)
-          const typeLC = record.type.toLowerCase();
+          // Normalize and validate type
+          const typeLC = record.type.trim().toLowerCase();
           if (!['expense', 'salary'].includes(typeLC)) {
-            errors.push(`Row ${rowNumber}: Type must be 'expense' or 'salary'`);
+            errors.push(`Row ${rowNumber}: Type must be 'expense' or 'salary', got '${record.type}'`);
             continue;
           }
 
           // Validate currency
-          if (!['USD', 'BDT'].includes(record.currency)) {
-            errors.push(`Row ${rowNumber}: Currency must be 'USD' or 'BDT'`);
+          const currencyUC = record.currency.trim().toUpperCase();
+          if (!['USD', 'BDT'].includes(currencyUC)) {
+            errors.push(`Row ${rowNumber}: Currency must be 'USD' or 'BDT', got '${record.currency}'`);
             continue;
           }
 
           // Validate amount
           const amount = parseFloat(record.amount);
           if (isNaN(amount) || amount <= 0) {
-            errors.push(`Row ${rowNumber}: Amount must be a positive number`);
+            errors.push(`Row ${rowNumber}: Amount must be a positive number, got '${record.amount}'`);
             continue;
           }
 
           // Validate date format
           const date = new Date(record.date);
           if (isNaN(date.getTime())) {
-            errors.push(`Row ${rowNumber}: Date must be in YYYY-MM-DD format`);
+            errors.push(`Row ${rowNumber}: Date must be in YYYY-MM-DD format, got '${record.date}'`);
             continue;
           }
 
           // Validate projectId if provided
           let projectId: string | null = null;
+          let projectName = 'No Project';
           if (record.projectId && record.projectId.trim() !== '') {
             const project = await storage.getFinanceProject(record.projectId.trim());
             if (!project) {
@@ -1181,15 +1183,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
               continue;
             }
             projectId = record.projectId.trim();
+            projectName = project.name;
           }
 
+          // Create validated record for preview
+          const validRecord = {
+            rowNumber,
+            type: typeLC,
+            projectId,
+            projectName,
+            amount: amount.toString(),
+            currency: currencyUC,
+            date: date.toISOString().split('T')[0],
+            notes: record.notes || '',
+            originalRow: record
+          };
+
+          validRecords.push(validRecord);
+
+        } catch (validationError) {
+          if (validationError instanceof z.ZodError) {
+            errors.push(`Row ${rowNumber}: ${validationError.errors.map(e => e.message).join(', ')}`);
+          } else {
+            errors.push(`Row ${rowNumber}: ${validationError instanceof Error ? validationError.message : 'Unknown error'}`);
+          }
+        }
+      }
+
+      res.json({
+        message: `Preview ready: ${validRecords.length} valid records, ${errors.length} errors`,
+        validRecords,
+        totalRows: records.length,
+        validCount: validRecords.length,
+        errorCount: errors.length,
+        errors: errors,
+      });
+
+    } catch (error) {
+      console.error("CSV Preview error:", error);
+      res.status(500).json({ message: "Internal server error during preview" });
+    }
+  });
+
+  // CSV Import for expenses (Step 2: Actually save the data)
+  app.post("/api/finance/expenses/import-csv/confirm", authenticate, requirePagePermission('finance', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const { validRecords } = req.body;
+      
+      if (!validRecords || !Array.isArray(validRecords)) {
+        return res.status(400).json({ message: "Invalid data: validRecords array required" });
+      }
+
+      let imported = 0;
+      let errors: string[] = [];
+
+      for (const record of validRecords) {
+        try {
           // Create expense data
           const expenseData = {
-            type: typeLC as 'expense' | 'salary',
-            projectId,
-            amount: amount.toString(),
+            type: record.type as 'expense' | 'salary',
+            projectId: record.projectId || null,
+            amount: record.amount,
             currency: record.currency as 'USD' | 'BDT',
-            date,
+            date: new Date(record.date),
             notes: record.notes || '',
           };
 
@@ -1202,26 +1258,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         } catch (validationError) {
           if (validationError instanceof z.ZodError) {
-            errors.push(`Row ${rowNumber}: ${validationError.errors.map(e => e.message).join(', ')}`);
+            errors.push(`Row ${record.rowNumber}: ${validationError.errors.map(e => e.message).join(', ')}`);
           } else {
-            errors.push(`Row ${rowNumber}: ${validationError instanceof Error ? validationError.message : 'Unknown error'}`);
+            errors.push(`Row ${record.rowNumber}: ${validationError instanceof Error ? validationError.message : 'Unknown error'}`);
           }
         }
       }
 
+      if (imported === 0 && errors.length > 0) {
+        return res.status(400).json({
+          message: "No records were imported due to validation errors",
+          imported: 0,
+          errors: errors.length,
+          errorDetails: errors,
+        });
+      }
+
       res.json({
-        message: `Import completed. ${imported} expenses imported successfully.`,
+        message: `Import completed successfully! ${imported} expenses imported.`,
         imported,
         errors: errors.length,
         errorDetails: errors,
       });
 
     } catch (error) {
-      console.error("CSV Import error:", error);
-      if (error instanceof Error && error.message === 'Only CSV files are allowed') {
-        return res.status(400).json({ message: "Only CSV files are allowed" });
-      }
-      res.status(500).json({ message: "Internal server error" });
+      console.error("CSV Confirm error:", error);
+      res.status(500).json({ message: "Internal server error during import" });
     }
   });
 

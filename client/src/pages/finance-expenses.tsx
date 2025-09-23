@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertFinanceExpenseSchema, type FinanceExpense, type FinanceProject, type InsertFinanceExpense } from "@shared/schema";
-import { Plus, Edit, Trash2, MoreHorizontal, DollarSign, Calendar, Building, Calculator, TrendingDown, Upload, FileSpreadsheet } from "lucide-react";
+import { Plus, Edit, Trash2, MoreHorizontal, DollarSign, Calendar, Building, Calculator, TrendingDown, Upload, FileSpreadsheet, Eye, CheckCircle } from "lucide-react";
 import { formatDistance } from "date-fns";
 import Sidebar from "@/components/layout/Sidebar";
 
@@ -26,6 +26,8 @@ export default function FinanceExpenses() {
   const [activeTab, setActiveTab] = useState("all");
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [isPreviewStep, setIsPreviewStep] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -124,24 +126,64 @@ export default function FinanceExpenses() {
     },
   });
 
-  // CSV Import mutation
-  const importCsvMutation = useMutation({
+  // CSV Preview mutation (Step 1)
+  const previewCsvMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('csvFile', file);
       
-      // Get token from localStorage like other API calls
       const token = localStorage.getItem('authToken');
       if (!token) {
         throw new Error('Not authenticated');
       }
       
-      const response = await fetch('/api/finance/expenses/import-csv', {
+      const response = await fetch('/api/finance/expenses/import-csv/preview', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
         body: formData,
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Preview failed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (result) => {
+      setPreviewData(result);
+      setIsPreviewStep(true);
+      toast({
+        title: "Preview Ready",
+        description: `${result.validCount} valid records found. Review and confirm to import.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to preview CSV file.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // CSV Confirm mutation (Step 2)
+  const confirmCsvMutation = useMutation({
+    mutationFn: async (validRecords: any[]) => {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      
+      const response = await fetch('/api/finance/expenses/import-csv/confirm', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ validRecords }),
       });
       
       if (!response.ok) {
@@ -156,18 +198,20 @@ export default function FinanceExpenses() {
       queryClient.invalidateQueries({ queryKey: ["/api/finance/dashboard"] });
       setIsImportDialogOpen(false);
       setCsvFile(null);
+      setPreviewData(null);
+      setIsPreviewStep(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
       toast({
         title: "Success",
-        description: `Successfully imported ${result.imported} expenses/salaries. ${result.errors || 0} errors.`,
+        description: `${result.imported} expenses imported successfully!`,
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to import CSV file.",
+        description: error.message || "Failed to import expenses.",
         variant: "destructive",
       });
     },
@@ -202,10 +246,21 @@ export default function FinanceExpenses() {
     }
   };
 
-  const handleImportCsv = () => {
+  const handlePreviewCsv = () => {
     if (csvFile) {
-      importCsvMutation.mutate(csvFile);
+      previewCsvMutation.mutate(csvFile);
     }
+  };
+
+  const handleConfirmImport = () => {
+    if (previewData?.validRecords) {
+      confirmCsvMutation.mutate(previewData.validRecords);
+    }
+  };
+
+  const handleBackToUpload = () => {
+    setIsPreviewStep(false);
+    setPreviewData(null);
   };
 
   const handleEdit = (expense: FinanceExpense) => {
@@ -285,11 +340,16 @@ export default function FinanceExpenses() {
                 Import CSV
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[800px]">
               <DialogHeader>
-                <DialogTitle>Import Expenses from CSV</DialogTitle>
+                <DialogTitle>
+                  {isPreviewStep ? "Review CSV Import Data" : "Import Expenses from CSV"}
+                </DialogTitle>
                 <DialogDescription>
-                  Upload a CSV file to bulk import expenses and salaries. Make sure your CSV follows the required format.
+                  {isPreviewStep 
+                    ? "Review the data below and confirm to import into your expenses."
+                    : "Upload a CSV file to bulk import expenses and salaries. Make sure your CSV follows the required format."
+                  }
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
@@ -347,10 +407,12 @@ export default function FinanceExpenses() {
                     Cancel
                   </Button>
                   <Button 
-                    onClick={handleImportCsv}
-                    disabled={!csvFile || importCsvMutation.isPending}
+                    onClick={handlePreviewCsv}
+                    disabled={!csvFile || previewCsvMutation.isPending}
+                    data-testid="button-preview-csv"
                   >
-                    {importCsvMutation.isPending ? "Importing..." : "Import CSV"}
+                    <Eye className="h-4 w-4 mr-2" />
+                    {previewCsvMutation.isPending ? "Loading..." : "Preview Data"}
                   </Button>
                 </div>
               </div>
