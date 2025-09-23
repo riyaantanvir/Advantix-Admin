@@ -1145,8 +1145,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          // Validate type
-          if (!['expense', 'salary'].includes(record.type)) {
+          // Validate type (case-insensitive)
+          const typeLC = record.type.toLowerCase();
+          if (!['expense', 'salary'].includes(typeLC)) {
             errors.push(`Row ${rowNumber}: Type must be 'expense' or 'salary'`);
             continue;
           }
@@ -1184,7 +1185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Create expense data
           const expenseData = {
-            type: record.type as 'expense' | 'salary',
+            type: typeLC as 'expense' | 'salary',
             projectId,
             amount: amount.toString(),
             currency: record.currency as 'USD' | 'BDT',
