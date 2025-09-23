@@ -373,7 +373,7 @@ export default function FinancePayments() {
                     <FormItem>
                       <FormLabel>Notes</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="Payment notes..." data-testid="textarea-notes" />
+                        <Textarea {...field} placeholder="Payment notes..." data-testid="textarea-notes" value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

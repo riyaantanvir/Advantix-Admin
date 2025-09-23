@@ -130,11 +130,10 @@ export default function FinanceExpenses() {
       const formData = new FormData();
       formData.append('csvFile', file);
       
+      // Use fetch with session-based authentication
       const response = await fetch('/api/finance/expenses/import-csv', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+        credentials: 'include', // This ensures session cookies are sent
         body: formData,
       });
       
@@ -469,7 +468,7 @@ export default function FinanceExpenses() {
                     <FormItem>
                       <FormLabel>Notes</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="Description of expense or salary..." data-testid="textarea-notes" />
+                        <Textarea {...field} placeholder="Description of expense or salary..." data-testid="textarea-notes" value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
