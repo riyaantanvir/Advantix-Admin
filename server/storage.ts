@@ -67,6 +67,7 @@ export interface IStorage {
   
   // Ad Copy Set methods
   getAdCopySets(campaignId: string): Promise<AdCopySet[]>;
+  getAllAdCopySets(): Promise<AdCopySet[]>; // Get all ad copy sets without campaign filter
   getAdCopySet(id: string): Promise<AdCopySet | undefined>;
   createAdCopySet(adCopySet: InsertAdCopySet): Promise<AdCopySet>;
   updateAdCopySet(id: string, adCopySet: Partial<InsertAdCopySet>): Promise<AdCopySet | undefined>;
@@ -120,6 +121,7 @@ export interface IStorage {
 
   // Finance Settings methods
   getFinanceSetting(key: string): Promise<FinanceSetting | undefined>;
+  getAllFinanceSettings(): Promise<FinanceSetting[]>; // Get all finance settings
   setFinanceSetting(setting: InsertFinanceSetting): Promise<FinanceSetting>;
   getExchangeRate(): Promise<number>; // Helper to get USD to BDT rate
 }
@@ -549,6 +551,12 @@ export class MemStorage implements IStorage {
         // Then by creation date
         return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
       });
+  }
+
+  async getAllAdCopySets(): Promise<AdCopySet[]> {
+    return Array.from(this.adCopySets.values()).sort((a, b) => {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
   }
 
   async getAdCopySet(id: string): Promise<AdCopySet | undefined> {
@@ -1030,6 +1038,12 @@ export class MemStorage implements IStorage {
   // Finance Settings methods
   async getFinanceSetting(key: string): Promise<FinanceSetting | undefined> {
     return Array.from(this.financeSettings.values()).find(setting => setting.key === key);
+  }
+
+  async getAllFinanceSettings(): Promise<FinanceSetting[]> {
+    return Array.from(this.financeSettings.values()).sort((a, b) => {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
   }
 
   async setFinanceSetting(insertSetting: InsertFinanceSetting): Promise<FinanceSetting> {

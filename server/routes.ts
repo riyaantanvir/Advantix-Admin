@@ -1344,6 +1344,280 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Data Backup and Export Endpoints - Super Admin Only
+  
+  // Helper function to check if user is Super Admin
+  function requireSuperAdmin(req: Request, res: Response, next: Function) {
+    if (!req.user || req.user.role !== UserRole.SUPER_ADMIN) {
+      return res.status(403).json({ message: "Super Admin access required" });
+    }
+    next();
+  }
+
+  // Full Database Backup (JSON format)
+  app.get("/api/backup/full", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const [
+        allUsers,
+        allCampaigns,
+        allClients,
+        allAdAccounts,
+        allAdCopySets,
+        allWorkReports,
+        allPages,
+        allRolePermissions,
+        allFinanceProjects,
+        allFinancePayments,
+        allFinanceExpenses,
+        allFinanceSettings
+      ] = await Promise.all([
+        storage.getAllUsers(),
+        storage.getCampaigns(),
+        storage.getClients(),
+        storage.getAdAccounts(),
+        storage.getAllAdCopySets(), // Get all ad copy sets
+        storage.getWorkReports(),
+        storage.getPages(),
+        storage.getRolePermissions(),
+        storage.getFinanceProjects(),
+        storage.getFinancePayments(),
+        storage.getFinanceExpenses(),
+        storage.getAllFinanceSettings(), // Get all settings
+      ]);
+
+      const backup = {
+        exportedAt: new Date().toISOString(),
+        version: "1.0",
+        data: {
+          users: allUsers,
+          campaigns: allCampaigns,
+          clients: allClients,
+          adAccounts: allAdAccounts,
+          adCopySets: allAdCopySets,
+          workReports: allWorkReports,
+          pages: allPages,
+          rolePermissions: allRolePermissions,
+          financeProjects: allFinanceProjects,
+          financePayments: allFinancePayments,
+          financeExpenses: allFinanceExpenses,
+          financeSettings: allFinanceSettings,
+        }
+      };
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="advantix-backup-${new Date().toISOString().split('T')[0]}.json"`);
+      res.json(backup);
+    } catch (error) {
+      console.error("Full backup error:", error);
+      res.status(500).json({ message: "Backup failed" });
+    }
+  });
+
+  // Individual table exports (JSON format)
+  app.get("/api/backup/users", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="users-backup-${new Date().toISOString().split('T')[0]}.json"`);
+      res.json({ exportedAt: new Date().toISOString(), data: users });
+    } catch (error) {
+      res.status(500).json({ message: "Users backup failed" });
+    }
+  });
+
+  app.get("/api/backup/clients", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const clients = await storage.getClients();
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="clients-backup-${new Date().toISOString().split('T')[0]}.json"`);
+      res.json({ exportedAt: new Date().toISOString(), data: clients });
+    } catch (error) {
+      res.status(500).json({ message: "Clients backup failed" });
+    }
+  });
+
+  app.get("/api/backup/campaigns", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const campaigns = await storage.getCampaigns();
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="campaigns-backup-${new Date().toISOString().split('T')[0]}.json"`);
+      res.json({ exportedAt: new Date().toISOString(), data: campaigns });
+    } catch (error) {
+      res.status(500).json({ message: "Campaigns backup failed" });
+    }
+  });
+
+  app.get("/api/backup/finance", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const [projects, payments, expenses, settings] = await Promise.all([
+        storage.getFinanceProjects(),
+        storage.getFinancePayments(),
+        storage.getFinanceExpenses(),
+        storage.getAllFinanceSettings(), // Get all settings
+      ]);
+
+      const financeData = {
+        projects,
+        payments,
+        expenses,
+        settings
+      };
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="finance-backup-${new Date().toISOString().split('T')[0]}.json"`);
+      res.json({ exportedAt: new Date().toISOString(), data: financeData });
+    } catch (error) {
+      res.status(500).json({ message: "Finance backup failed" });
+    }
+  });
+
+  // CSV Export Functions
+  function convertToCSV(data: any[], headers: string[]): string {
+    const csvHeaders = headers.join(',');
+    const csvRows = data.map(row => {
+      return headers.map(header => {
+        const value = row[header];
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return String(value);
+      }).join(',');
+    });
+    return [csvHeaders, ...csvRows].join('\n');
+  }
+
+  // CSV Export Endpoints
+  app.get("/api/backup/clients/csv", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const clients = await storage.getClients();
+      const headers = ['id', 'clientName', 'businessName', 'contactPerson', 'email', 'phone', 'address', 'notes', 'status', 'createdAt', 'updatedAt'];
+      const csv = convertToCSV(clients, headers);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="clients-${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      res.status(500).json({ message: "CSV export failed" });
+    }
+  });
+
+  app.get("/api/backup/campaigns/csv", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const campaigns = await storage.getCampaigns();
+      const headers = ['id', 'name', 'startDate', 'comments', 'adAccountId', 'clientId', 'spend', 'status', 'createdAt', 'updatedAt'];
+      const csv = convertToCSV(campaigns, headers);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="campaigns-${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      res.status(500).json({ message: "CSV export failed" });
+    }
+  });
+
+  app.get("/api/backup/finance-projects/csv", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const projects = await storage.getFinanceProjects();
+      const headers = ['id', 'name', 'description', 'budget', 'expenses', 'status', 'createdAt', 'updatedAt'];
+      const csv = convertToCSV(projects, headers);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="finance-projects-${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      res.status(500).json({ message: "CSV export failed" });
+    }
+  });
+
+  app.get("/api/backup/finance-payments/csv", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const payments = await storage.getFinancePayments();
+      const headers = ['id', 'projectId', 'amount', 'currency', 'description', 'paymentDate', 'createdAt', 'updatedAt'];
+      const csv = convertToCSV(payments, headers);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="finance-payments-${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      res.status(500).json({ message: "CSV export failed" });
+    }
+  });
+
+  app.get("/api/backup/finance-expenses/csv", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const expenses = await storage.getFinanceExpenses();
+      const headers = ['id', 'projectId', 'amount', 'currency', 'category', 'description', 'expenseDate', 'createdAt', 'updatedAt'];
+      const csv = convertToCSV(expenses, headers);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="finance-expenses-${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      res.status(500).json({ message: "CSV export failed" });
+    }
+  });
+
+  // Data Recovery Information Endpoint
+  app.get("/api/backup/info", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const [
+        usersCount,
+        campaignsCount,
+        clientsCount,
+        adAccountsCount,
+        workReportsCount,
+        financeProjectsCount,
+        financePaymentsCount,
+        financeExpensesCount
+      ] = await Promise.all([
+        storage.getAllUsers().then(users => users.length),
+        storage.getCampaigns().then(campaigns => campaigns.length),
+        storage.getClients().then(clients => clients.length),
+        storage.getAdAccounts().then(accounts => accounts.length),
+        storage.getWorkReports().then(reports => reports.length),
+        storage.getFinanceProjects().then(projects => projects.length),
+        storage.getFinancePayments().then(payments => payments.length),
+        storage.getFinanceExpenses().then(expenses => expenses.length),
+      ]);
+
+      res.json({
+        message: "Data backup and recovery system active",
+        dataIntegrity: "All data is permanently stored in PostgreSQL database",
+        backupOptions: {
+          fullBackup: "/api/backup/full",
+          individualBackups: {
+            users: "/api/backup/users",
+            clients: "/api/backup/clients", 
+            campaigns: "/api/backup/campaigns",
+            finance: "/api/backup/finance"
+          },
+          csvExports: {
+            clients: "/api/backup/clients/csv",
+            campaigns: "/api/backup/campaigns/csv",
+            financeProjects: "/api/backup/finance-projects/csv",
+            financePayments: "/api/backup/finance-payments/csv",
+            financeExpenses: "/api/backup/finance-expenses/csv"
+          }
+        },
+        dataStats: {
+          users: usersCount,
+          campaigns: campaignsCount,
+          clients: clientsCount,
+          adAccounts: adAccountsCount,
+          workReports: workReportsCount,
+          financeProjects: financeProjectsCount,
+          financePayments: financePaymentsCount,
+          financeExpenses: financeExpensesCount,
+          lastBackupAvailable: "On-demand via API endpoints"
+        },
+        securityNote: "All backup endpoints require Super Admin authentication"
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Backup info retrieval failed" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

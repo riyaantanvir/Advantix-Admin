@@ -423,6 +423,12 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(adCopySets.isActive), desc(adCopySets.createdAt));
   }
 
+  async getAllAdCopySets(): Promise<AdCopySet[]> {
+    return db.select()
+      .from(adCopySets)
+      .orderBy(desc(adCopySets.createdAt));
+  }
+
   async getAdCopySet(id: string): Promise<AdCopySet | undefined> {
     const result = await db.select().from(adCopySets).where(eq(adCopySets.id, id)).limit(1);
     return result[0];
@@ -761,6 +767,12 @@ export class DatabaseStorage implements IStorage {
   async getFinanceSetting(key: string): Promise<FinanceSetting | undefined> {
     const results = await db.select().from(financeSettings).where(eq(financeSettings.key, key));
     return results[0];
+  }
+
+  async getAllFinanceSettings(): Promise<FinanceSetting[]> {
+    return db.select()
+      .from(financeSettings)
+      .orderBy(desc(financeSettings.createdAt));
   }
 
   async setFinanceSetting(setting: InsertFinanceSetting): Promise<FinanceSetting> {
