@@ -244,7 +244,10 @@ export default function FinanceReports() {
                   <SelectItem value="">All Projects</SelectItem>
                   {projects?.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
-                      {project.name}
+                      <div>
+                        <div className="font-medium">{project.name}</div>
+                        <div className="text-xs text-gray-400 font-mono">ID: {project.id}</div>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -404,6 +407,7 @@ export default function FinanceReports() {
                       <Building className="h-4 w-4 text-gray-500" />
                       <div>
                         <div className="font-medium">{item.project.name}</div>
+                        <div className="text-xs text-gray-400 font-mono">ID: {item.project.id}</div>
                         <Badge variant={item.project.status === "active" ? "default" : "secondary"} className="mt-1">
                           {item.project.status}
                         </Badge>

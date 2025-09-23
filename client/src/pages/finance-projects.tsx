@@ -314,7 +314,7 @@ export default function FinanceProjects() {
                     <FormItem>
                       <FormLabel>Notes</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="Project notes..." data-testid="textarea-notes" />
+                        <Textarea {...field} placeholder="Project notes..." data-testid="textarea-notes" value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -370,6 +370,7 @@ export default function FinanceProjects() {
                       <Building className="h-4 w-4 text-gray-500" />
                       <div>
                         <div className="font-medium">{project.name}</div>
+                        <div className="text-xs text-gray-400 font-mono">ID: {project.id}</div>
                         {project.notes && (
                           <div className="text-sm text-gray-500 truncate max-w-xs">
                             {project.notes}

@@ -290,7 +290,10 @@ export default function FinancePayments() {
                           <SelectContent>
                             {projects?.map((project) => (
                               <SelectItem key={project.id} value={project.id}>
-                                {project.name}
+                                <div>
+                                  <div className="font-medium">{project.name}</div>
+                                  <div className="text-xs text-gray-400 font-mono">ID: {project.id}</div>
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
