@@ -103,7 +103,126 @@
     @apply border-border;
   }
 
+  html {
+    /* Improve text rendering */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    
+    /* Ensure full height is available */
+    height: 100%;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    /* Dynamic viewport height for mobile compatibility */
+    min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height for modern browsers */
+    margin: 0;
+    overflow-x: hidden; /* Prevent horizontal scroll issues */
+  }
+
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Responsive breakpoints for consistent design */
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Mobile-first responsive containers */
+  @media (min-width: 640px) {
+    .container {
+      max-width: 640px;
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .container {
+      max-width: 768px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container {
+      max-width: 1024px;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .container {
+      max-width: 1280px;
+    }
+  }
+
+  @media (min-width: 1536px) {
+    .container {
+      max-width: 1536px;
+    }
+  }
+
+  /* Improve scroll behavior */
+  * {
+    scroll-behavior: smooth;
+  }
+
+  /* Fix for iOS Safari viewport issues */
+  @supports (-webkit-touch-callout: none) {
+    .min-h-screen {
+      min-height: -webkit-fill-available;
+    }
+  }
+
+  /* Cross-browser form styling */
+  input, textarea, select {
+    font-family: inherit;
+  }
+
+  /* Ensure tables are responsive */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  /* Improve focus visibility */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Custom scrollbar styles for webkit browsers */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--accent-foreground));
+  }
+
+  /* Firefox scrollbar styles */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) hsl(var(--muted));
   }
 }

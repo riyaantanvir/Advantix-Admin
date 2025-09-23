@@ -258,14 +258,15 @@ export default function Sidebar({ children }: SidebarProps) {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Sidebar */}
       <div className={cn(
         "bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 flex flex-col",
-        isCollapsed ? "w-16" : "w-64"
+        "md:relative md:translate-x-0",
+        isCollapsed ? "w-16" : "w-64 md:w-64"
       )}>
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-3 md:p-4 border-b border-gray-200 dark:border-gray-700">
           {!isCollapsed && (
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">
               Advantix Admin
@@ -504,7 +505,7 @@ export default function Sidebar({ children }: SidebarProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col">
         {children}
       </div>
     </div>
