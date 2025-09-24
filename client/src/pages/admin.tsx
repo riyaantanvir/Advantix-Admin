@@ -51,8 +51,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign } from "lucide-react";
-import type { User, InsertUserWithRole, Page, RolePermission } from "@shared/schema";
+import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign, Tag as TagIcon, Plus } from "lucide-react";
+import type { User, InsertUserWithRole, Page, RolePermission, Tag, InsertTag } from "@shared/schema";
 
 interface UserFormData {
   name: string;
@@ -908,10 +908,24 @@ function AccessControl() {
 
 function FinanceAccessControl() {
   const { toast } = useToast();
+  const [isCreateTagOpen, setIsCreateTagOpen] = useState(false);
+  const [isEditTagOpen, setIsEditTagOpen] = useState(false);
+  const [editingTag, setEditingTag] = useState<Tag | null>(null);
+  const [tagFormData, setTagFormData] = useState({ name: "", description: "", color: "#3B82F6" });
   
   // Fetch all users
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
+  });
+
+  // Fetch tags
+  const { data: tags = [], isLoading: tagsLoading, refetch: refetchTags } = useQuery<Tag[]>({
+    queryKey: ["/api/tags"],
+  });
+
+  // Fetch employees (same as users)
+  const { data: employees = [], isLoading: employeesLoading } = useQuery<User[]>({
+    queryKey: ["/api/employees"],
   });
 
   // Fetch finance page and role permissions
@@ -986,6 +1000,121 @@ function FinanceAccessControl() {
 
   const handleAccessToggle = (userId: string, hasAccess: boolean) => {
     updatePermissionMutation.mutate({ userId, hasAccess });
+  };
+
+  // Tag mutations
+  const createTagMutation = useMutation({
+    mutationFn: async (tagData: InsertTag) => {
+      const response = await apiRequest("POST", "/api/tags", tagData);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Tag created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      setIsCreateTagOpen(false);
+      resetTagForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create tag",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateTagMutation = useMutation({
+    mutationFn: async ({ id, tagData }: { id: string; tagData: Partial<InsertTag> }) => {
+      const response = await apiRequest("PUT", `/api/tags/${id}`, tagData);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Tag updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      setIsEditTagOpen(false);
+      setEditingTag(null);
+      resetTagForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update tag",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTagMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/tags/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Tag deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete tag",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetTagForm = () => {
+    setTagFormData({ name: "", description: "", color: "#3B82F6" });
+  };
+
+  const handleCreateTag = () => {
+    if (!tagFormData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Tag name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    createTagMutation.mutate({
+      name: tagFormData.name,
+      description: tagFormData.description || null,
+      color: tagFormData.color,
+    });
+  };
+
+  const handleEditTag = (tag: Tag) => {
+    setEditingTag(tag);
+    setTagFormData({
+      name: tag.name,
+      description: tag.description || "",
+      color: tag.color || "#3B82F6",
+    });
+    setIsEditTagOpen(true);
+  };
+
+  const handleUpdateTag = () => {
+    if (!editingTag || !tagFormData.name.trim()) return;
+    updateTagMutation.mutate({
+      id: editingTag.id,
+      tagData: {
+        name: tagFormData.name,
+        description: tagFormData.description || null,
+        color: tagFormData.color,
+      },
+    });
+  };
+
+  const handleDeleteTag = (id: string) => {
+    deleteTagMutation.mutate(id);
   };
 
   if (usersLoading) {
@@ -1107,6 +1236,301 @@ function FinanceAccessControl() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Tag Management Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <TagIcon className="w-5 h-5" />
+                Tag Management
+              </CardTitle>
+              <CardDescription>
+                Create and manage tags for categorizing finance data
+              </CardDescription>
+            </div>
+            <Dialog open={isCreateTagOpen} onOpenChange={setIsCreateTagOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-tag">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Tag
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Tag</DialogTitle>
+                  <DialogDescription>
+                    Create a new tag for categorizing finance data
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="tag-name">Tag Name</Label>
+                    <Input
+                      id="tag-name"
+                      value={tagFormData.name}
+                      onChange={(e) => setTagFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Enter tag name"
+                      data-testid="input-tag-name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="tag-description">Description (optional)</Label>
+                    <Input
+                      id="tag-description"
+                      value={tagFormData.description}
+                      onChange={(e) => setTagFormData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Enter tag description"
+                      data-testid="input-tag-description"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="tag-color">Color</Label>
+                    <Input
+                      id="tag-color"
+                      type="color"
+                      value={tagFormData.color}
+                      onChange={(e) => setTagFormData(prev => ({ ...prev, color: e.target.value }))}
+                      data-testid="input-tag-color"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCreateTagOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleCreateTag}
+                    disabled={createTagMutation.isPending}
+                    data-testid="button-save-tag"
+                  >
+                    {createTagMutation.isPending ? "Creating..." : "Create Tag"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {tagsLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Color</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tags.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                      No tags found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  tags.map((tag) => (
+                    <TableRow key={tag.id} data-testid={`row-tag-${tag.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-tag-name-${tag.id}`}>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-4 h-4 rounded-full" 
+                            style={{ backgroundColor: tag.color || "#3B82F6" }}
+                          />
+                          {tag.name}
+                        </div>
+                      </TableCell>
+                      <TableCell data-testid={`text-tag-description-${tag.id}`}>
+                        {tag.description || "No description"}
+                      </TableCell>
+                      <TableCell data-testid={`text-tag-color-${tag.id}`}>
+                        {tag.color || "#3B82F6"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={tag.isActive ? "default" : "secondary"} data-testid={`badge-tag-status-${tag.id}`}>
+                          {tag.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditTag(tag)}
+                            data-testid={`button-edit-tag-${tag.id}`}
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700"
+                                data-testid={`button-delete-tag-${tag.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Tag</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete "{tag.name}"? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteTag(tag.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                  data-testid={`button-confirm-delete-tag-${tag.id}`}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Employee Name Management Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            Employee Name Management
+          </CardTitle>
+          <CardDescription>
+            Manage employee names and information for finance tracking
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {employeesLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {employees.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                      No employees found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  employees.map((employee) => (
+                    <TableRow key={employee.id} data-testid={`row-employee-${employee.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-employee-name-${employee.id}`}>
+                        {employee.name || "N/A"}
+                      </TableCell>
+                      <TableCell data-testid={`text-employee-username-${employee.id}`}>
+                        {employee.username}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" data-testid={`badge-employee-role-${employee.id}`}>
+                          {employee.role === 'super_admin' ? 'Super Admin' : 
+                           employee.role === 'admin' ? 'Admin' :
+                           employee.role === 'manager' ? 'Manager' : 'User'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={employee.isActive ? "default" : "secondary"} data-testid={`badge-employee-status-${employee.id}`}>
+                          {employee.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell data-testid={`text-employee-created-${employee.id}`}>
+                        {employee.createdAt ? new Date(employee.createdAt).toLocaleDateString() : "N/A"}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit Tag Dialog */}
+      <Dialog open={isEditTagOpen} onOpenChange={setIsEditTagOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Tag</DialogTitle>
+            <DialogDescription>
+              Update tag information
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-tag-name">Tag Name</Label>
+              <Input
+                id="edit-tag-name"
+                value={tagFormData.name}
+                onChange={(e) => setTagFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter tag name"
+                data-testid="input-edit-tag-name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-tag-description">Description (optional)</Label>
+              <Input
+                id="edit-tag-description"
+                value={tagFormData.description}
+                onChange={(e) => setTagFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter tag description"
+                data-testid="input-edit-tag-description"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-tag-color">Color</Label>
+              <Input
+                id="edit-tag-color"
+                type="color"
+                value={tagFormData.color}
+                onChange={(e) => setTagFormData(prev => ({ ...prev, color: e.target.value }))}
+                data-testid="input-edit-tag-color"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditTagOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpdateTag}
+              disabled={updateTagMutation.isPending}
+              data-testid="button-update-tag"
+            >
+              {updateTagMutation.isPending ? "Updating..." : "Update Tag"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
