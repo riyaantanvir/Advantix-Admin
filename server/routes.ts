@@ -17,6 +17,7 @@ import {
   insertFinanceExpenseSchema,
   insertFinanceSettingSchema,
   insertTagSchema,
+  insertEmployeeSchema,
   type Campaign,
   type Client,
   type User,
@@ -30,6 +31,7 @@ import {
   type FinanceExpense,
   type FinanceSetting,
   type Tag,
+  type Employee,
   UserRole 
 } from "@shared/schema";
 import { z } from "zod";
@@ -1483,24 +1485,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Employee Management Routes (reusing existing users but filtered for employees)
+  // Employee Management Routes - Admin Only
   
-  // Get all employees (users with employee-like roles)
+  // Get all employees
   app.get("/api/employees", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
     try {
-      const users = await storage.getAllUsers();
-      // Filter to include all users since they represent employees
-      const employees = users.map(user => ({
-        id: user.id,
-        name: user.name,
-        username: user.username,
-        role: user.role,
-        isActive: user.isActive,
-        createdAt: user.createdAt
-      }));
+      const employees = await storage.getEmployees();
       res.json(employees);
     } catch (error) {
       console.error("Get employees error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get single employee
+  app.get("/api/employees/:id", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const employee = await storage.getEmployee(req.params.id);
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+      res.json(employee);
+    } catch (error) {
+      console.error("Get employee error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create new employee
+  app.post("/api/employees", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertEmployeeSchema.parse(req.body);
+      const employee = await storage.createEmployee(validatedData);
+      res.status(201).json(employee);
+    } catch (error) {
+      console.error("Create employee error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update employee
+  app.put("/api/employees/:id", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertEmployeeSchema.partial().parse(req.body);
+      const employee = await storage.updateEmployee(req.params.id, validatedData);
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+      res.json(employee);
+    } catch (error) {
+      console.error("Update employee error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete employee
+  app.delete("/api/employees/:id", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteEmployee(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+      res.json({ message: "Employee deleted successfully" });
+    } catch (error) {
+      console.error("Delete employee error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
