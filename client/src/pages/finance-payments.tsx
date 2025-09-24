@@ -609,6 +609,51 @@ export default function FinancePayments() {
         </CardContent>
       </Card>
 
+      {/* Payment Totals Section */}
+      {filteredPayments && filteredPayments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Payment Totals
+              {(selectedProject !== "all" || selectedClient !== "all" || dateFilter !== "all") && (
+                <Badge variant="outline" className="ml-2">
+                  Filtered Results
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Showing totals for {filteredPayments.length} payment{filteredPayments.length !== 1 ? 's' : ''}
+              {payments && filteredPayments.length !== payments.length && (
+                <> out of {payments.length} total</>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                  <span className="text-sm font-medium text-gray-600">Total Amount (USD)</span>
+                </div>
+                <div className="text-3xl font-bold text-green-600" data-testid="total-usd">
+                  {formatCurrency(totals.totalUSD, "USD")}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-600">Total Conversion (BDT)</span>
+                </div>
+                <div className="text-3xl font-bold text-blue-600" data-testid="total-bdt">
+                  {formatCurrency(totals.totalBDT, "BDT")}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Exchange Rate Display */}
       <Card>
         <CardContent className="pt-6">
@@ -718,51 +763,6 @@ export default function FinancePayments() {
           )}
         </CardContent>
       </Card>
-
-      {/* Totals Section */}
-      {filteredPayments && filteredPayments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Payment Totals
-              {(selectedProject !== "all" || selectedClient !== "all" || dateFilter !== "all") && (
-                <Badge variant="outline" className="ml-2">
-                  Filtered Results
-                </Badge>
-              )}
-            </CardTitle>
-            <CardDescription>
-              Showing totals for {filteredPayments.length} payment{filteredPayments.length !== 1 ? 's' : ''}
-              {payments && filteredPayments.length !== payments.length && (
-                <> out of {payments.length} total</>
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                  <span className="text-sm font-medium text-gray-600">Total Amount (USD)</span>
-                </div>
-                <div className="text-3xl font-bold text-green-600" data-testid="total-usd">
-                  {formatCurrency(totals.totalUSD, "USD")}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium text-gray-600">Total Conversion (BDT)</span>
-                </div>
-                <div className="text-3xl font-bold text-blue-600" data-testid="total-bdt">
-                  {formatCurrency(totals.totalBDT, "BDT")}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
         </div>
       </div>
     </Sidebar>
