@@ -259,6 +259,18 @@ export const tags = pgTable("tags", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Employees for finance tracking (separate from users)
+export const employees = pgTable("employees", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  department: text("department"),
+  position: text("position"),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Projects for finance tracking
 export const financeProjects = pgTable("finance_projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -293,6 +305,7 @@ export const financeExpenses = pgTable("finance_expenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   type: text("type").notNull(), // "expense", "salary"
   projectId: varchar("project_id").references(() => financeProjects.id, { onDelete: "restrict" }),
+  employeeId: varchar("employee_id").references(() => employees.id, { onDelete: "restrict" }), // Employee reference for salaries
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(), // BDT
   currency: text("currency").notNull().default("BDT"),
   date: timestamp("date").notNull(),
@@ -348,6 +361,12 @@ export const insertTagSchema = createInsertSchema(tags).omit({
   updatedAt: true,
 });
 
+export const insertEmployeeSchema = createInsertSchema(employees).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertUserWithRole = z.infer<typeof insertUserWithRoleSchema>;
@@ -394,3 +413,6 @@ export type FinanceSetting = typeof financeSettings.$inferSelect;
 
 export type InsertTag = z.infer<typeof insertTagSchema>;
 export type Tag = typeof tags.$inferSelect;
+
+export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
+export type Employee = typeof employees.$inferSelect;

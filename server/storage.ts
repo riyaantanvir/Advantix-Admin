@@ -27,6 +27,8 @@ import {
   type InsertFinanceSetting,
   type Tag,
   type InsertTag,
+  type Employee,
+  type InsertEmployee,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -133,6 +135,13 @@ export interface IStorage {
   createTag(tag: InsertTag): Promise<Tag>;
   updateTag(id: string, tag: Partial<InsertTag>): Promise<Tag | undefined>;
   deleteTag(id: string): Promise<boolean>;
+
+  // Employee methods
+  getEmployees(): Promise<Employee[]>;
+  getEmployee(id: string): Promise<Employee | undefined>;
+  createEmployee(employee: InsertEmployee): Promise<Employee>;
+  updateEmployee(id: string, employee: Partial<InsertEmployee>): Promise<Employee | undefined>;
+  deleteEmployee(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -150,6 +159,7 @@ export class MemStorage implements IStorage {
   private financeExpenses: Map<string, FinanceExpense>;
   private financeSettings: Map<string, FinanceSetting>;
   private tags: Map<string, Tag>;
+  private employees: Map<string, Employee>;
 
   constructor() {
     this.users = new Map();
@@ -166,6 +176,7 @@ export class MemStorage implements IStorage {
     this.financeExpenses = new Map();
     this.financeSettings = new Map();
     this.tags = new Map();
+    this.employees = new Map();
     
     // Initialize default finance settings
     this.initializeFinanceSettings();
@@ -1131,6 +1142,46 @@ export class MemStorage implements IStorage {
 
   async deleteTag(id: string): Promise<boolean> {
     return this.tags.delete(id);
+  }
+
+  // Employee methods implementation
+  async getEmployees(): Promise<Employee[]> {
+    return Array.from(this.employees.values()).sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+  }
+
+  async getEmployee(id: string): Promise<Employee | undefined> {
+    return this.employees.get(id);
+  }
+
+  async createEmployee(insertEmployee: InsertEmployee): Promise<Employee> {
+    const id = randomUUID();
+    const now = new Date();
+    const employee: Employee = {
+      id,
+      ...insertEmployee,
+      isActive: insertEmployee.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.employees.set(id, employee);
+    return employee;
+  }
+
+  async updateEmployee(id: string, updates: Partial<InsertEmployee>): Promise<Employee | undefined> {
+    const existing = this.employees.get(id);
+    if (!existing) return undefined;
+
+    const updated: Employee = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    this.employees.set(id, updated);
+    return updated;
+  }
+
+  async deleteEmployee(id: string): Promise<boolean> {
+    return this.employees.delete(id);
   }
 }
 
