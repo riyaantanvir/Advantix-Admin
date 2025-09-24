@@ -29,6 +29,22 @@ import {
   type InsertTag,
   type Employee,
   type InsertEmployee,
+  type FishfireProduct,
+  type InsertFishfireProduct,
+  type FishfireOrder,
+  type InsertFishfireOrder,
+  type FishfireOrderItem,
+  type InsertFishfireOrderItem,
+  type FishfireExpense,
+  type InsertFishfireExpense,
+  type FishfirePurchase,
+  type InsertFishfirePurchase,
+  type FishfirePurchaseItem,
+  type InsertFishfirePurchaseItem,
+  type FishfireDailyOrder,
+  type InsertFishfireDailyOrder,
+  type FishfireDailyExpense,
+  type InsertFishfireDailyExpense,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -142,6 +158,64 @@ export interface IStorage {
   createEmployee(employee: InsertEmployee): Promise<Employee>;
   updateEmployee(id: string, employee: Partial<InsertEmployee>): Promise<Employee | undefined>;
   deleteEmployee(id: string): Promise<boolean>;
+
+  // Fishfire Product methods
+  getFishfireProducts(): Promise<FishfireProduct[]>;
+  getFishfireProduct(id: string): Promise<FishfireProduct | undefined>;
+  createFishfireProduct(product: InsertFishfireProduct): Promise<FishfireProduct>;
+  updateFishfireProduct(id: string, product: Partial<InsertFishfireProduct>): Promise<FishfireProduct | undefined>;
+  deleteFishfireProduct(id: string): Promise<boolean>;
+
+  // Fishfire Order methods
+  getFishfireOrders(): Promise<FishfireOrder[]>;
+  getFishfireOrder(id: string): Promise<FishfireOrder | undefined>;
+  createFishfireOrder(order: InsertFishfireOrder): Promise<FishfireOrder>;
+  updateFishfireOrder(id: string, order: Partial<InsertFishfireOrder>): Promise<FishfireOrder | undefined>;
+  deleteFishfireOrder(id: string): Promise<boolean>;
+
+  // Fishfire Order Item methods
+  getFishfireOrderItems(orderId: string): Promise<FishfireOrderItem[]>;
+  getFishfireOrderItem(id: string): Promise<FishfireOrderItem | undefined>;
+  createFishfireOrderItem(orderItem: InsertFishfireOrderItem): Promise<FishfireOrderItem>;
+  updateFishfireOrderItem(id: string, orderItem: Partial<InsertFishfireOrderItem>): Promise<FishfireOrderItem | undefined>;
+  deleteFishfireOrderItem(id: string): Promise<boolean>;
+
+  // Fishfire Expense methods
+  getFishfireExpenses(): Promise<FishfireExpense[]>;
+  getFishfireExpense(id: string): Promise<FishfireExpense | undefined>;
+  createFishfireExpense(expense: InsertFishfireExpense): Promise<FishfireExpense>;
+  updateFishfireExpense(id: string, expense: Partial<InsertFishfireExpense>): Promise<FishfireExpense | undefined>;
+  deleteFishfireExpense(id: string): Promise<boolean>;
+
+  // Fishfire Purchase methods
+  getFishfirePurchases(): Promise<FishfirePurchase[]>;
+  getFishfirePurchase(id: string): Promise<FishfirePurchase | undefined>;
+  createFishfirePurchase(purchase: InsertFishfirePurchase): Promise<FishfirePurchase>;
+  updateFishfirePurchase(id: string, purchase: Partial<InsertFishfirePurchase>): Promise<FishfirePurchase | undefined>;
+  deleteFishfirePurchase(id: string): Promise<boolean>;
+
+  // Fishfire Purchase Item methods
+  getFishfirePurchaseItems(purchaseId: string): Promise<FishfirePurchaseItem[]>;
+  getFishfirePurchaseItem(id: string): Promise<FishfirePurchaseItem | undefined>;
+  createFishfirePurchaseItem(purchaseItem: InsertFishfirePurchaseItem): Promise<FishfirePurchaseItem>;
+  updateFishfirePurchaseItem(id: string, purchaseItem: Partial<InsertFishfirePurchaseItem>): Promise<FishfirePurchaseItem | undefined>;
+  deleteFishfirePurchaseItem(id: string): Promise<boolean>;
+
+  // Fishfire Daily Order methods
+  getFishfireDailyOrders(): Promise<FishfireDailyOrder[]>;
+  getFishfireDailyOrder(id: string): Promise<FishfireDailyOrder | undefined>;
+  getFishfireDailyOrderByDate(date: Date): Promise<FishfireDailyOrder | undefined>;
+  createFishfireDailyOrder(dailyOrder: InsertFishfireDailyOrder): Promise<FishfireDailyOrder>;
+  updateFishfireDailyOrder(id: string, dailyOrder: Partial<InsertFishfireDailyOrder>): Promise<FishfireDailyOrder | undefined>;
+  deleteFishfireDailyOrder(id: string): Promise<boolean>;
+
+  // Fishfire Daily Expense methods
+  getFishfireDailyExpenses(): Promise<FishfireDailyExpense[]>;
+  getFishfireDailyExpense(id: string): Promise<FishfireDailyExpense | undefined>;
+  getFishfireDailyExpenseByDate(date: Date): Promise<FishfireDailyExpense | undefined>;
+  createFishfireDailyExpense(dailyExpense: InsertFishfireDailyExpense): Promise<FishfireDailyExpense>;
+  updateFishfireDailyExpense(id: string, dailyExpense: Partial<InsertFishfireDailyExpense>): Promise<FishfireDailyExpense | undefined>;
+  deleteFishfireDailyExpense(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -160,6 +234,15 @@ export class MemStorage implements IStorage {
   private financeSettings: Map<string, FinanceSetting>;
   private tags: Map<string, Tag>;
   private employees: Map<string, Employee>;
+  // Fishfire Maps
+  private fishfireProducts: Map<string, FishfireProduct>;
+  private fishfireOrders: Map<string, FishfireOrder>;
+  private fishfireOrderItems: Map<string, FishfireOrderItem>;
+  private fishfireExpenses: Map<string, FishfireExpense>;
+  private fishfirePurchases: Map<string, FishfirePurchase>;
+  private fishfirePurchaseItems: Map<string, FishfirePurchaseItem>;
+  private fishfireDailyOrders: Map<string, FishfireDailyOrder>;
+  private fishfireDailyExpenses: Map<string, FishfireDailyExpense>;
 
   constructor() {
     this.users = new Map();
@@ -177,6 +260,15 @@ export class MemStorage implements IStorage {
     this.financeSettings = new Map();
     this.tags = new Map();
     this.employees = new Map();
+    // Initialize Fishfire Maps
+    this.fishfireProducts = new Map();
+    this.fishfireOrders = new Map();
+    this.fishfireOrderItems = new Map();
+    this.fishfireExpenses = new Map();
+    this.fishfirePurchases = new Map();
+    this.fishfirePurchaseItems = new Map();
+    this.fishfireDailyOrders = new Map();
+    this.fishfireDailyExpenses = new Map();
     
     // Initialize default finance settings
     this.initializeFinanceSettings();
@@ -1182,6 +1274,316 @@ export class MemStorage implements IStorage {
 
   async deleteEmployee(id: string): Promise<boolean> {
     return this.employees.delete(id);
+  }
+
+  // Fishfire Product methods
+  async getFishfireProducts(): Promise<FishfireProduct[]> {
+    return Array.from(this.fishfireProducts.values());
+  }
+
+  async getFishfireProduct(id: string): Promise<FishfireProduct | undefined> {
+    return this.fishfireProducts.get(id);
+  }
+
+  async createFishfireProduct(product: InsertFishfireProduct): Promise<FishfireProduct> {
+    const newProduct: FishfireProduct = {
+      ...product,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.fishfireProducts.set(newProduct.id, newProduct);
+    return newProduct;
+  }
+
+  async updateFishfireProduct(id: string, product: Partial<InsertFishfireProduct>): Promise<FishfireProduct | undefined> {
+    const existing = this.fishfireProducts.get(id);
+    if (!existing) return undefined;
+
+    const updated: FishfireProduct = {
+      ...existing,
+      ...product,
+      updatedAt: new Date(),
+    };
+    this.fishfireProducts.set(id, updated);
+    return updated;
+  }
+
+  async deleteFishfireProduct(id: string): Promise<boolean> {
+    return this.fishfireProducts.delete(id);
+  }
+
+  // Fishfire Order methods
+  async getFishfireOrders(): Promise<FishfireOrder[]> {
+    return Array.from(this.fishfireOrders.values());
+  }
+
+  async getFishfireOrder(id: string): Promise<FishfireOrder | undefined> {
+    return this.fishfireOrders.get(id);
+  }
+
+  async createFishfireOrder(order: InsertFishfireOrder): Promise<FishfireOrder> {
+    const newOrder: FishfireOrder = {
+      ...order,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.fishfireOrders.set(newOrder.id, newOrder);
+    return newOrder;
+  }
+
+  async updateFishfireOrder(id: string, order: Partial<InsertFishfireOrder>): Promise<FishfireOrder | undefined> {
+    const existing = this.fishfireOrders.get(id);
+    if (!existing) return undefined;
+
+    const updated: FishfireOrder = {
+      ...existing,
+      ...order,
+      updatedAt: new Date(),
+    };
+    this.fishfireOrders.set(id, updated);
+    return updated;
+  }
+
+  async deleteFishfireOrder(id: string): Promise<boolean> {
+    return this.fishfireOrders.delete(id);
+  }
+
+  // Fishfire Order Item methods
+  async getFishfireOrderItems(orderId: string): Promise<FishfireOrderItem[]> {
+    return Array.from(this.fishfireOrderItems.values()).filter(item => item.orderId === orderId);
+  }
+
+  async getFishfireOrderItem(id: string): Promise<FishfireOrderItem | undefined> {
+    return this.fishfireOrderItems.get(id);
+  }
+
+  async createFishfireOrderItem(orderItem: InsertFishfireOrderItem): Promise<FishfireOrderItem> {
+    const newOrderItem: FishfireOrderItem = {
+      ...orderItem,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.fishfireOrderItems.set(newOrderItem.id, newOrderItem);
+    return newOrderItem;
+  }
+
+  async updateFishfireOrderItem(id: string, orderItem: Partial<InsertFishfireOrderItem>): Promise<FishfireOrderItem | undefined> {
+    const existing = this.fishfireOrderItems.get(id);
+    if (!existing) return undefined;
+
+    const updated: FishfireOrderItem = {
+      ...existing,
+      ...orderItem,
+      updatedAt: new Date(),
+    };
+    this.fishfireOrderItems.set(id, updated);
+    return updated;
+  }
+
+  async deleteFishfireOrderItem(id: string): Promise<boolean> {
+    return this.fishfireOrderItems.delete(id);
+  }
+
+  // Fishfire Expense methods
+  async getFishfireExpenses(): Promise<FishfireExpense[]> {
+    return Array.from(this.fishfireExpenses.values());
+  }
+
+  async getFishfireExpense(id: string): Promise<FishfireExpense | undefined> {
+    return this.fishfireExpenses.get(id);
+  }
+
+  async createFishfireExpense(expense: InsertFishfireExpense): Promise<FishfireExpense> {
+    const newExpense: FishfireExpense = {
+      ...expense,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.fishfireExpenses.set(newExpense.id, newExpense);
+    return newExpense;
+  }
+
+  async updateFishfireExpense(id: string, expense: Partial<InsertFishfireExpense>): Promise<FishfireExpense | undefined> {
+    const existing = this.fishfireExpenses.get(id);
+    if (!existing) return undefined;
+
+    const updated: FishfireExpense = {
+      ...existing,
+      ...expense,
+      updatedAt: new Date(),
+    };
+    this.fishfireExpenses.set(id, updated);
+    return updated;
+  }
+
+  async deleteFishfireExpense(id: string): Promise<boolean> {
+    return this.fishfireExpenses.delete(id);
+  }
+
+  // Fishfire Purchase methods
+  async getFishfirePurchases(): Promise<FishfirePurchase[]> {
+    return Array.from(this.fishfirePurchases.values());
+  }
+
+  async getFishfirePurchase(id: string): Promise<FishfirePurchase | undefined> {
+    return this.fishfirePurchases.get(id);
+  }
+
+  async createFishfirePurchase(purchase: InsertFishfirePurchase): Promise<FishfirePurchase> {
+    const newPurchase: FishfirePurchase = {
+      ...purchase,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.fishfirePurchases.set(newPurchase.id, newPurchase);
+    return newPurchase;
+  }
+
+  async updateFishfirePurchase(id: string, purchase: Partial<InsertFishfirePurchase>): Promise<FishfirePurchase | undefined> {
+    const existing = this.fishfirePurchases.get(id);
+    if (!existing) return undefined;
+
+    const updated: FishfirePurchase = {
+      ...existing,
+      ...purchase,
+      updatedAt: new Date(),
+    };
+    this.fishfirePurchases.set(id, updated);
+    return updated;
+  }
+
+  async deleteFishfirePurchase(id: string): Promise<boolean> {
+    return this.fishfirePurchases.delete(id);
+  }
+
+  // Fishfire Purchase Item methods
+  async getFishfirePurchaseItems(purchaseId: string): Promise<FishfirePurchaseItem[]> {
+    return Array.from(this.fishfirePurchaseItems.values()).filter(item => item.purchaseId === purchaseId);
+  }
+
+  async getFishfirePurchaseItem(id: string): Promise<FishfirePurchaseItem | undefined> {
+    return this.fishfirePurchaseItems.get(id);
+  }
+
+  async createFishfirePurchaseItem(purchaseItem: InsertFishfirePurchaseItem): Promise<FishfirePurchaseItem> {
+    const newPurchaseItem: FishfirePurchaseItem = {
+      ...purchaseItem,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.fishfirePurchaseItems.set(newPurchaseItem.id, newPurchaseItem);
+    return newPurchaseItem;
+  }
+
+  async updateFishfirePurchaseItem(id: string, purchaseItem: Partial<InsertFishfirePurchaseItem>): Promise<FishfirePurchaseItem | undefined> {
+    const existing = this.fishfirePurchaseItems.get(id);
+    if (!existing) return undefined;
+
+    const updated: FishfirePurchaseItem = {
+      ...existing,
+      ...purchaseItem,
+      updatedAt: new Date(),
+    };
+    this.fishfirePurchaseItems.set(id, updated);
+    return updated;
+  }
+
+  async deleteFishfirePurchaseItem(id: string): Promise<boolean> {
+    return this.fishfirePurchaseItems.delete(id);
+  }
+
+  // Fishfire Daily Order methods
+  async getFishfireDailyOrders(): Promise<FishfireDailyOrder[]> {
+    return Array.from(this.fishfireDailyOrders.values());
+  }
+
+  async getFishfireDailyOrder(id: string): Promise<FishfireDailyOrder | undefined> {
+    return this.fishfireDailyOrders.get(id);
+  }
+
+  async getFishfireDailyOrderByDate(date: Date): Promise<FishfireDailyOrder | undefined> {
+    const dateStr = date.toDateString();
+    return Array.from(this.fishfireDailyOrders.values()).find(order => 
+      new Date(order.date).toDateString() === dateStr
+    );
+  }
+
+  async createFishfireDailyOrder(dailyOrder: InsertFishfireDailyOrder): Promise<FishfireDailyOrder> {
+    const newDailyOrder: FishfireDailyOrder = {
+      ...dailyOrder,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.fishfireDailyOrders.set(newDailyOrder.id, newDailyOrder);
+    return newDailyOrder;
+  }
+
+  async updateFishfireDailyOrder(id: string, dailyOrder: Partial<InsertFishfireDailyOrder>): Promise<FishfireDailyOrder | undefined> {
+    const existing = this.fishfireDailyOrders.get(id);
+    if (!existing) return undefined;
+
+    const updated: FishfireDailyOrder = {
+      ...existing,
+      ...dailyOrder,
+      updatedAt: new Date(),
+    };
+    this.fishfireDailyOrders.set(id, updated);
+    return updated;
+  }
+
+  async deleteFishfireDailyOrder(id: string): Promise<boolean> {
+    return this.fishfireDailyOrders.delete(id);
+  }
+
+  // Fishfire Daily Expense methods
+  async getFishfireDailyExpenses(): Promise<FishfireDailyExpense[]> {
+    return Array.from(this.fishfireDailyExpenses.values());
+  }
+
+  async getFishfireDailyExpense(id: string): Promise<FishfireDailyExpense | undefined> {
+    return this.fishfireDailyExpenses.get(id);
+  }
+
+  async getFishfireDailyExpenseByDate(date: Date): Promise<FishfireDailyExpense | undefined> {
+    const dateStr = date.toDateString();
+    return Array.from(this.fishfireDailyExpenses.values()).find(expense => 
+      new Date(expense.date).toDateString() === dateStr
+    );
+  }
+
+  async createFishfireDailyExpense(dailyExpense: InsertFishfireDailyExpense): Promise<FishfireDailyExpense> {
+    const newDailyExpense: FishfireDailyExpense = {
+      ...dailyExpense,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.fishfireDailyExpenses.set(newDailyExpense.id, newDailyExpense);
+    return newDailyExpense;
+  }
+
+  async updateFishfireDailyExpense(id: string, dailyExpense: Partial<InsertFishfireDailyExpense>): Promise<FishfireDailyExpense | undefined> {
+    const existing = this.fishfireDailyExpenses.get(id);
+    if (!existing) return undefined;
+
+    const updated: FishfireDailyExpense = {
+      ...existing,
+      ...dailyExpense,
+      updatedAt: new Date(),
+    };
+    this.fishfireDailyExpenses.set(id, updated);
+    return updated;
+  }
+
+  async deleteFishfireDailyExpense(id: string): Promise<boolean> {
+    return this.fishfireDailyExpenses.delete(id);
   }
 }
 
