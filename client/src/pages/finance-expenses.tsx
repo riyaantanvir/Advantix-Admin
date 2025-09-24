@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { insertFinanceExpenseSchema, type FinanceExpense, type FinanceProject, type InsertFinanceExpense } from "@shared/schema";
+import { insertFinanceExpenseSchema, type FinanceExpense, type FinanceProject, type InsertFinanceExpense, type Employee } from "@shared/schema";
 import { Plus, Edit, Trash2, MoreHorizontal, DollarSign, Calendar, Building, Calculator, TrendingDown, Upload, FileSpreadsheet, Eye, CheckCircle } from "lucide-react";
 import { formatDistance } from "date-fns";
 import Sidebar from "@/components/layout/Sidebar";
@@ -41,12 +41,18 @@ export default function FinanceExpenses() {
     queryKey: ["/api/finance/projects"],
   });
 
+  // Fetch employees
+  const { data: employees } = useQuery<Employee[]>({
+    queryKey: ["/api/employees"],
+  });
+
   // Create/Update form
   const form = useForm<InsertFinanceExpense>({
     resolver: zodResolver(insertFinanceExpenseSchema),
     defaultValues: {
       type: "expense",
       projectId: "none",
+      employeeId: null,
       amount: "",
       currency: "BDT",
       date: new Date(),
@@ -221,7 +227,8 @@ export default function FinanceExpenses() {
     // Convert "none" to null for the API
     const submitData = {
       ...data,
-      projectId: data.projectId === "none" ? null : data.projectId
+      projectId: data.projectId === "none" ? null : data.projectId,
+      employeeId: data.employeeId === "none" ? null : data.employeeId
     };
     
     if (editingExpense) {
@@ -494,6 +501,32 @@ export default function FinanceExpenses() {
                     )}
                   />
                 </div>
+                
+                <FormField
+                  control={form.control}
+                  name="employeeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Employee (Optional)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || "none"}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-employee">
+                            <SelectValue placeholder="Select employee" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No Employee Selected</SelectItem>
+                          {employees?.map((employee) => (
+                            <SelectItem key={employee.id} value={employee.id}>
+                              {employee.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
