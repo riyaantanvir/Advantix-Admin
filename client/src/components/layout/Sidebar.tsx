@@ -20,7 +20,14 @@ import {
   CreditCard,
   Calculator,
   BarChart3,
-  Building2
+  Building2,
+  Fish,
+  ShoppingCart,
+  Receipt,
+  Package,
+  Calendar,
+  Truck,
+  TrendingDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -178,6 +185,57 @@ export default function Sidebar({ children }: SidebarProps) {
         }
       ]
     },
+    {
+      label: "Fishfire",
+      icon: Fish,
+      testId: "nav-fishfire",
+      pageKey: "fishfire",
+      isSection: true,
+      subItems: [
+        {
+          href: "/fishfire/order-management",
+          icon: ShoppingCart,
+          label: "Order Management",
+          testId: "nav-fishfire-orders",
+          pageKey: "fishfire"
+        },
+        {
+          href: "/fishfire/expense-management",
+          icon: Receipt,
+          label: "Expense Management",
+          testId: "nav-fishfire-expenses",
+          pageKey: "fishfire"
+        },
+        {
+          href: "/fishfire/stock-report",
+          icon: Package,
+          label: "Stock Report",
+          testId: "nav-fishfire-stock",
+          pageKey: "fishfire"
+        },
+        {
+          href: "/fishfire/daily-order",
+          icon: Calendar,
+          label: "Daily Order",
+          testId: "nav-fishfire-daily-order",
+          pageKey: "fishfire"
+        },
+        {
+          href: "/fishfire/purchase",
+          icon: Truck,
+          label: "Purchase",
+          testId: "nav-fishfire-purchase",
+          pageKey: "fishfire"
+        },
+        {
+          href: "/fishfire/daily-expense",
+          icon: TrendingDown,
+          label: "Daily Expense",
+          testId: "nav-fishfire-daily-expense",
+          pageKey: "fishfire"
+        }
+      ]
+    },
     { 
       href: "/admin", 
       icon: Settings, 
@@ -237,6 +295,14 @@ export default function Sidebar({ children }: SidebarProps) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const fishfirePermission = useQuery({
+    queryKey: [`/api/permissions/check/fishfire`],
+    enabled: !!user && user.role !== 'super_admin',
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Helper function to get permission for each page
   const getPermissionForPage = (pageKey: string) => {
     switch (pageKey) {
@@ -246,6 +312,7 @@ export default function Sidebar({ children }: SidebarProps) {
       case 'ad_accounts': return adAccountsPermission.data;
       case 'work_reports': return workReportsPermission.data;
       case 'finance': return financePermission.data;
+      case 'fishfire': return fishfirePermission.data;
       default: return false;
     }
   };
