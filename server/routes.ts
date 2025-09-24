@@ -1852,8 +1852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         financeExpenses,
         financeSettings,
         tags,
-        employees,
-        salaries
+        employees
       ] = await Promise.all([
         storage.getAllUsers(),
         storage.getCampaigns(),
@@ -1868,8 +1867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getFinanceExpenses(),
         storage.getAllFinanceSettings(),
         storage.getTags(),
-        storage.getEmployees(),
-        storage.getSalaries()
+        storage.getEmployees()
       ]);
 
       const exportData = {
@@ -1890,8 +1888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           financeExpenses,
           financeSettings,
           tags,
-          employees,
-          salaries
+          employees
         }
       };
 
@@ -2118,24 +2115,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             } catch (error: any) {
               results.errors.push(`employee (${employee.id}): ${error.message}`);
-              results.skipped++;
-            }
-          }
-        }
-
-        if (importData.data.salaries && Array.isArray(importData.data.salaries)) {
-          for (const salary of importData.data.salaries) {
-            try {
-              const existing = await storage.getSalary(salary.id);
-              if (existing) {
-                await storage.updateSalary(salary.id, salary);
-                results.updated++;
-              } else {
-                await storage.createSalary(salary);
-                results.imported++;
-              }
-            } catch (error: any) {
-              results.errors.push(`salary (${salary.id}): ${error.message}`);
               results.skipped++;
             }
           }
