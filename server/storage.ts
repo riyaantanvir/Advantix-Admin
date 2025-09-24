@@ -25,6 +25,8 @@ import {
   type InsertFinanceExpense,
   type FinanceSetting,
   type InsertFinanceSetting,
+  type Tag,
+  type InsertTag,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -124,6 +126,13 @@ export interface IStorage {
   getAllFinanceSettings(): Promise<FinanceSetting[]>; // Get all finance settings
   setFinanceSetting(setting: InsertFinanceSetting): Promise<FinanceSetting>;
   getExchangeRate(): Promise<number>; // Helper to get USD to BDT rate
+
+  // Tag methods
+  getTags(): Promise<Tag[]>;
+  getTag(id: string): Promise<Tag | undefined>;
+  createTag(tag: InsertTag): Promise<Tag>;
+  updateTag(id: string, tag: Partial<InsertTag>): Promise<Tag | undefined>;
+  deleteTag(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -140,6 +149,7 @@ export class MemStorage implements IStorage {
   private financePayments: Map<string, FinancePayment>;
   private financeExpenses: Map<string, FinanceExpense>;
   private financeSettings: Map<string, FinanceSetting>;
+  private tags: Map<string, Tag>;
 
   constructor() {
     this.users = new Map();
@@ -155,6 +165,7 @@ export class MemStorage implements IStorage {
     this.financePayments = new Map();
     this.financeExpenses = new Map();
     this.financeSettings = new Map();
+    this.tags = new Map();
     
     // Initialize default finance settings
     this.initializeFinanceSettings();
@@ -1079,6 +1090,45 @@ export class MemStorage implements IStorage {
   async getExchangeRate(): Promise<number> {
     const setting = await this.getFinanceSetting("usd_to_bdt_rate");
     return setting ? parseFloat(setting.value) : 110.0; // Default rate
+  }
+
+  // Tag methods implementation
+  async getTags(): Promise<Tag[]> {
+    return Array.from(this.tags.values()).sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+  }
+
+  async getTag(id: string): Promise<Tag | undefined> {
+    return this.tags.get(id);
+  }
+
+  async createTag(insertTag: InsertTag): Promise<Tag> {
+    const id = randomUUID();
+    const tag: Tag = {
+      ...insertTag,
+      id,
+      isActive: insertTag.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.tags.set(id, tag);
+    return tag;
+  }
+
+  async updateTag(id: string, updateData: Partial<InsertTag>): Promise<Tag | undefined> {
+    const tag = this.tags.get(id);
+    if (!tag) return undefined;
+
+    const updatedTag: Tag = {
+      ...tag,
+      ...updateData,
+      updatedAt: new Date(),
+    };
+    this.tags.set(id, updatedTag);
+    return updatedTag;
+  }
+
+  async deleteTag(id: string): Promise<boolean> {
+    return this.tags.delete(id);
   }
 }
 

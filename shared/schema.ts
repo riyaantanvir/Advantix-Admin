@@ -248,6 +248,17 @@ export const loginSchema = z.object({
 
 // Finance Management Tables
 
+// Tags for categorization
+export const tags = pgTable("tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color").default("#3B82F6"), // Default blue color
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Projects for finance tracking
 export const financeProjects = pgTable("finance_projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -331,6 +342,12 @@ export const insertFinanceSettingSchema = createInsertSchema(financeSettings).om
   updatedAt: true,
 });
 
+export const insertTagSchema = createInsertSchema(tags).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertUserWithRole = z.infer<typeof insertUserWithRoleSchema>;
@@ -374,3 +391,6 @@ export type FinanceExpense = typeof financeExpenses.$inferSelect;
 
 export type InsertFinanceSetting = z.infer<typeof insertFinanceSettingSchema>;
 export type FinanceSetting = typeof financeSettings.$inferSelect;
+
+export type InsertTag = z.infer<typeof insertTagSchema>;
+export type Tag = typeof tags.$inferSelect;
