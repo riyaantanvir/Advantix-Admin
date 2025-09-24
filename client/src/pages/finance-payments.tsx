@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,13 +15,21 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertFinancePaymentSchema, type FinancePayment, type Client, type FinanceProject, type InsertFinancePayment } from "@shared/schema";
-import { Plus, Edit, Trash2, MoreHorizontal, DollarSign, Calendar, Building, ArrowUpDown } from "lucide-react";
+import { Plus, Edit, Trash2, MoreHorizontal, DollarSign, Calendar, Building, ArrowUpDown, Filter, X } from "lucide-react";
 import { formatDistance } from "date-fns";
 import Sidebar from "@/components/layout/Sidebar";
 
 export default function FinancePayments() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<FinancePayment | null>(null);
+  
+  // Filter states
+  const [selectedProject, setSelectedProject] = useState<string>("all");
+  const [selectedClient, setSelectedClient] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [customStartDate, setCustomStartDate] = useState<string>("");
+  const [customEndDate, setCustomEndDate] = useState<string>("");
+  
   const { toast } = useToast();
 
   // Fetch payments
@@ -197,6 +205,98 @@ export default function FinancePayments() {
       currency,
       minimumFractionDigits: currency === "BDT" ? 0 : 2,
     }).format(numAmount);
+  };
+
+  // Helper function to get date range
+  const getDateRange = (filter: string) => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    
+    switch (filter) {
+      case "thisYear":
+        const yearEnd = new Date(currentYear, 11, 31);
+        yearEnd.setHours(23, 59, 59, 999);
+        return {
+          start: new Date(currentYear, 0, 1),
+          end: yearEnd
+        };
+      case "thisMonth":
+        const monthEnd = new Date(currentYear, currentMonth + 1, 0);
+        monthEnd.setHours(23, 59, 59, 999);
+        return {
+          start: new Date(currentYear, currentMonth, 1),
+          end: monthEnd
+        };
+      case "lastMonth":
+        const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+        const lastMonthEnd = new Date(lastMonthYear, lastMonth + 1, 0);
+        lastMonthEnd.setHours(23, 59, 59, 999);
+        return {
+          start: new Date(lastMonthYear, lastMonth, 1),
+          end: lastMonthEnd
+        };
+      case "custom":
+        const customStart = customStartDate ? new Date(customStartDate) : null;
+        let customEnd = null;
+        if (customEndDate) {
+          customEnd = new Date(customEndDate);
+          customEnd.setHours(23, 59, 59, 999);
+        }
+        return {
+          start: customStart,
+          end: customEnd
+        };
+      default:
+        return null;
+    }
+  };
+
+  // Filtered payments based on current filters
+  const filteredPayments = useMemo(() => {
+    if (!payments) return [];
+    
+    return payments.filter(payment => {
+      // Filter by project
+      if (selectedProject !== "all" && payment.projectId !== selectedProject) {
+        return false;
+      }
+      
+      // Filter by client  
+      if (selectedClient !== "all" && payment.clientId !== selectedClient) {
+        return false;
+      }
+      
+      // Filter by date
+      if (dateFilter !== "all") {
+        const dateRange = getDateRange(dateFilter);
+        if (dateRange && (dateRange.start || dateRange.end)) {
+          const paymentDate = new Date(payment.date);
+          if (dateRange.start && paymentDate < dateRange.start) return false;
+          if (dateRange.end && paymentDate > dateRange.end) return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [payments, selectedProject, selectedClient, dateFilter, customStartDate, customEndDate]);
+
+  // Calculate totals for filtered payments
+  const totals = useMemo(() => {
+    const totalUSD = filteredPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+    const totalBDT = filteredPayments.reduce((sum, payment) => sum + parseFloat(payment.convertedAmount), 0);
+    
+    return { totalUSD, totalBDT };
+  }, [filteredPayments]);
+
+  // Clear filters function
+  const clearFilters = () => {
+    setSelectedProject("all");
+    setSelectedClient("all");
+    setDateFilter("all");
+    setCustomStartDate("");
+    setCustomEndDate("");
   };
 
   if (paymentsLoading) {
@@ -406,6 +506,109 @@ export default function FinancePayments() {
         </Dialog>
       </div>
 
+      {/* Filter Options */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filter Options
+            </div>
+            {(selectedProject !== "all" || selectedClient !== "all" || dateFilter !== "all") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearFilters}
+                data-testid="button-clear-filters"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Clear Filters
+              </Button>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Project Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Filter by Project</label>
+              <Select value={selectedProject} onValueChange={setSelectedProject}>
+                <SelectTrigger data-testid="filter-project">
+                  <SelectValue placeholder="All Projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projects?.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Client Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Filter by Client</label>
+              <Select value={selectedClient} onValueChange={setSelectedClient}>
+                <SelectTrigger data-testid="filter-client">
+                  <SelectValue placeholder="All Clients" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Clients</SelectItem>
+                  {clients?.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.clientName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Filter by Date</label>
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger data-testid="filter-date">
+                  <SelectValue placeholder="All Dates" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Dates</SelectItem>
+                  <SelectItem value="thisYear">This Year</SelectItem>
+                  <SelectItem value="thisMonth">This Month</SelectItem>
+                  <SelectItem value="lastMonth">Last Month</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Custom Date Range */}
+          {dateFilter === "custom" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Start Date</label>
+                <Input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  data-testid="filter-start-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">End Date</label>
+                <Input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  data-testid="filter-end-date"
+                />
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Exchange Rate Display */}
       <Card>
         <CardContent className="pt-6">
@@ -437,7 +640,7 @@ export default function FinancePayments() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payments?.map((payment) => (
+              {filteredPayments?.map((payment) => (
                 <TableRow key={payment.id} data-testid={`row-payment-${payment.id}`}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -505,13 +708,61 @@ export default function FinancePayments() {
               ))}
             </TableBody>
           </Table>
-          {(!payments || payments.length === 0) && (
+          {(!filteredPayments || filteredPayments.length === 0) && (
             <div className="text-center py-8 text-gray-500">
-              No payments recorded yet. Add your first payment to get started.
+              {!payments || payments.length === 0 
+                ? "No payments recorded yet. Add your first payment to get started."
+                : "No payments match the current filters. Try adjusting your filter criteria."
+              }
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Totals Section */}
+      {filteredPayments && filteredPayments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Payment Totals
+              {(selectedProject !== "all" || selectedClient !== "all" || dateFilter !== "all") && (
+                <Badge variant="outline" className="ml-2">
+                  Filtered Results
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Showing totals for {filteredPayments.length} payment{filteredPayments.length !== 1 ? 's' : ''}
+              {payments && filteredPayments.length !== payments.length && (
+                <> out of {payments.length} total</>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                  <span className="text-sm font-medium text-gray-600">Total Amount (USD)</span>
+                </div>
+                <div className="text-3xl font-bold text-green-600" data-testid="total-usd">
+                  {formatCurrency(totals.totalUSD, "USD")}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-600">Total Conversion (BDT)</span>
+                </div>
+                <div className="text-3xl font-bold text-blue-600" data-testid="total-bdt">
+                  {formatCurrency(totals.totalBDT, "BDT")}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
         </div>
       </div>
     </Sidebar>
