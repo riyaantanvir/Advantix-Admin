@@ -1833,6 +1833,272 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // JSON Export/Import Endpoints for Admin Panel
+
+  // Full Data Export (JSON)
+  app.get("/api/data/export", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const [
+        users,
+        campaigns,
+        clients,
+        adAccounts,
+        adCopySets,
+        workReports,
+        pages,
+        rolePermissions,
+        financeProjects,
+        financePayments,
+        financeExpenses,
+        financeSettings,
+        tags,
+        employees,
+        salaries
+      ] = await Promise.all([
+        storage.getAllUsers(),
+        storage.getCampaigns(),
+        storage.getClients(),
+        storage.getAdAccounts(),
+        storage.getAllAdCopySets(),
+        storage.getWorkReports(),
+        storage.getPages(),
+        storage.getRolePermissions(),
+        storage.getFinanceProjects(),
+        storage.getFinancePayments(),
+        storage.getFinanceExpenses(),
+        storage.getAllFinanceSettings(),
+        storage.getTags(),
+        storage.getEmployees(),
+        storage.getSalaries()
+      ]);
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        exportedBy: req.user?.username,
+        version: "1.0",
+        data: {
+          users: users.map(u => ({ ...u, password: "[REDACTED]" })), // Remove passwords for security
+          campaigns,
+          clients,
+          adAccounts,
+          adCopySets,
+          workReports,
+          pages,
+          rolePermissions,
+          financeProjects,
+          financePayments,
+          financeExpenses,
+          financeSettings,
+          tags,
+          employees,
+          salaries
+        }
+      };
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="data-export-${new Date().toISOString().split('T')[0]}.json"`);
+      res.json(exportData);
+    } catch (error) {
+      console.error("Data export failed:", error);
+      res.status(500).json({ message: "Data export failed" });
+    }
+  });
+
+  // Full Data Import (JSON)
+  app.post("/api/data/import", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const importData = req.body;
+      
+      if (!importData || !importData.data) {
+        return res.status(400).json({ message: "Invalid import data format" });
+      }
+
+      const results = {
+        imported: 0,
+        updated: 0,
+        skipped: 0,
+        errors: [] as string[]
+      };
+
+      // Helper function to safely import data with duplicate handling
+      async function importTable<T extends { id: string }>(
+        tableName: string,
+        data: T[],
+        createFn: (item: Omit<T, 'id' | 'createdAt' | 'updatedAt'>) => Promise<T>,
+        updateFn: (id: string, item: Partial<Omit<T, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<T>,
+        getFn: (id: string) => Promise<T | null>
+      ) {
+        if (!Array.isArray(data)) return;
+
+        for (const item of data) {
+          try {
+            const existing = await getFn(item.id);
+            const { id, createdAt, updatedAt, ...itemData } = item;
+            
+            if (existing) {
+              // Update existing record
+              await updateFn(item.id, itemData);
+              results.updated++;
+            } else {
+              // Create new record with original ID
+              await createFn({ ...itemData, id: item.id } as any);
+              results.imported++;
+            }
+          } catch (error: any) {
+            results.errors.push(`${tableName} (${item.id}): ${error.message}`);
+            results.skipped++;
+          }
+        }
+      }
+
+      // Import data in dependency order (referenced tables first)
+      
+      // Core system data
+      if (importData.data.pages) {
+        await importTable("pages", importData.data.pages, 
+          (item) => storage.createPage(item),
+          (id, item) => storage.updatePage(id, item),
+          (id) => storage.getPage(id)
+        );
+      }
+
+      if (importData.data.users && importData.data.users.length > 0) {
+        // Skip users with redacted passwords
+        const validUsers = importData.data.users.filter((u: any) => u.password !== "[REDACTED]");
+        await importTable("users", validUsers,
+          (item) => storage.createUser(item),
+          (id, item) => storage.updateUser(id, item),
+          (id) => storage.getUser(id)
+        );
+      }
+
+      if (importData.data.rolePermissions) {
+        await importTable("rolePermissions", importData.data.rolePermissions,
+          (item) => storage.createRolePermission(item),
+          (id, item) => storage.updateRolePermission(id, item),
+          (id) => storage.getRolePermission(id)
+        );
+      }
+
+      // Business data
+      if (importData.data.clients) {
+        await importTable("clients", importData.data.clients,
+          (item) => storage.createClient(item),
+          (id, item) => storage.updateClient(id, item),
+          (id) => storage.getClient(id)
+        );
+      }
+
+      if (importData.data.adAccounts) {
+        await importTable("adAccounts", importData.data.adAccounts,
+          (item) => storage.createAdAccount(item),
+          (id, item) => storage.updateAdAccount(id, item),
+          (id) => storage.getAdAccount(id)
+        );
+      }
+
+      if (importData.data.campaigns) {
+        await importTable("campaigns", importData.data.campaigns,
+          (item) => storage.createCampaign(item),
+          (id, item) => storage.updateCampaign(id, item),
+          (id) => storage.getCampaign(id)
+        );
+      }
+
+      if (importData.data.adCopySets) {
+        await importTable("adCopySets", importData.data.adCopySets,
+          (item) => storage.createAdCopySet(item),
+          (id, item) => storage.updateAdCopySet(id, item),
+          (id) => storage.getAdCopySet(id)
+        );
+      }
+
+      if (importData.data.workReports) {
+        await importTable("workReports", importData.data.workReports,
+          (item) => storage.createWorkReport(item),
+          (id, item) => storage.updateWorkReport(id, item),
+          (id) => storage.getWorkReport(id)
+        );
+      }
+
+      if (importData.data.salaries) {
+        await importTable("salaries", importData.data.salaries,
+          (item) => storage.createSalary(item),
+          (id, item) => storage.updateSalary(id, item),
+          (id) => storage.getSalary(id)
+        );
+      }
+
+      // Finance data
+      if (importData.data.financeProjects) {
+        await importTable("financeProjects", importData.data.financeProjects,
+          (item) => storage.createFinanceProject(item),
+          (id, item) => storage.updateFinanceProject(id, item),
+          (id) => storage.getFinanceProject(id)
+        );
+      }
+
+      if (importData.data.financePayments) {
+        await importTable("financePayments", importData.data.financePayments,
+          (item) => storage.createFinancePayment(item),
+          (id, item) => storage.updateFinancePayment(id, item),
+          (id) => storage.getFinancePayment(id)
+        );
+      }
+
+      if (importData.data.financeExpenses) {
+        await importTable("financeExpenses", importData.data.financeExpenses,
+          (item) => storage.createFinanceExpense(item),
+          (id, item) => storage.updateFinanceExpense(id, item),
+          (id) => storage.getFinanceExpense(id)
+        );
+      }
+
+      if (importData.data.financeSettings) {
+        await importTable("financeSettings", importData.data.financeSettings,
+          (item) => storage.createFinanceSetting(item),
+          (id, item) => storage.updateFinanceSetting(id, item),
+          (id) => storage.getFinanceSetting(id)
+        );
+      }
+
+      if (importData.data.tags) {
+        await importTable("tags", importData.data.tags,
+          (item) => storage.createTag(item),
+          (id, item) => storage.updateTag(id, item),
+          (id) => storage.getTag(id)
+        );
+      }
+
+      if (importData.data.employees) {
+        await importTable("employees", importData.data.employees,
+          (item) => storage.createEmployee(item),
+          (id, item) => storage.updateEmployee(id, item),
+          (id) => storage.getEmployee(id)
+        );
+      }
+
+      res.json({
+        message: "Data import completed",
+        results: {
+          ...results,
+          totalProcessed: results.imported + results.updated + results.skipped
+        },
+        importedAt: new Date().toISOString(),
+        importedBy: req.user?.username
+      });
+
+    } catch (error: any) {
+      console.error("Data import failed:", error);
+      res.status(500).json({ 
+        message: "Data import failed", 
+        error: error.message,
+        importedAt: new Date().toISOString(),
+        importedBy: req.user?.username
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
