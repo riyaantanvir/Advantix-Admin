@@ -1917,18 +1917,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         errors: [] as string[]
       };
 
+      // Helper function to convert date strings back to Date objects
+      function convertDatesToObjects(obj: any): any {
+        if (obj === null || obj === undefined) return obj;
+        if (Array.isArray(obj)) return obj.map(convertDatesToObjects);
+        if (typeof obj !== 'object') return obj;
+        
+        const converted: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          // Convert ISO date strings to Date objects for timestamp fields
+          if (typeof value === 'string' && 
+              (key.includes('Date') || key.includes('At') || key === 'createdAt' || key === 'updatedAt') &&
+              /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+            converted[key] = new Date(value);
+          } else if (typeof value === 'object') {
+            converted[key] = convertDatesToObjects(value);
+          } else {
+            converted[key] = value;
+          }
+        }
+        return converted;
+      }
+
       // Import data with duplicate handling - simplified approach
       try {
         // Core system data first
         if (importData.data.pages && Array.isArray(importData.data.pages)) {
           for (const page of importData.data.pages) {
             try {
-              const existing = await storage.getPage(page.id);
+              const processedPage = convertDatesToObjects(page);
+              const existing = await storage.getPage(processedPage.id);
               if (existing) {
-                await storage.updatePage(page.id, page);
+                await storage.updatePage(processedPage.id, processedPage);
                 results.updated++;
               } else {
-                await storage.createPage(page);
+                await storage.createPage(processedPage);
                 results.imported++;
               }
             } catch (error: any) {
@@ -1942,12 +1965,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (importData.data.clients && Array.isArray(importData.data.clients)) {
           for (const client of importData.data.clients) {
             try {
-              const existing = await storage.getClient(client.id);
+              const processedClient = convertDatesToObjects(client);
+              const existing = await storage.getClient(processedClient.id);
               if (existing) {
-                await storage.updateClient(client.id, client);
+                await storage.updateClient(processedClient.id, processedClient);
                 results.updated++;
               } else {
-                await storage.createClient(client);
+                await storage.createClient(processedClient);
                 results.imported++;
               }
             } catch (error: any) {
@@ -1960,12 +1984,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (importData.data.adAccounts && Array.isArray(importData.data.adAccounts)) {
           for (const account of importData.data.adAccounts) {
             try {
-              const existing = await storage.getAdAccount(account.id);
+              const processedAccount = convertDatesToObjects(account);
+              const existing = await storage.getAdAccount(processedAccount.id);
               if (existing) {
-                await storage.updateAdAccount(account.id, account);
+                await storage.updateAdAccount(processedAccount.id, processedAccount);
                 results.updated++;
               } else {
-                await storage.createAdAccount(account);
+                await storage.createAdAccount(processedAccount);
                 results.imported++;
               }
             } catch (error: any) {
@@ -1978,12 +2003,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (importData.data.campaigns && Array.isArray(importData.data.campaigns)) {
           for (const campaign of importData.data.campaigns) {
             try {
-              const existing = await storage.getCampaign(campaign.id);
+              const processedCampaign = convertDatesToObjects(campaign);
+              const existing = await storage.getCampaign(processedCampaign.id);
               if (existing) {
-                await storage.updateCampaign(campaign.id, campaign);
+                await storage.updateCampaign(processedCampaign.id, processedCampaign);
                 results.updated++;
               } else {
-                await storage.createCampaign(campaign);
+                await storage.createCampaign(processedCampaign);
                 results.imported++;
               }
             } catch (error: any) {
@@ -1996,12 +2022,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (importData.data.adCopySets && Array.isArray(importData.data.adCopySets)) {
           for (const copySet of importData.data.adCopySets) {
             try {
-              const existing = await storage.getAdCopySet(copySet.id);
+              const processedCopySet = convertDatesToObjects(copySet);
+              const existing = await storage.getAdCopySet(processedCopySet.id);
               if (existing) {
-                await storage.updateAdCopySet(copySet.id, copySet);
+                await storage.updateAdCopySet(processedCopySet.id, processedCopySet);
                 results.updated++;
               } else {
-                await storage.createAdCopySet(copySet);
+                await storage.createAdCopySet(processedCopySet);
                 results.imported++;
               }
             } catch (error: any) {
@@ -2014,12 +2041,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (importData.data.workReports && Array.isArray(importData.data.workReports)) {
           for (const report of importData.data.workReports) {
             try {
-              const existing = await storage.getWorkReport(report.id);
+              const processedReport = convertDatesToObjects(report);
+              const existing = await storage.getWorkReport(processedReport.id);
               if (existing) {
-                await storage.updateWorkReport(report.id, report);
+                await storage.updateWorkReport(processedReport.id, processedReport);
                 results.updated++;
               } else {
-                await storage.createWorkReport(report);
+                await storage.createWorkReport(processedReport);
                 results.imported++;
               }
             } catch (error: any) {
@@ -2033,12 +2061,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (importData.data.financeProjects && Array.isArray(importData.data.financeProjects)) {
           for (const project of importData.data.financeProjects) {
             try {
-              const existing = await storage.getFinanceProject(project.id);
+              const processedProject = convertDatesToObjects(project);
+              const existing = await storage.getFinanceProject(processedProject.id);
               if (existing) {
-                await storage.updateFinanceProject(project.id, project);
+                await storage.updateFinanceProject(processedProject.id, processedProject);
                 results.updated++;
               } else {
-                await storage.createFinanceProject(project);
+                await storage.createFinanceProject(processedProject);
                 results.imported++;
               }
             } catch (error: any) {
@@ -2051,12 +2080,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (importData.data.financePayments && Array.isArray(importData.data.financePayments)) {
           for (const payment of importData.data.financePayments) {
             try {
-              const existing = await storage.getFinancePayment(payment.id);
+              const processedPayment = convertDatesToObjects(payment);
+              const existing = await storage.getFinancePayment(processedPayment.id);
               if (existing) {
-                await storage.updateFinancePayment(payment.id, payment);
+                await storage.updateFinancePayment(processedPayment.id, processedPayment);
                 results.updated++;
               } else {
-                await storage.createFinancePayment(payment);
+                await storage.createFinancePayment(processedPayment);
                 results.imported++;
               }
             } catch (error: any) {
@@ -2069,12 +2099,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (importData.data.financeExpenses && Array.isArray(importData.data.financeExpenses)) {
           for (const expense of importData.data.financeExpenses) {
             try {
-              const existing = await storage.getFinanceExpense(expense.id);
+              const processedExpense = convertDatesToObjects(expense);
+              const existing = await storage.getFinanceExpense(processedExpense.id);
               if (existing) {
-                await storage.updateFinanceExpense(expense.id, expense);
+                await storage.updateFinanceExpense(processedExpense.id, processedExpense);
                 results.updated++;
               } else {
-                await storage.createFinanceExpense(expense);
+                await storage.createFinanceExpense(processedExpense);
                 results.imported++;
               }
             } catch (error: any) {
@@ -2087,12 +2118,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (importData.data.tags && Array.isArray(importData.data.tags)) {
           for (const tag of importData.data.tags) {
             try {
-              const existing = await storage.getTag(tag.id);
+              const processedTag = convertDatesToObjects(tag);
+              const existing = await storage.getTag(processedTag.id);
               if (existing) {
-                await storage.updateTag(tag.id, tag);
+                await storage.updateTag(processedTag.id, processedTag);
                 results.updated++;
               } else {
-                await storage.createTag(tag);
+                await storage.createTag(processedTag);
                 results.imported++;
               }
             } catch (error: any) {
@@ -2105,12 +2137,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (importData.data.employees && Array.isArray(importData.data.employees)) {
           for (const employee of importData.data.employees) {
             try {
-              const existing = await storage.getEmployee(employee.id);
+              const processedEmployee = convertDatesToObjects(employee);
+              const existing = await storage.getEmployee(processedEmployee.id);
               if (existing) {
-                await storage.updateEmployee(employee.id, employee);
+                await storage.updateEmployee(processedEmployee.id, processedEmployee);
                 results.updated++;
               } else {
-                await storage.createEmployee(employee);
+                await storage.createEmployee(processedEmployee);
                 results.imported++;
               }
             } catch (error: any) {
