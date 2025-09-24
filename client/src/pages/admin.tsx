@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign, Tag as TagIcon, Plus } from "lucide-react";
+import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign, Tag as TagIcon, Plus, Database, Download, Upload, FileText, AlertCircle } from "lucide-react";
 import type { User, InsertUserWithRole, Page, RolePermission, Tag, InsertTag } from "@shared/schema";
 
 interface UserFormData {
@@ -1833,6 +1833,319 @@ function FinanceAccessControl() {
   );
 }
 
+function DataImportExport() {
+  const { toast } = useToast();
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResults, setImportResults] = useState<any>(null);
+
+  // Get current user to check permissions
+  const { data: currentUser } = useQuery<{ id: string; username: string; role: string }>({
+    queryKey: ["/api/auth/user"],
+  });
+
+  const isAdminOrSuperAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+
+  // Export data function
+  const handleExport = async () => {
+    if (!isAdminOrSuperAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Only admin users can export data.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const response = await apiRequest("GET", "/api/data/export");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `data-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+
+      toast({
+        title: "Export Successful",
+        description: "All data has been exported successfully.",
+      });
+    } catch (error: any) {
+      console.error("Export failed:", error);
+      toast({
+        title: "Export Failed",
+        description: error.message || "Failed to export data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Import data function
+  const handleImport = async () => {
+    if (!isAdminOrSuperAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Only admin users can import data.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!importFile) {
+      toast({
+        title: "No File Selected",
+        description: "Please select a JSON file to import.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsImporting(true);
+    setImportResults(null);
+    
+    try {
+      const fileContent = await importFile.text();
+      const importData = JSON.parse(fileContent);
+
+      const response = await apiRequest("POST", "/api/data/import", importData);
+      const results = await response.json();
+      
+      setImportResults(results);
+      
+      toast({
+        title: "Import Completed",
+        description: `Imported: ${results.results.imported}, Updated: ${results.results.updated}, Errors: ${results.results.errors.length}`,
+      });
+
+      // Invalidate all queries to refresh data
+      queryClient.invalidateQueries();
+      
+    } catch (error: any) {
+      console.error("Import failed:", error);
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // File input handler
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type === 'application/json') {
+      setImportFile(file);
+      setImportResults(null);
+    } else {
+      toast({
+        title: "Invalid File",
+        description: "Please select a valid JSON file.",
+        variant: "destructive",
+      });
+      setImportFile(null);
+    }
+  };
+
+  if (!isAdminOrSuperAdmin) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
+              <p className="text-gray-500">
+                Data Import/Export is only available to Admin and Super Admin users.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="w-5 h-5" />
+            Data Import/Export
+          </CardTitle>
+          <CardDescription>
+            Export all site data to JSON format or import previously exported data back into the system.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          
+          {/* Export Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <Download className="w-4 h-4" />
+              <h3 className="font-semibold">Export Data</h3>
+            </div>
+            
+            <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+              <div className="flex items-start gap-3">
+                <FileText className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100">Export All Data</h4>
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                    Download a complete backup of all site data including users, campaigns, clients, 
+                    finance records, and settings in JSON format.
+                  </p>
+                  <ul className="text-xs text-blue-600 dark:text-blue-400 mt-2 space-y-1">
+                    <li>• Passwords are automatically redacted for security</li>
+                    <li>• All data relationships are preserved</li>
+                    <li>• Compatible with the import function below</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <Button 
+                onClick={handleExport}
+                disabled={isExporting}
+                className="mt-4"
+                data-testid="button-export"
+              >
+                {isExporting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export All Data
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Import Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <Upload className="w-4 h-4" />
+              <h3 className="font-semibold">Import Data</h3>
+            </div>
+            
+            <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-medium text-amber-900 dark:text-amber-100">Import Previously Exported Data</h4>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    Upload a JSON file exported from this system to restore data. Existing records will be 
+                    updated and new records will be created.
+                  </p>
+                  <ul className="text-xs text-amber-600 dark:text-amber-400 mt-2 space-y-1">
+                    <li>• Duplicate handling: Updates existing records instead of creating duplicates</li>
+                    <li>• Maintains data integrity and relationships</li>
+                    <li>• Shows detailed import results</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="mt-4 space-y-3">
+                <div>
+                  <Input
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileSelect}
+                    disabled={isImporting}
+                    data-testid="input-import-file"
+                  />
+                  {importFile && (
+                    <p className="text-sm text-green-600 mt-1">
+                      Selected: {importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)
+                    </p>
+                  )}
+                </div>
+                
+                <Button 
+                  onClick={handleImport}
+                  disabled={isImporting || !importFile}
+                  variant="secondary"
+                  data-testid="button-import"
+                >
+                  {isImporting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Import Data
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Import Results */}
+          {importResults && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <FileText className="w-4 h-4" />
+                <h3 className="font-semibold">Import Results</h3>
+              </div>
+              
+              <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{importResults.results.imported}</div>
+                    <div className="text-sm text-gray-600">New Records</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{importResults.results.updated}</div>
+                    <div className="text-sm text-gray-600">Updated Records</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-red-600">{importResults.results.skipped}</div>
+                    <div className="text-sm text-gray-600">Errors/Skipped</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-600">{importResults.results.totalProcessed}</div>
+                    <div className="text-sm text-gray-600">Total Processed</div>
+                  </div>
+                </div>
+                
+                {importResults.results.errors.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="font-medium text-red-700 dark:text-red-300 mb-2">Errors:</h4>
+                    <div className="text-sm text-red-600 dark:text-red-400 space-y-1 max-h-32 overflow-y-auto">
+                      {importResults.results.errors.map((error: string, index: number) => (
+                        <div key={index}>• {error}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="text-xs text-gray-500 mt-4">
+                  Import completed at {new Date(importResults.importedAt).toLocaleString()}
+                  {importResults.importedBy && ` by ${importResults.importedBy}`}
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   return (
     <Sidebar>
@@ -1851,7 +2164,7 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="users" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 max-w-2xl">
+            <TabsList className="grid w-full grid-cols-4 max-w-4xl">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 User Management
@@ -1863,6 +2176,10 @@ export default function AdminPage() {
               <TabsTrigger value="finance" className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4" />
                 Finance Access
+              </TabsTrigger>
+              <TabsTrigger value="data" className="flex items-center gap-2">
+                <Database className="w-4 h-4" />
+                Data Import/Export
               </TabsTrigger>
             </TabsList>
 
@@ -1876,6 +2193,10 @@ export default function AdminPage() {
 
             <TabsContent value="finance">
               <FinanceAccessControl />
+            </TabsContent>
+            
+            <TabsContent value="data">
+              <DataImportExport />
             </TabsContent>
           </Tabs>
         </div>

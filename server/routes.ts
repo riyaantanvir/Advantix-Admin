@@ -1920,162 +1920,229 @@ export async function registerRoutes(app: Express): Promise<Server> {
         errors: [] as string[]
       };
 
-      // Helper function to safely import data with duplicate handling
-      async function importTable<T extends { id: string }>(
-        tableName: string,
-        data: T[],
-        createFn: (item: Omit<T, 'id' | 'createdAt' | 'updatedAt'>) => Promise<T>,
-        updateFn: (id: string, item: Partial<Omit<T, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<T>,
-        getFn: (id: string) => Promise<T | null>
-      ) {
-        if (!Array.isArray(data)) return;
-
-        for (const item of data) {
-          try {
-            const existing = await getFn(item.id);
-            const { id, createdAt, updatedAt, ...itemData } = item;
-            
-            if (existing) {
-              // Update existing record
-              await updateFn(item.id, itemData);
-              results.updated++;
-            } else {
-              // Create new record with original ID
-              await createFn({ ...itemData, id: item.id } as any);
-              results.imported++;
+      // Import data with duplicate handling - simplified approach
+      try {
+        // Core system data first
+        if (importData.data.pages && Array.isArray(importData.data.pages)) {
+          for (const page of importData.data.pages) {
+            try {
+              const existing = await storage.getPage(page.id);
+              if (existing) {
+                await storage.updatePage(page.id, page);
+                results.updated++;
+              } else {
+                await storage.createPage(page);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`page (${page.id}): ${error.message}`);
+              results.skipped++;
             }
-          } catch (error: any) {
-            results.errors.push(`${tableName} (${item.id}): ${error.message}`);
-            results.skipped++;
           }
         }
-      }
 
-      // Import data in dependency order (referenced tables first)
-      
-      // Core system data
-      if (importData.data.pages) {
-        await importTable("pages", importData.data.pages, 
-          (item) => storage.createPage(item),
-          (id, item) => storage.updatePage(id, item),
-          (id) => storage.getPage(id)
-        );
-      }
+        // Business data
+        if (importData.data.clients && Array.isArray(importData.data.clients)) {
+          for (const client of importData.data.clients) {
+            try {
+              const existing = await storage.getClient(client.id);
+              if (existing) {
+                await storage.updateClient(client.id, client);
+                results.updated++;
+              } else {
+                await storage.createClient(client);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`client (${client.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
 
-      if (importData.data.users && importData.data.users.length > 0) {
-        // Skip users with redacted passwords
-        const validUsers = importData.data.users.filter((u: any) => u.password !== "[REDACTED]");
-        await importTable("users", validUsers,
-          (item) => storage.createUser(item),
-          (id, item) => storage.updateUser(id, item),
-          (id) => storage.getUser(id)
-        );
-      }
+        if (importData.data.adAccounts && Array.isArray(importData.data.adAccounts)) {
+          for (const account of importData.data.adAccounts) {
+            try {
+              const existing = await storage.getAdAccount(account.id);
+              if (existing) {
+                await storage.updateAdAccount(account.id, account);
+                results.updated++;
+              } else {
+                await storage.createAdAccount(account);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`adAccount (${account.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
 
-      if (importData.data.rolePermissions) {
-        await importTable("rolePermissions", importData.data.rolePermissions,
-          (item) => storage.createRolePermission(item),
-          (id, item) => storage.updateRolePermission(id, item),
-          (id) => storage.getRolePermission(id)
-        );
-      }
+        if (importData.data.campaigns && Array.isArray(importData.data.campaigns)) {
+          for (const campaign of importData.data.campaigns) {
+            try {
+              const existing = await storage.getCampaign(campaign.id);
+              if (existing) {
+                await storage.updateCampaign(campaign.id, campaign);
+                results.updated++;
+              } else {
+                await storage.createCampaign(campaign);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`campaign (${campaign.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
 
-      // Business data
-      if (importData.data.clients) {
-        await importTable("clients", importData.data.clients,
-          (item) => storage.createClient(item),
-          (id, item) => storage.updateClient(id, item),
-          (id) => storage.getClient(id)
-        );
-      }
+        if (importData.data.adCopySets && Array.isArray(importData.data.adCopySets)) {
+          for (const copySet of importData.data.adCopySets) {
+            try {
+              const existing = await storage.getAdCopySet(copySet.id);
+              if (existing) {
+                await storage.updateAdCopySet(copySet.id, copySet);
+                results.updated++;
+              } else {
+                await storage.createAdCopySet(copySet);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`adCopySet (${copySet.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
 
-      if (importData.data.adAccounts) {
-        await importTable("adAccounts", importData.data.adAccounts,
-          (item) => storage.createAdAccount(item),
-          (id, item) => storage.updateAdAccount(id, item),
-          (id) => storage.getAdAccount(id)
-        );
-      }
+        if (importData.data.workReports && Array.isArray(importData.data.workReports)) {
+          for (const report of importData.data.workReports) {
+            try {
+              const existing = await storage.getWorkReport(report.id);
+              if (existing) {
+                await storage.updateWorkReport(report.id, report);
+                results.updated++;
+              } else {
+                await storage.createWorkReport(report);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`workReport (${report.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
 
-      if (importData.data.campaigns) {
-        await importTable("campaigns", importData.data.campaigns,
-          (item) => storage.createCampaign(item),
-          (id, item) => storage.updateCampaign(id, item),
-          (id) => storage.getCampaign(id)
-        );
-      }
+        // Finance data
+        if (importData.data.financeProjects && Array.isArray(importData.data.financeProjects)) {
+          for (const project of importData.data.financeProjects) {
+            try {
+              const existing = await storage.getFinanceProject(project.id);
+              if (existing) {
+                await storage.updateFinanceProject(project.id, project);
+                results.updated++;
+              } else {
+                await storage.createFinanceProject(project);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`financeProject (${project.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
 
-      if (importData.data.adCopySets) {
-        await importTable("adCopySets", importData.data.adCopySets,
-          (item) => storage.createAdCopySet(item),
-          (id, item) => storage.updateAdCopySet(id, item),
-          (id) => storage.getAdCopySet(id)
-        );
-      }
+        if (importData.data.financePayments && Array.isArray(importData.data.financePayments)) {
+          for (const payment of importData.data.financePayments) {
+            try {
+              const existing = await storage.getFinancePayment(payment.id);
+              if (existing) {
+                await storage.updateFinancePayment(payment.id, payment);
+                results.updated++;
+              } else {
+                await storage.createFinancePayment(payment);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`financePayment (${payment.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
 
-      if (importData.data.workReports) {
-        await importTable("workReports", importData.data.workReports,
-          (item) => storage.createWorkReport(item),
-          (id, item) => storage.updateWorkReport(id, item),
-          (id) => storage.getWorkReport(id)
-        );
-      }
+        if (importData.data.financeExpenses && Array.isArray(importData.data.financeExpenses)) {
+          for (const expense of importData.data.financeExpenses) {
+            try {
+              const existing = await storage.getFinanceExpense(expense.id);
+              if (existing) {
+                await storage.updateFinanceExpense(expense.id, expense);
+                results.updated++;
+              } else {
+                await storage.createFinanceExpense(expense);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`financeExpense (${expense.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
 
-      if (importData.data.salaries) {
-        await importTable("salaries", importData.data.salaries,
-          (item) => storage.createSalary(item),
-          (id, item) => storage.updateSalary(id, item),
-          (id) => storage.getSalary(id)
-        );
-      }
+        if (importData.data.tags && Array.isArray(importData.data.tags)) {
+          for (const tag of importData.data.tags) {
+            try {
+              const existing = await storage.getTag(tag.id);
+              if (existing) {
+                await storage.updateTag(tag.id, tag);
+                results.updated++;
+              } else {
+                await storage.createTag(tag);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`tag (${tag.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
 
-      // Finance data
-      if (importData.data.financeProjects) {
-        await importTable("financeProjects", importData.data.financeProjects,
-          (item) => storage.createFinanceProject(item),
-          (id, item) => storage.updateFinanceProject(id, item),
-          (id) => storage.getFinanceProject(id)
-        );
-      }
+        if (importData.data.employees && Array.isArray(importData.data.employees)) {
+          for (const employee of importData.data.employees) {
+            try {
+              const existing = await storage.getEmployee(employee.id);
+              if (existing) {
+                await storage.updateEmployee(employee.id, employee);
+                results.updated++;
+              } else {
+                await storage.createEmployee(employee);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`employee (${employee.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
 
-      if (importData.data.financePayments) {
-        await importTable("financePayments", importData.data.financePayments,
-          (item) => storage.createFinancePayment(item),
-          (id, item) => storage.updateFinancePayment(id, item),
-          (id) => storage.getFinancePayment(id)
-        );
-      }
+        if (importData.data.salaries && Array.isArray(importData.data.salaries)) {
+          for (const salary of importData.data.salaries) {
+            try {
+              const existing = await storage.getSalary(salary.id);
+              if (existing) {
+                await storage.updateSalary(salary.id, salary);
+                results.updated++;
+              } else {
+                await storage.createSalary(salary);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`salary (${salary.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
 
-      if (importData.data.financeExpenses) {
-        await importTable("financeExpenses", importData.data.financeExpenses,
-          (item) => storage.createFinanceExpense(item),
-          (id, item) => storage.updateFinanceExpense(id, item),
-          (id) => storage.getFinanceExpense(id)
-        );
-      }
-
-      if (importData.data.financeSettings) {
-        await importTable("financeSettings", importData.data.financeSettings,
-          (item) => storage.createFinanceSetting(item),
-          (id, item) => storage.updateFinanceSetting(id, item),
-          (id) => storage.getFinanceSetting(id)
-        );
-      }
-
-      if (importData.data.tags) {
-        await importTable("tags", importData.data.tags,
-          (item) => storage.createTag(item),
-          (id, item) => storage.updateTag(id, item),
-          (id) => storage.getTag(id)
-        );
-      }
-
-      if (importData.data.employees) {
-        await importTable("employees", importData.data.employees,
-          (item) => storage.createEmployee(item),
-          (id, item) => storage.updateEmployee(id, item),
-          (id) => storage.getEmployee(id)
-        );
+      } catch (importError: any) {
+        results.errors.push(`Import process error: ${importError.message}`);
       }
 
       res.json({
