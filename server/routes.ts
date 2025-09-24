@@ -1925,10 +1925,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const converted: any = {};
         for (const [key, value] of Object.entries(obj)) {
-          // Convert ISO date strings to Date objects for timestamp fields
-          if (typeof value === 'string' && 
-              (key.includes('Date') || key.includes('At') || key === 'createdAt' || key === 'updatedAt') &&
-              /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+          // Convert ISO date strings to Date objects - more comprehensive detection
+          if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+            // Convert any string that looks like an ISO date to Date object
             converted[key] = new Date(value);
           } else if (typeof value === 'object') {
             converted[key] = convertDatesToObjects(value);
