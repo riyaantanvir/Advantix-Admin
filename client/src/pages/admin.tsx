@@ -913,6 +913,11 @@ function FinanceAccessControl() {
   const [editingTag, setEditingTag] = useState<Tag | null>(null);
   const [tagFormData, setTagFormData] = useState({ name: "", description: "", color: "#3B82F6" });
   
+  const [isCreateEmployeeOpen, setIsCreateEmployeeOpen] = useState(false);
+  const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [employeeFormData, setEmployeeFormData] = useState({ name: "", department: "", position: "", notes: "" });
+  
   // Fetch all users
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -923,8 +928,8 @@ function FinanceAccessControl() {
     queryKey: ["/api/tags"],
   });
 
-  // Fetch employees (same as users)
-  const { data: employees = [], isLoading: employeesLoading } = useQuery<User[]>({
+  // Fetch employees (dedicated employees table)
+  const { data: employees = [], isLoading: employeesLoading, refetch: refetchEmployees } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
   });
 
@@ -1115,6 +1120,124 @@ function FinanceAccessControl() {
 
   const handleDeleteTag = (id: string) => {
     deleteTagMutation.mutate(id);
+  };
+
+  // Employee mutations
+  const createEmployeeMutation = useMutation({
+    mutationFn: async (employeeData: InsertEmployee) => {
+      const response = await apiRequest("POST", "/api/employees", employeeData);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Employee created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setIsCreateEmployeeOpen(false);
+      resetEmployeeForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create employee",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateEmployeeMutation = useMutation({
+    mutationFn: async ({ id, employeeData }: { id: string; employeeData: Partial<InsertEmployee> }) => {
+      const response = await apiRequest("PUT", `/api/employees/${id}`, employeeData);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Employee updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setIsEditEmployeeOpen(false);
+      setEditingEmployee(null);
+      resetEmployeeForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update employee",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/employees/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Employee deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete employee",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetEmployeeForm = () => {
+    setEmployeeFormData({ name: "", department: "", position: "", notes: "" });
+  };
+
+  const handleCreateEmployee = () => {
+    if (!employeeFormData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Employee name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    createEmployeeMutation.mutate({
+      name: employeeFormData.name,
+      department: employeeFormData.department || null,
+      position: employeeFormData.position || null,
+      notes: employeeFormData.notes || null,
+    });
+  };
+
+  const handleEditEmployee = (employee: Employee) => {
+    setEditingEmployee(employee);
+    setEmployeeFormData({
+      name: employee.name,
+      department: employee.department || "",
+      position: employee.position || "",
+      notes: employee.notes || "",
+    });
+    setIsEditEmployeeOpen(true);
+  };
+
+  const handleUpdateEmployee = () => {
+    if (!editingEmployee || !employeeFormData.name.trim()) return;
+    updateEmployeeMutation.mutate({
+      id: editingEmployee.id,
+      employeeData: {
+        name: employeeFormData.name,
+        department: employeeFormData.department || null,
+        position: employeeFormData.position || null,
+        notes: employeeFormData.notes || null,
+      },
+    });
+  };
+
+  const handleDeleteEmployee = (id: string) => {
+    deleteEmployeeMutation.mutate(id);
   };
 
   if (usersLoading) {
@@ -1412,13 +1535,87 @@ function FinanceAccessControl() {
       {/* Employee Name Management Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Employee Name Management
-          </CardTitle>
-          <CardDescription>
-            Manage employee names and information for finance tracking
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Employee Name Management
+              </CardTitle>
+              <CardDescription>
+                Create and manage employee names for finance tracking (no registration required)
+              </CardDescription>
+            </div>
+            <Dialog open={isCreateEmployeeOpen} onOpenChange={setIsCreateEmployeeOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-employee">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Employee
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Employee</DialogTitle>
+                  <DialogDescription>
+                    Add a new employee name that will sync with Expenses & Salaries
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="employee-name">Employee Name *</Label>
+                    <Input
+                      id="employee-name"
+                      value={employeeFormData.name}
+                      onChange={(e) => setEmployeeFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Enter employee name"
+                      data-testid="input-employee-name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="employee-department">Department (optional)</Label>
+                    <Input
+                      id="employee-department"
+                      value={employeeFormData.department}
+                      onChange={(e) => setEmployeeFormData(prev => ({ ...prev, department: e.target.value }))}
+                      placeholder="Enter department"
+                      data-testid="input-employee-department"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="employee-position">Position (optional)</Label>
+                    <Input
+                      id="employee-position"
+                      value={employeeFormData.position}
+                      onChange={(e) => setEmployeeFormData(prev => ({ ...prev, position: e.target.value }))}
+                      placeholder="Enter position"
+                      data-testid="input-employee-position"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="employee-notes">Notes (optional)</Label>
+                    <Input
+                      id="employee-notes"
+                      value={employeeFormData.notes}
+                      onChange={(e) => setEmployeeFormData(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Enter notes"
+                      data-testid="input-employee-notes"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCreateEmployeeOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleCreateEmployee}
+                    disabled={createEmployeeMutation.isPending}
+                    data-testid="button-save-employee"
+                  >
+                    {createEmployeeMutation.isPending ? "Adding..." : "Add Employee"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
           {employeesLoading ? (
@@ -1430,42 +1627,77 @@ function FinanceAccessControl() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Position</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {employees.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                      No employees found
+                      No employees found. Click "Add Employee" to create your first employee.
                     </TableCell>
                   </TableRow>
                 ) : (
                   employees.map((employee) => (
                     <TableRow key={employee.id} data-testid={`row-employee-${employee.id}`}>
                       <TableCell className="font-medium" data-testid={`text-employee-name-${employee.id}`}>
-                        {employee.name || "N/A"}
+                        {employee.name}
                       </TableCell>
-                      <TableCell data-testid={`text-employee-username-${employee.id}`}>
-                        {employee.username}
+                      <TableCell data-testid={`text-employee-department-${employee.id}`}>
+                        {employee.department || "N/A"}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" data-testid={`badge-employee-role-${employee.id}`}>
-                          {employee.role === 'super_admin' ? 'Super Admin' : 
-                           employee.role === 'admin' ? 'Admin' :
-                           employee.role === 'manager' ? 'Manager' : 'User'}
-                        </Badge>
+                      <TableCell data-testid={`text-employee-position-${employee.id}`}>
+                        {employee.position || "N/A"}
                       </TableCell>
                       <TableCell>
                         <Badge variant={employee.isActive ? "default" : "secondary"} data-testid={`badge-employee-status-${employee.id}`}>
                           {employee.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
-                      <TableCell data-testid={`text-employee-created-${employee.id}`}>
-                        {employee.createdAt ? new Date(employee.createdAt).toLocaleDateString() : "N/A"}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditEmployee(employee)}
+                            data-testid={`button-edit-employee-${employee.id}`}
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700"
+                                data-testid={`button-delete-employee-${employee.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete "{employee.name}"? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteEmployee(employee.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                  data-testid={`button-confirm-delete-employee-${employee.id}`}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -1475,6 +1707,72 @@ function FinanceAccessControl() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Employee Dialog */}
+      <Dialog open={isEditEmployeeOpen} onOpenChange={setIsEditEmployeeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Employee</DialogTitle>
+            <DialogDescription>
+              Update employee information
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-employee-name">Employee Name *</Label>
+              <Input
+                id="edit-employee-name"
+                value={employeeFormData.name}
+                onChange={(e) => setEmployeeFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter employee name"
+                data-testid="input-edit-employee-name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-employee-department">Department (optional)</Label>
+              <Input
+                id="edit-employee-department"
+                value={employeeFormData.department}
+                onChange={(e) => setEmployeeFormData(prev => ({ ...prev, department: e.target.value }))}
+                placeholder="Enter department"
+                data-testid="input-edit-employee-department"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-employee-position">Position (optional)</Label>
+              <Input
+                id="edit-employee-position"
+                value={employeeFormData.position}
+                onChange={(e) => setEmployeeFormData(prev => ({ ...prev, position: e.target.value }))}
+                placeholder="Enter position"
+                data-testid="input-edit-employee-position"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-employee-notes">Notes (optional)</Label>
+              <Input
+                id="edit-employee-notes"
+                value={employeeFormData.notes}
+                onChange={(e) => setEmployeeFormData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Enter notes"
+                data-testid="input-edit-employee-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditEmployeeOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpdateEmployee}
+              disabled={updateEmployeeMutation.isPending}
+              data-testid="button-update-employee"
+            >
+              {updateEmployeeMutation.isPending ? "Updating..." : "Update Employee"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Tag Dialog */}
       <Dialog open={isEditTagOpen} onOpenChange={setIsEditTagOpen}>
