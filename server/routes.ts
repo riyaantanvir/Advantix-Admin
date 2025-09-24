@@ -16,6 +16,7 @@ import {
   insertFinancePaymentSchema,
   insertFinanceExpenseSchema,
   insertFinanceSettingSchema,
+  insertTagSchema,
   type Campaign,
   type Client,
   type User,
@@ -28,6 +29,7 @@ import {
   type FinancePayment,
   type FinanceExpense,
   type FinanceSetting,
+  type Tag,
   UserRole 
 } from "@shared/schema";
 import { z } from "zod";
@@ -1403,6 +1405,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Get finance dashboard error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Tag Management Routes - Admin Only
+  
+  // Get all tags
+  app.get("/api/tags", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const tags = await storage.getTags();
+      res.json(tags);
+    } catch (error) {
+      console.error("Get tags error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get single tag
+  app.get("/api/tags/:id", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const tag = await storage.getTag(req.params.id);
+      if (!tag) {
+        return res.status(404).json({ message: "Tag not found" });
+      }
+      res.json(tag);
+    } catch (error) {
+      console.error("Get tag error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create new tag
+  app.post("/api/tags", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertTagSchema.parse(req.body);
+      const tag = await storage.createTag(validatedData);
+      res.status(201).json(tag);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Create tag error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update tag
+  app.put("/api/tags/:id", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertTagSchema.partial().parse(req.body);
+      const tag = await storage.updateTag(req.params.id, validatedData);
+      if (!tag) {
+        return res.status(404).json({ message: "Tag not found" });
+      }
+      res.json(tag);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Update tag error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete tag
+  app.delete("/api/tags/:id", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteTag(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Tag not found" });
+      }
+      res.json({ message: "Tag deleted successfully" });
+    } catch (error) {
+      console.error("Delete tag error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Employee Management Routes (reusing existing users but filtered for employees)
+  
+  // Get all employees (users with employee-like roles)
+  app.get("/api/employees", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const users = await storage.getAllUsers();
+      // Filter to include all users since they represent employees
+      const employees = users.map(user => ({
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt
+      }));
+      res.json(employees);
+    } catch (error) {
+      console.error("Get employees error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
