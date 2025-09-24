@@ -611,3 +611,28 @@ export type Tag = typeof tags.$inferSelect;
 
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type Employee = typeof employees.$inferSelect;
+
+// Fishfire types
+export type InsertFishfireProduct = z.infer<typeof insertFishfireProductSchema>;
+export type FishfireProduct = typeof fishfireProducts.$inferSelect;
+
+export type InsertFishfireOrder = z.infer<typeof insertFishfireOrderSchema>;
+export type FishfireOrder = typeof fishfireOrders.$inferSelect;
+
+export type InsertFishfireOrderItem = z.infer<typeof insertFishfireOrderItemSchema>;
+export type FishfireOrderItem = typeof fishfireOrderItems.$inferSelect;
+
+export type InsertFishfireExpense = z.infer<typeof insertFishfireExpenseSchema>;
+export type FishfireExpense = typeof fishfireExpenses.$inferSelect;
+
+export type InsertFishfirePurchase = z.infer<typeof insertFishfirePurchaseSchema>;
+export type FishfirePurchase = typeof fishfirePurchases.$inferSelect;
+
+export type InsertFishfirePurchaseItem = z.infer<typeof insertFishfirePurchaseItemSchema>;
+export type FishfirePurchaseItem = typeof fishfirePurchaseItems.$inferSelect;
+
+export type InsertFishfireDailyOrder = z.infer<typeof insertFishfireDailyOrderSchema>;
+export type FishfireDailyOrder = typeof fishfireDailyOrders.$inferSelect;
+
+export type InsertFishfireDailyExpense = z.infer<typeof insertFishfireDailyExpenseSchema>;
+export type FishfireDailyExpense = typeof fishfireDailyExpenses.$inferSelect;
