@@ -24,6 +24,8 @@ import {
   type InsertFinanceExpense,
   type FinanceSetting,
   type InsertFinanceSetting,
+  type Tag,
+  type InsertTag,
   UserRole,
   users,
   sessions,
@@ -37,7 +39,8 @@ import {
   financeProjects,
   financePayments,
   financeExpenses,
-  financeSettings
+  financeSettings,
+  tags
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, and, desc } from "drizzle-orm";
@@ -1101,5 +1104,70 @@ export class DatabaseStorage implements IStorage {
     };
     await this.setFinanceSetting(defaultRate);
     return 110;
+  }
+
+  // Tag methods implementation
+  async getTags(): Promise<Tag[]> {
+    try {
+      return db.select().from(tags).orderBy(desc(tags.createdAt));
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get tags:`, error);
+      throw new Error(`Failed to get tags: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getTag(id: string): Promise<Tag | undefined> {
+    try {
+      const result = await db.select().from(tags).where(eq(tags.id, id)).limit(1);
+      return result[0];
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get tag with ID ${id}:`, error);
+      throw new Error(`Failed to get tag: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async createTag(insertTag: InsertTag): Promise<Tag> {
+    try {
+      const id = randomUUID();
+      const newTag = {
+        ...insertTag,
+        id,
+        isActive: insertTag.isActive ?? true,
+      };
+      
+      await db.insert(tags).values(newTag);
+      console.log(`[DB] Created tag: ${newTag.name} (ID: ${newTag.id})`);
+      return newTag as Tag;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to create tag:`, error);
+      throw new Error(`Failed to create tag: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async updateTag(id: string, updateData: Partial<InsertTag>): Promise<Tag | undefined> {
+    try {
+      await db.update(tags).set(updateData).where(eq(tags.id, id));
+      console.log(`[DB] Updated tag with ID: ${id}`);
+      return this.getTag(id);
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to update tag with ID ${id}:`, error);
+      throw new Error(`Failed to update tag: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async deleteTag(id: string): Promise<boolean> {
+    try {
+      const result = await db.delete(tags).where(eq(tags.id, id));
+      const deleted = (result.rowCount ?? 0) > 0;
+      if (deleted) {
+        console.log(`[DB] Deleted tag with ID: ${id}`);
+      } else {
+        console.warn(`[DB] No tag found to delete with ID: ${id}`);
+      }
+      return deleted;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to delete tag with ID ${id}:`, error);
+      throw new Error(`Failed to delete tag: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }

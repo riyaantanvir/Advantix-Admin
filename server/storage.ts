@@ -1106,6 +1106,8 @@ export class MemStorage implements IStorage {
     const tag: Tag = {
       ...insertTag,
       id,
+      description: insertTag.description ?? null,
+      color: insertTag.color ?? "#3B82F6",
       isActive: insertTag.isActive ?? true,
       createdAt: new Date(),
       updatedAt: new Date(),
