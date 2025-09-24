@@ -26,6 +26,8 @@ import {
   type InsertFinanceSetting,
   type Tag,
   type InsertTag,
+  type Employee,
+  type InsertEmployee,
   UserRole,
   users,
   sessions,
@@ -40,7 +42,8 @@ import {
   financePayments,
   financeExpenses,
   financeSettings,
-  tags
+  tags,
+  employees
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, and, desc } from "drizzle-orm";
@@ -1168,6 +1171,71 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`[DB ERROR] Failed to delete tag with ID ${id}:`, error);
       throw new Error(`Failed to delete tag: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Employee methods implementation
+  async getEmployees(): Promise<Employee[]> {
+    try {
+      return db.select().from(employees).orderBy(desc(employees.createdAt));
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get employees:`, error);
+      throw new Error(`Failed to get employees: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getEmployee(id: string): Promise<Employee | undefined> {
+    try {
+      const result = await db.select().from(employees).where(eq(employees.id, id)).limit(1);
+      return result[0];
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get employee with ID ${id}:`, error);
+      throw new Error(`Failed to get employee: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async createEmployee(insertEmployee: InsertEmployee): Promise<Employee> {
+    try {
+      const id = randomUUID();
+      const newEmployee = {
+        ...insertEmployee,
+        id,
+        isActive: insertEmployee.isActive ?? true,
+      };
+      
+      await db.insert(employees).values(newEmployee);
+      console.log(`[DB] Created employee: ${newEmployee.name} (ID: ${newEmployee.id})`);
+      return newEmployee as Employee;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to create employee:`, error);
+      throw new Error(`Failed to create employee: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async updateEmployee(id: string, updateData: Partial<InsertEmployee>): Promise<Employee | undefined> {
+    try {
+      await db.update(employees).set(updateData).where(eq(employees.id, id));
+      console.log(`[DB] Updated employee with ID: ${id}`);
+      return this.getEmployee(id);
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to update employee with ID ${id}:`, error);
+      throw new Error(`Failed to update employee: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async deleteEmployee(id: string): Promise<boolean> {
+    try {
+      const result = await db.delete(employees).where(eq(employees.id, id));
+      const deleted = (result.rowCount ?? 0) > 0;
+      if (deleted) {
+        console.log(`[DB] Deleted employee with ID: ${id}`);
+      } else {
+        console.warn(`[DB] No employee found to delete with ID: ${id}`);
+      }
+      return deleted;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to delete employee with ID ${id}:`, error);
+      throw new Error(`Failed to delete employee: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }
