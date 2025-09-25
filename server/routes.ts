@@ -130,7 +130,7 @@ const upload = multer({
     if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV files are allowed'), false);
+      cb(null, false);
     }
   },
   limits: {
@@ -1852,7 +1852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User-friendly CSV Export Endpoints for Finance Users
-  app.get("/api/finance/expenses/export/csv", authenticate, requireFinanceAccess, async (req: Request, res: Response) => {
+  app.get("/api/finance/expenses/export/csv", authenticate, requirePagePermission('finance', 'view'), async (req: Request, res: Response) => {
     try {
       const expenses = await storage.getFinanceExpenses();
       const headers = ['id', 'projectId', 'amount', 'currency', 'category', 'description', 'expenseDate', 'createdAt', 'updatedAt'];
@@ -1867,7 +1867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/employees/export/csv", authenticate, requireFinanceAccess, async (req: Request, res: Response) => {
+  app.get("/api/employees/export/csv", authenticate, requirePagePermission('finance', 'view'), async (req: Request, res: Response) => {
     try {
       const employees = await storage.getEmployees();
       const headers = ['id', 'name', 'department', 'position', 'notes', 'isActive', 'createdAt', 'updatedAt'];

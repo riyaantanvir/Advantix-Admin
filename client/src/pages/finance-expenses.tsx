@@ -318,34 +318,67 @@ export default function FinanceExpenses() {
   // Export CSV functions
   const exportExpensesCSV = async () => {
     try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Authentication required");
+      }
+
+      console.log("Starting CSV export...");
+      
       const response = await fetch("/api/finance/expenses/export/csv", {
+        method: "GET",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Authorization": `Bearer ${token}`,
         },
       });
       
+      console.log("Response status:", response.status);
+      console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+      
       if (!response.ok) {
-        throw new Error("Export failed");
+        const errorText = await response.text();
+        throw new Error(`Export failed: ${response.status} - ${errorText}`);
       }
       
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `expenses-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      // Get the text content directly and create blob
+      const csvText = await response.text();
+      console.log("CSV text length:", csvText.length);
+      console.log("CSV preview:", csvText.substring(0, 200));
+      
+      // Check if it's actually CSV content
+      if (csvText.includes("<!DOCTYPE html>")) {
+        throw new Error("Received HTML instead of CSV - authentication may have failed");
+      }
+      
+      // Create blob and download
+      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create download link
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `expenses-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      // Add to DOM, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      
+      console.log("Download initiated successfully");
       
       toast({
         title: "Success",
         description: "Expenses exported successfully.",
       });
     } catch (error) {
+      console.error("CSV export error:", error);
       toast({
         title: "Error",
-        description: "Failed to export expenses.",
+        description: error instanceof Error ? error.message : "Failed to export expenses.",
         variant: "destructive",
       });
     }
