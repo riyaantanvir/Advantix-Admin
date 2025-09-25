@@ -18,12 +18,6 @@ import FinanceProjects from "@/pages/finance-projects";
 import FinancePayments from "@/pages/finance-payments";
 import FinanceExpenses from "@/pages/finance-expenses";
 import FinanceReports from "@/pages/finance-reports";
-import FishfireOrderManagementPage from "@/pages/fishfire-order-management";
-import FishfireExpenseManagementPage from "@/pages/fishfire-expense-management";
-import FishfireStockReportPage from "@/pages/fishfire-stock-report";
-import FishfireDailyOrderPage from "@/pages/fishfire-daily-order";
-import FishfirePurchasePage from "@/pages/fishfire-purchase";
-import FishfireDailyExpensePage from "@/pages/fishfire-daily-expense";
 import NotFound from "@/pages/not-found";
 
 function AuthenticatedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -180,12 +174,6 @@ function Router() {
       <Route path="/finance/payments" component={() => <ProtectedRoute component={FinancePayments} pageKey="finance" />} />
       <Route path="/finance/expenses" component={() => <ProtectedRoute component={FinanceExpenses} pageKey="finance" />} />
       <Route path="/finance/reports" component={() => <ProtectedRoute component={FinanceReports} pageKey="finance" />} />
-      <Route path="/fishfire/order-management" component={() => <ProtectedRoute component={FishfireOrderManagementPage} pageKey="fishfire" />} />
-      <Route path="/fishfire/expense-management" component={() => <ProtectedRoute component={FishfireExpenseManagementPage} pageKey="fishfire" />} />
-      <Route path="/fishfire/stock-report" component={() => <ProtectedRoute component={FishfireStockReportPage} pageKey="fishfire" />} />
-      <Route path="/fishfire/daily-order" component={() => <ProtectedRoute component={FishfireDailyOrderPage} pageKey="fishfire" />} />
-      <Route path="/fishfire/purchase" component={() => <ProtectedRoute component={FishfirePurchasePage} pageKey="fishfire" />} />
-      <Route path="/fishfire/daily-expense" component={() => <ProtectedRoute component={FishfireDailyExpensePage} pageKey="fishfire" />} />
       <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} pageKey="admin" />} />
       <Route path="/" component={() => <ProtectedRoute component={Home} pageKey="dashboard" />} />
       <Route component={NotFound} />
