@@ -1773,6 +1773,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/backup/employees/csv", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const employees = await storage.getEmployees();
+      const headers = ['id', 'name', 'department', 'position', 'notes', 'isActive', 'createdAt', 'updatedAt'];
+      const csv = convertToCSV(employees, headers);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="employees-${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      res.status(500).json({ message: "CSV export failed" });
+    }
+  });
+
   // Data Recovery Information Endpoint
   app.get("/api/backup/info", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
     try {
@@ -1784,7 +1798,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workReportsCount,
         financeProjectsCount,
         financePaymentsCount,
-        financeExpensesCount
+        financeExpensesCount,
+        employeesCount
       ] = await Promise.all([
         storage.getAllUsers().then(users => users.length),
         storage.getCampaigns().then(campaigns => campaigns.length),
@@ -1794,6 +1809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getFinanceProjects().then(projects => projects.length),
         storage.getFinancePayments().then(payments => payments.length),
         storage.getFinanceExpenses().then(expenses => expenses.length),
+        storage.getEmployees().then(employees => employees.length),
       ]);
 
       res.json({
@@ -1812,7 +1828,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             campaigns: "/api/backup/campaigns/csv",
             financeProjects: "/api/backup/finance-projects/csv",
             financePayments: "/api/backup/finance-payments/csv",
-            financeExpenses: "/api/backup/finance-expenses/csv"
+            financeExpenses: "/api/backup/finance-expenses/csv",
+            employees: "/api/backup/employees/csv"
           }
         },
         dataStats: {
@@ -1824,12 +1841,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
           financeProjects: financeProjectsCount,
           financePayments: financePaymentsCount,
           financeExpenses: financeExpensesCount,
+          employees: employeesCount,
           lastBackupAvailable: "On-demand via API endpoints"
         },
         securityNote: "All backup endpoints require Super Admin authentication"
       });
     } catch (error) {
       res.status(500).json({ message: "Backup info retrieval failed" });
+    }
+  });
+
+  // User-friendly CSV Export Endpoints for Finance Users
+  app.get("/api/finance/expenses/export/csv", authenticate, requireFinanceAccess, async (req: Request, res: Response) => {
+    try {
+      const expenses = await storage.getFinanceExpenses();
+      const headers = ['id', 'projectId', 'amount', 'currency', 'category', 'description', 'expenseDate', 'createdAt', 'updatedAt'];
+      const csv = convertToCSV(expenses, headers);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="expenses-${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      console.error('Finance expenses CSV export error:', error);
+      res.status(500).json({ message: "CSV export failed" });
+    }
+  });
+
+  app.get("/api/employees/export/csv", authenticate, requireFinanceAccess, async (req: Request, res: Response) => {
+    try {
+      const employees = await storage.getEmployees();
+      const headers = ['id', 'name', 'department', 'position', 'notes', 'isActive', 'createdAt', 'updatedAt'];
+      const csv = convertToCSV(employees, headers);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="employees-${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      console.error('Employees CSV export error:', error);
+      res.status(500).json({ message: "CSV export failed" });
     }
   });
 
