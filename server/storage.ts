@@ -29,22 +29,6 @@ import {
   type InsertTag,
   type Employee,
   type InsertEmployee,
-  type FishfireProduct,
-  type InsertFishfireProduct,
-  type FishfireOrder,
-  type InsertFishfireOrder,
-  type FishfireOrderItem,
-  type InsertFishfireOrderItem,
-  type FishfireExpense,
-  type InsertFishfireExpense,
-  type FishfirePurchase,
-  type InsertFishfirePurchase,
-  type FishfirePurchaseItem,
-  type InsertFishfirePurchaseItem,
-  type FishfireDailyOrder,
-  type InsertFishfireDailyOrder,
-  type FishfireDailyExpense,
-  type InsertFishfireDailyExpense,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
