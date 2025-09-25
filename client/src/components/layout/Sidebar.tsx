@@ -20,14 +20,7 @@ import {
   CreditCard,
   Calculator,
   BarChart3,
-  Building2,
-  Fish,
-  ShoppingCart,
-  Receipt,
-  Package,
-  Calendar,
-  Truck,
-  TrendingDown
+  Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -182,57 +175,6 @@ export default function Sidebar({ children }: SidebarProps) {
           label: "Reports",
           testId: "nav-finance-reports",
           pageKey: "finance"
-        }
-      ]
-    },
-    {
-      label: "Fishfire",
-      icon: Fish,
-      testId: "nav-fishfire",
-      pageKey: "fishfire",
-      isSection: true,
-      subItems: [
-        {
-          href: "/fishfire/order-management",
-          icon: ShoppingCart,
-          label: "Order Management",
-          testId: "nav-fishfire-orders",
-          pageKey: "fishfire"
-        },
-        {
-          href: "/fishfire/expense-management",
-          icon: Receipt,
-          label: "Expense Management",
-          testId: "nav-fishfire-expenses",
-          pageKey: "fishfire"
-        },
-        {
-          href: "/fishfire/stock-report",
-          icon: Package,
-          label: "Stock Report",
-          testId: "nav-fishfire-stock",
-          pageKey: "fishfire"
-        },
-        {
-          href: "/fishfire/daily-order",
-          icon: Calendar,
-          label: "Daily Order",
-          testId: "nav-fishfire-daily-order",
-          pageKey: "fishfire"
-        },
-        {
-          href: "/fishfire/purchase",
-          icon: Truck,
-          label: "Purchase",
-          testId: "nav-fishfire-purchase",
-          pageKey: "fishfire"
-        },
-        {
-          href: "/fishfire/daily-expense",
-          icon: TrendingDown,
-          label: "Daily Expense",
-          testId: "nav-fishfire-daily-expense",
-          pageKey: "fishfire"
         }
       ]
     },
