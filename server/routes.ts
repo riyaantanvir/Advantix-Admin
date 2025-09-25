@@ -1918,7 +1918,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Helper function to convert date strings back to Date objects
-      function convertDatesToObjects(obj: any): any {
+      const convertDatesToObjects = (obj: any): any => {
         if (obj === null || obj === undefined) return obj;
         if (Array.isArray(obj)) return obj.map(convertDatesToObjects);
         if (typeof obj !== 'object') return obj;
@@ -1936,7 +1936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         return converted;
-      }
+      };
 
       // Import data with duplicate handling - simplified approach
       try {
@@ -1973,10 +1973,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // Page key already exists with different ID - skip to avoid unique constraint violation
                 results.errors.push(`page (${page.pageKey}): duplicate key value violates unique constraint "pages_page_key_unique"`);
                 results.skipped++;
+              } else if (existingByKey) {
+                // Same pageKey exists - update it
+                await storage.updatePage(existingByKey.id, processedPage);
+                results.updated++;
               } else if (existingById) {
+                // Same ID exists - update it
                 await storage.updatePage(processedPage.id, processedPage);
                 results.updated++;
               } else {
+                // No existing record - create new
                 await storage.createPage(processedPage);
                 results.imported++;
               }
