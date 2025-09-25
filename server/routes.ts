@@ -1940,13 +1940,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Import data with duplicate handling - simplified approach
       try {
-        // Core system data first
+        // Users MUST be imported first - everything else depends on them
+        if (importData.data.users && Array.isArray(importData.data.users)) {
+          for (const user of importData.data.users) {
+            try {
+              const processedUser = convertDatesToObjects(user);
+              const existing = await storage.getUser(processedUser.id);
+              if (existing) {
+                await storage.updateUser(processedUser.id, processedUser);
+                results.updated++;
+              } else {
+                await storage.createUser(processedUser);
+                results.imported++;
+              }
+            } catch (error: any) {
+              results.errors.push(`user (${user.username || user.id}): ${error.message}`);
+              results.skipped++;
+            }
+          }
+        }
+
+        // Core system data next
         if (importData.data.pages && Array.isArray(importData.data.pages)) {
           for (const page of importData.data.pages) {
             try {
               const processedPage = convertDatesToObjects(page);
-              const existing = await storage.getPage(processedPage.id);
-              if (existing) {
+              // Check for existing page by pageKey to handle duplicates
+              const existingByKey = await storage.getPageByKey(processedPage.pageKey);
+              const existingById = await storage.getPage(processedPage.id);
+              
+              if (existingByKey && existingByKey.id !== processedPage.id) {
+                // Page key already exists with different ID - skip to avoid unique constraint violation
+                results.errors.push(`page (${page.pageKey}): duplicate key value violates unique constraint "pages_page_key_unique"`);
+                results.skipped++;
+              } else if (existingById) {
                 await storage.updatePage(processedPage.id, processedPage);
                 results.updated++;
               } else {
@@ -1954,7 +1981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 results.imported++;
               }
             } catch (error: any) {
-              results.errors.push(`page (${page.id}): ${error.message}`);
+              results.errors.push(`page (${page.pageKey || page.id}): ${error.message}`);
               results.skipped++;
             }
           }
@@ -2041,6 +2068,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           for (const report of importData.data.workReports) {
             try {
               const processedReport = convertDatesToObjects(report);
+              
+              // Check if user exists before creating work report
+              if (processedReport.userId) {
+                const user = await storage.getUser(processedReport.userId);
+                if (!user) {
+                  results.errors.push(`workReport (${report.id}): user ${processedReport.userId} not found`);
+                  results.skipped++;
+                  continue;
+                }
+              }
+              
               const existing = await storage.getWorkReport(processedReport.id);
               if (existing) {
                 await storage.updateWorkReport(processedReport.id, processedReport);
@@ -2056,11 +2094,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Finance data
+        // Finance data - ensure client dependencies exist
         if (importData.data.financeProjects && Array.isArray(importData.data.financeProjects)) {
           for (const project of importData.data.financeProjects) {
             try {
               const processedProject = convertDatesToObjects(project);
+              
+              // Check if client exists before creating finance project
+              if (processedProject.clientId) {
+                const client = await storage.getClient(processedProject.clientId);
+                if (!client) {
+                  results.errors.push(`financeProject (${project.id}): client ${processedProject.clientId} not found`);
+                  results.skipped++;
+                  continue;
+                }
+              }
+              
               const existing = await storage.getFinanceProject(processedProject.id);
               if (existing) {
                 await storage.updateFinanceProject(processedProject.id, processedProject);
@@ -2080,6 +2129,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           for (const payment of importData.data.financePayments) {
             try {
               const processedPayment = convertDatesToObjects(payment);
+              
+              // Check if client exists before creating finance payment
+              if (processedPayment.clientId) {
+                const client = await storage.getClient(processedPayment.clientId);
+                if (!client) {
+                  results.errors.push(`financePayment (${payment.id}): client ${processedPayment.clientId} not found`);
+                  results.skipped++;
+                  continue;
+                }
+              }
+              
               const existing = await storage.getFinancePayment(processedPayment.id);
               if (existing) {
                 await storage.updateFinancePayment(processedPayment.id, processedPayment);
@@ -2099,6 +2159,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           for (const expense of importData.data.financeExpenses) {
             try {
               const processedExpense = convertDatesToObjects(expense);
+              
+              // Check if project exists before creating finance expense
+              if (processedExpense.projectId) {
+                const project = await storage.getFinanceProject(processedExpense.projectId);
+                if (!project) {
+                  results.errors.push(`financeExpense (${expense.id}): project ${processedExpense.projectId} not found`);
+                  results.skipped++;
+                  continue;
+                }
+              }
+              
               const existing = await storage.getFinanceExpense(processedExpense.id);
               if (existing) {
                 await storage.updateFinanceExpense(processedExpense.id, processedExpense);
