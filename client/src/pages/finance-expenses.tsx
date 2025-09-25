@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertFinanceExpenseSchema, type FinanceExpense, type FinanceProject, type InsertFinanceExpense, type Employee } from "@shared/schema";
-import { Plus, Edit, Trash2, MoreHorizontal, DollarSign, Calendar, Building, Calculator, TrendingDown, Upload, FileSpreadsheet, Eye, CheckCircle } from "lucide-react";
+import { Plus, Edit, Trash2, MoreHorizontal, DollarSign, Calendar, Building, Calculator, TrendingDown, Upload, FileSpreadsheet, Eye, CheckCircle, Download } from "lucide-react";
 import { formatDistance } from "date-fns";
 import Sidebar from "@/components/layout/Sidebar";
 
@@ -315,6 +315,77 @@ export default function FinanceExpenses() {
   const totalSalaries = expenses?.filter(e => e.type === "salary").reduce((sum, e) => sum + parseFloat(e.amount), 0) || 0;
   const grandTotal = totalExpenses + totalSalaries;
 
+  // Export CSV functions
+  const exportExpensesCSV = async () => {
+    try {
+      const response = await fetch("/api/finance/expenses/export/csv", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `expenses-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Success",
+        description: "Expenses exported successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export expenses.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const exportEmployeesCSV = async () => {
+    try {
+      const response = await fetch("/api/employees/export/csv", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `employees-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Success",
+        description: "Employee data exported successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export employee data.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (expensesLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -340,6 +411,24 @@ export default function FinanceExpenses() {
         </div>
         
         <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" data-testid="button-export-csv">
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={exportExpensesCSV} data-testid="menu-export-expenses">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export Expenses
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportEmployeesCSV} data-testid="menu-export-employees">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export Employees
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} data-testid="button-import-csv">
@@ -478,7 +567,7 @@ export default function FinanceExpenses() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Project (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || "none"}>
                           <FormControl>
                             <SelectTrigger data-testid="select-project">
                               <SelectValue placeholder="Select project" />
