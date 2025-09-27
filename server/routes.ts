@@ -146,6 +146,73 @@ const upload = multer({
   },
 });
 
+// Helper function to send work report notifications via Telegram
+async function sendWorkReportNotification(workReport: WorkReport, submittedByUser: { id: string; username: string; role: string }) {
+  try {
+    // Get Telegram configuration
+    const config = await storage.getTelegramConfig();
+    if (!config || !config.botToken || !config.isActive) {
+      return; // No Telegram config or not active
+    }
+
+    // Get active chat IDs
+    const chatIds = await storage.getTelegramChatIds();
+    const activeChatIds = chatIds.filter(chat => chat.isActive);
+    if (activeChatIds.length === 0) {
+      return; // No active chat IDs
+    }
+
+    // Get user details for the work report
+    const reportUser = await storage.getUser(workReport.userId);
+    if (!reportUser) {
+      return;
+    }
+
+    // Format the notification message
+    const message = `
+🔔 <b>New Work Report Submitted</b>
+
+👤 <b>Employee:</b> ${reportUser.name} (@${reportUser.username})
+📅 <b>Date:</b> ${new Date(workReport.date).toLocaleDateString()}
+⏰ <b>Start Time:</b> ${workReport.startTime}
+⏰ <b>End Time:</b> ${workReport.endTime}
+📝 <b>Tasks:</b> ${workReport.tasksCompleted}
+💰 <b>Total Pay:</b> $${workReport.totalPay}
+
+${workReport.notes ? `📋 <b>Notes:</b> ${workReport.notes}` : ''}
+
+<i>Submitted by ${submittedByUser.username} at ${new Date().toLocaleString()}</i>
+`;
+
+    // Send message to all active chat IDs
+    for (const chatId of activeChatIds) {
+      try {
+        const telegramApiUrl = `https://api.telegram.org/bot${config.botToken}/sendMessage`;
+        const telegramResponse = await fetch(telegramApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: chatId.chatId,
+            text: message.trim(),
+            parse_mode: 'HTML'
+          })
+        });
+
+        if (!telegramResponse.ok) {
+          const errorData = await telegramResponse.json();
+          console.error(`Failed to send Telegram notification to ${chatId.name}:`, errorData.description);
+        }
+      } catch (error: any) {
+        console.error(`Error sending Telegram notification to ${chatId.name}:`, error.message);
+      }
+    }
+  } catch (error: any) {
+    console.error("Error in sendWorkReportNotification:", error);
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Login route
   app.post("/api/auth/login", async (req: Request, res: Response) => {
@@ -790,6 +857,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const workReport = await storage.createWorkReport(validatedData);
+      
+      // Send Telegram notification for new work report (async, don't block response)
+      sendWorkReportNotification(workReport, req.user!).catch(error => {
+        console.error("Failed to send Telegram notification for work report:", error);
+      });
+      
       res.status(201).json(workReport);
     } catch (error: any) {
       if (error.name === 'ZodError') {
