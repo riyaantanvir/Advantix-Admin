@@ -17,6 +17,7 @@ import FinanceDashboard from "@/pages/finance-dashboard";
 import FinanceProjects from "@/pages/finance-projects";
 import FinancePayments from "@/pages/finance-payments";
 import FinanceExpenses from "@/pages/finance-expenses";
+import FinanceSalaryManagement from "@/pages/finance-salary-management";
 import FinanceReports from "@/pages/finance-reports";
 import NotFound from "@/pages/not-found";
 
@@ -173,6 +174,7 @@ function Router() {
       <Route path="/finance/projects" component={() => <ProtectedRoute component={FinanceProjects} pageKey="finance" />} />
       <Route path="/finance/payments" component={() => <ProtectedRoute component={FinancePayments} pageKey="finance" />} />
       <Route path="/finance/expenses" component={() => <ProtectedRoute component={FinanceExpenses} pageKey="finance" />} />
+      <Route path="/finance/salary-management" component={() => <ProtectedRoute component={FinanceSalaryManagement} pageKey="finance" />} />
       <Route path="/finance/reports" component={() => <ProtectedRoute component={FinanceReports} pageKey="finance" />} />
       <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} pageKey="admin" />} />
       <Route path="/" component={() => <ProtectedRoute component={Home} pageKey="dashboard" />} />

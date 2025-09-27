@@ -170,6 +170,13 @@ export default function Sidebar({ children }: SidebarProps) {
           pageKey: "finance"
         },
         {
+          href: "/finance/salary-management",
+          icon: DollarSign,
+          label: "Salary Management",
+          testId: "nav-finance-salary-management",
+          pageKey: "finance"
+        },
+        {
           href: "/finance/reports",
           icon: BarChart3,
           label: "Reports",

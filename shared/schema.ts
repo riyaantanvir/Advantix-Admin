@@ -380,6 +380,7 @@ export const userMenuPermissions = pgTable("user_menu_permissions", {
   projects: boolean("projects").default(false),
   payments: boolean("payments").default(false),
   expensesSalaries: boolean("expenses_salaries").default(false),
+  salaryManagement: boolean("salary_management").default(false),
   reports: boolean("reports").default(false),
   adminPanel: boolean("admin_panel").default(false),
   createdAt: timestamp("created_at").defaultNow(),

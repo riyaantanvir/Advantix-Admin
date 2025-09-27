@@ -52,7 +52,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign, Tag as TagIcon, Plus, Database, Download, Upload, FileText, AlertCircle } from "lucide-react";
-import type { User, InsertUserWithRole, Page, RolePermission, Tag, InsertTag, UserMenuPermission, InsertUserMenuPermission } from "@shared/schema";
+import type { User, InsertUserWithRole, Page, RolePermission, Tag, InsertTag, UserMenuPermission, InsertUserMenuPermission, Employee, InsertEmployee } from "@shared/schema";
 
 interface UserFormData {
   name: string;
@@ -81,6 +81,7 @@ function UserManagement() {
       projects: false,
       payments: false,
       expensesSalaries: false,
+      salaryManagement: false,
       reports: false,
       adminPanel: false,
     }
@@ -133,6 +134,7 @@ function UserManagement() {
           projects: permission === 'projects' ? value : false,
           payments: permission === 'payments' ? value : false,
           expensesSalaries: permission === 'expensesSalaries' ? value : false,
+          salaryManagement: permission === 'salaryManagement' ? value : false,
           reports: permission === 'reports' ? value : false,
           adminPanel: permission === 'adminPanel' ? value : false,
         };
@@ -169,6 +171,7 @@ function UserManagement() {
         projects: false,
         payments: false,
         expensesSalaries: false,
+        salaryManagement: false,
         reports: false,
         adminPanel: false,
       };
@@ -346,6 +349,7 @@ function UserManagement() {
                   <TableHead className="text-center font-semibold">Projects</TableHead>
                   <TableHead className="text-center font-semibold">Payments</TableHead>
                   <TableHead className="text-center font-semibold">Expenses & Salaries</TableHead>
+                  <TableHead className="text-center font-semibold">Salary Management</TableHead>
                   <TableHead className="text-center font-semibold">Reports</TableHead>
                   <TableHead className="text-center font-semibold">Admin Panel</TableHead>
                   <TableHead className="text-center font-semibold">Actions</TableHead>
@@ -354,7 +358,7 @@ function UserManagement() {
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={14} className="text-center py-8 text-gray-500">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -472,6 +476,18 @@ function UserManagement() {
                           </div>
                           <span className={`text-sm font-medium ${permissions.expensesSalaries ? 'text-green-600' : 'text-red-600'}`}>
                             {permissions.expensesSalaries ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.salaryManagement || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'salaryManagement', checked)}
+                              data-testid={`switch-salary-management-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.salaryManagement ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.salaryManagement ? 'Yes' : 'No'}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
