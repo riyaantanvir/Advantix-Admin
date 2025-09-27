@@ -33,6 +33,10 @@ import {
   type InsertUserMenuPermission,
   type Salary,
   type InsertSalary,
+  type TelegramConfig,
+  type InsertTelegramConfig,
+  type TelegramChatId,
+  type InsertTelegramChatId,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -161,6 +165,19 @@ export interface IStorage {
   updateUserMenuPermission(userId: string, permission: Partial<InsertUserMenuPermission>): Promise<UserMenuPermission | undefined>;
   deleteUserMenuPermission(userId: string): Promise<boolean>;
 
+  // Telegram Configuration methods
+  getTelegramConfig(): Promise<TelegramConfig | undefined>;
+  createTelegramConfig(config: InsertTelegramConfig): Promise<TelegramConfig>;
+  updateTelegramConfig(config: Partial<InsertTelegramConfig>): Promise<TelegramConfig | undefined>;
+  deleteTelegramConfig(): Promise<boolean>;
+
+  // Telegram Chat ID methods
+  getTelegramChatIds(): Promise<TelegramChatId[]>;
+  getTelegramChatId(id: string): Promise<TelegramChatId | undefined>;
+  createTelegramChatId(chatId: InsertTelegramChatId): Promise<TelegramChatId>;
+  updateTelegramChatId(id: string, chatId: Partial<InsertTelegramChatId>): Promise<TelegramChatId | undefined>;
+  deleteTelegramChatId(id: string): Promise<boolean>;
+
 }
 
 export class MemStorage implements IStorage {
@@ -181,6 +198,8 @@ export class MemStorage implements IStorage {
   private employees: Map<string, Employee>;
   private userMenuPermissions: Map<string, UserMenuPermission>;
   private salaries: Map<string, Salary>;
+  private telegramConfig: TelegramConfig | undefined;
+  private telegramChatIds: Map<string, TelegramChatId>;
 
   constructor() {
     this.users = new Map();
@@ -200,6 +219,8 @@ export class MemStorage implements IStorage {
     this.employees = new Map();
     this.userMenuPermissions = new Map();
     this.salaries = new Map();
+    this.telegramConfig = undefined;
+    this.telegramChatIds = new Map();
     
     // Initialize default finance settings
     this.initializeFinanceSettings();
@@ -1288,6 +1309,83 @@ export class MemStorage implements IStorage {
 
   async deleteSalary(id: string): Promise<boolean> {
     return this.salaries.delete(id);
+  }
+
+  // Telegram Configuration methods implementation
+  async getTelegramConfig(): Promise<TelegramConfig | undefined> {
+    return this.telegramConfig;
+  }
+
+  async createTelegramConfig(config: InsertTelegramConfig): Promise<TelegramConfig> {
+    const id = randomUUID();
+    const now = new Date();
+    const telegramConfig: TelegramConfig = {
+      id,
+      ...config,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.telegramConfig = telegramConfig;
+    return telegramConfig;
+  }
+
+  async updateTelegramConfig(updates: Partial<InsertTelegramConfig>): Promise<TelegramConfig | undefined> {
+    if (!this.telegramConfig) return undefined;
+
+    const updated: TelegramConfig = {
+      ...this.telegramConfig,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    this.telegramConfig = updated;
+    return updated;
+  }
+
+  async deleteTelegramConfig(): Promise<boolean> {
+    if (!this.telegramConfig) return false;
+    this.telegramConfig = undefined;
+    return true;
+  }
+
+  // Telegram Chat ID methods implementation
+  async getTelegramChatIds(): Promise<TelegramChatId[]> {
+    return Array.from(this.telegramChatIds.values()).sort((a, b) => {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+  }
+
+  async getTelegramChatId(id: string): Promise<TelegramChatId | undefined> {
+    return this.telegramChatIds.get(id);
+  }
+
+  async createTelegramChatId(chatId: InsertTelegramChatId): Promise<TelegramChatId> {
+    const id = randomUUID();
+    const now = new Date();
+    const telegramChatId: TelegramChatId = {
+      id,
+      ...chatId,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.telegramChatIds.set(id, telegramChatId);
+    return telegramChatId;
+  }
+
+  async updateTelegramChatId(id: string, updates: Partial<InsertTelegramChatId>): Promise<TelegramChatId | undefined> {
+    const existing = this.telegramChatIds.get(id);
+    if (!existing) return undefined;
+
+    const updated: TelegramChatId = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    this.telegramChatIds.set(id, updated);
+    return updated;
+  }
+
+  async deleteTelegramChatId(id: string): Promise<boolean> {
+    return this.telegramChatIds.delete(id);
   }
 
 }

@@ -402,6 +402,38 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({
   updatedAt: true,
 });
 
+// Telegram Configuration
+export const telegramConfig = pgTable("telegram_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  botToken: text("bot_token"), // Encrypted storage for bot token
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Telegram Chat IDs for notifications
+export const telegramChatIds = pgTable("telegram_chat_ids", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  chatId: text("chat_id").notNull().unique(),
+  name: text("name").notNull(), // Friendly name for the chat
+  description: text("description"), // Optional description
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTelegramConfigSchema = createInsertSchema(telegramConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTelegramChatIdSchema = createInsertSchema(telegramChatIds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // User Menu Permissions - Controls access to specific menu items per user
 export const userMenuPermissions = pgTable("user_menu_permissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -484,3 +516,9 @@ export type Tag = typeof tags.$inferSelect;
 
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type Employee = typeof employees.$inferSelect;
+
+export type InsertTelegramConfig = z.infer<typeof insertTelegramConfigSchema>;
+export type TelegramConfig = typeof telegramConfig.$inferSelect;
+
+export type InsertTelegramChatId = z.infer<typeof insertTelegramChatIdSchema>;
+export type TelegramChatId = typeof telegramChatIds.$inferSelect;
