@@ -223,8 +223,8 @@ export default function WorkReportsPage() {
     defaultValues: {
       title: "",
       description: "",
-      hours: "1",
-      minutes: "0",
+      hours: "",
+      minutes: "",
       date: new Date(),
       status: "submitted",
       userId: currentUser?.id || "",
