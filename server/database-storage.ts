@@ -32,6 +32,10 @@ import {
   type InsertUserMenuPermission,
   type Salary,
   type InsertSalary,
+  type TelegramConfig,
+  type InsertTelegramConfig,
+  type TelegramChatId,
+  type InsertTelegramChatId,
   UserRole,
   users,
   sessions,
@@ -49,7 +53,9 @@ import {
   tags,
   employees,
   userMenuPermissions,
-  salaries
+  salaries,
+  telegramConfig,
+  telegramChatIds
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, and, desc } from "drizzle-orm";
@@ -1460,6 +1466,159 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`[DB ERROR] Failed to delete salary with ID ${id}:`, error);
       throw new Error(`Failed to delete salary: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Telegram Configuration Methods
+  async getTelegramConfig(): Promise<TelegramConfig | undefined> {
+    try {
+      const result = await db.select()
+        .from(telegramConfig)
+        .limit(1);
+      
+      return result.length > 0 ? result[0] : undefined;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get Telegram config:", error);
+      throw new Error(`Failed to get Telegram config: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async createTelegramConfig(data: InsertTelegramConfig): Promise<TelegramConfig> {
+    try {
+      // First, delete any existing config (there should only be one)
+      await db.delete(telegramConfig);
+      
+      // Insert the new config
+      const result = await db.insert(telegramConfig).values({
+        ...data,
+        id: randomUUID(),
+      }).returning();
+      
+      console.log("[DB] Created Telegram config");
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to create Telegram config:", error);
+      throw new Error(`Failed to create Telegram config: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async updateTelegramConfig(data: InsertTelegramConfig): Promise<TelegramConfig | undefined> {
+    try {
+      // Get existing config
+      const existing = await this.getTelegramConfig();
+      if (!existing) {
+        return undefined;
+      }
+      
+      const result = await db.update(telegramConfig)
+        .set({
+          ...data,
+          updatedAt: new Date(),
+        })
+        .where(eq(telegramConfig.id, existing.id))
+        .returning();
+      
+      console.log("[DB] Updated Telegram config");
+      return result.length > 0 ? result[0] : undefined;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to update Telegram config:", error);
+      throw new Error(`Failed to update Telegram config: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async deleteTelegramConfig(): Promise<boolean> {
+    try {
+      const deleted = await db.delete(telegramConfig).returning();
+      console.log("[DB] Deleted Telegram config");
+      return deleted.length > 0;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to delete Telegram config:", error);
+      throw new Error(`Failed to delete Telegram config: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Telegram Chat ID Methods
+  async getTelegramChatIds(): Promise<TelegramChatId[]> {
+    try {
+      const result = await db.select()
+        .from(telegramChatIds)
+        .orderBy(desc(telegramChatIds.createdAt));
+      
+      return result;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get Telegram chat IDs:", error);
+      throw new Error(`Failed to get Telegram chat IDs: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getTelegramChatId(id: string): Promise<TelegramChatId | undefined> {
+    try {
+      const result = await db.select()
+        .from(telegramChatIds)
+        .where(eq(telegramChatIds.id, id))
+        .limit(1);
+      
+      return result.length > 0 ? result[0] : undefined;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get Telegram chat ID with ID ${id}:`, error);
+      throw new Error(`Failed to get Telegram chat ID: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async createTelegramChatId(data: InsertTelegramChatId): Promise<TelegramChatId> {
+    try {
+      const result = await db.insert(telegramChatIds).values({
+        ...data,
+        id: randomUUID(),
+      }).returning();
+      
+      console.log(`[DB] Created Telegram chat ID: ${data.name}`);
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to create Telegram chat ID:", error);
+      throw new Error(`Failed to create Telegram chat ID: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async updateTelegramChatId(id: string, data: InsertTelegramChatId): Promise<TelegramChatId | undefined> {
+    try {
+      const result = await db.update(telegramChatIds)
+        .set({
+          ...data,
+          updatedAt: new Date(),
+        })
+        .where(eq(telegramChatIds.id, id))
+        .returning();
+      
+      if (result.length > 0) {
+        console.log(`[DB] Updated Telegram chat ID: ${id}`);
+        return result[0];
+      } else {
+        console.warn(`[DB] No Telegram chat ID found to update with ID: ${id}`);
+        return undefined;
+      }
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to update Telegram chat ID with ID ${id}:`, error);
+      throw new Error(`Failed to update Telegram chat ID: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async deleteTelegramChatId(id: string): Promise<boolean> {
+    try {
+      const deleted = await db.delete(telegramChatIds)
+        .where(eq(telegramChatIds.id, id))
+        .returning();
+      
+      if (deleted.length > 0) {
+        console.log(`[DB] Deleted Telegram chat ID: ${id}`);
+        return true;
+      } else {
+        console.warn(`[DB] No Telegram chat ID found to delete with ID: ${id}`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to delete Telegram chat ID with ID ${id}:`, error);
+      throw new Error(`Failed to delete Telegram chat ID: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }
