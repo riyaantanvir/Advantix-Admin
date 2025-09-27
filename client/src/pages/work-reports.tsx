@@ -75,10 +75,24 @@ const workReportFormSchema = insertWorkReportSchema.extend({
   date: z.coerce.date({
     required_error: "Date is required",
   }),
-  hoursWorked: z.string().refine((val) => {
-    const num = parseFloat(val);
-    return !isNaN(num) && num >= 0.1;
-  }, "Hours worked must be a valid number of at least 0.1"),
+  hours: z.string().refine((val) => {
+    if (val === "") return true; // Allow empty hours if minutes are provided
+    const num = parseInt(val);
+    return !isNaN(num) && num >= 0;
+  }, "Hours must be a valid number 0 or greater"),
+  minutes: z.string().refine((val) => {
+    if (val === "") return true; // Allow empty minutes if hours are provided
+    const num = parseInt(val);
+    return !isNaN(num) && num >= 0 && num < 60;
+  }, "Minutes must be between 0-59"),
+}).refine((data) => {
+  // At least one of hours or minutes must have a value > 0
+  const hours = parseInt(data.hours) || 0;
+  const minutes = parseInt(data.minutes) || 0;
+  return hours > 0 || minutes > 0;
+}, {
+  message: "Please enter at least some hours or minutes"
+  // Removed path so error shows generally, not on specific field
 });
 
 type WorkReportFormData = z.infer<typeof workReportFormSchema>;
@@ -113,10 +127,18 @@ export default function WorkReportsPage() {
   // Create work report mutation
   const createMutation = useMutation({
     mutationFn: async (data: WorkReportFormData) => {
+      // Convert hours and minutes to decimal hours
+      const hours = parseInt(data.hours) || 0;
+      const minutes = parseInt(data.minutes) || 0;
+      const hoursWorked = hours + (minutes / 60);
+      
       const response = await apiRequest("POST", "/api/work-reports", {
-        ...data,
+        title: data.title,
+        description: data.description,
         date: data.date,
-        hoursWorked: data.hoursWorked,
+        hoursWorked: hoursWorked.toString(),
+        status: data.status,
+        userId: data.userId,
       });
       return response.json();
     },
@@ -140,10 +162,18 @@ export default function WorkReportsPage() {
   // Update work report mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<WorkReportFormData> }) => {
+      // Convert hours and minutes to decimal hours
+      const hours = parseInt(data.hours || "0") || 0;
+      const minutes = parseInt(data.minutes || "0") || 0;
+      const hoursWorked = hours + (minutes / 60);
+      
       const response = await apiRequest("PUT", `/api/work-reports/${id}`, {
-        ...data,
+        title: data.title,
+        description: data.description,
         date: data.date,
-        hoursWorked: data.hoursWorked,
+        hoursWorked: hoursWorked.toString(),
+        status: data.status,
+        userId: data.userId,
       });
       return response.json();
     },
@@ -193,7 +223,8 @@ export default function WorkReportsPage() {
     defaultValues: {
       title: "",
       description: "",
-      hoursWorked: "1",
+      hours: "",
+      minutes: "",
       date: new Date(),
       status: "submitted",
       userId: currentUser?.id || "",
@@ -219,10 +250,17 @@ export default function WorkReportsPage() {
   // Handle editing
   const handleEdit = (workReport: WorkReport) => {
     setEditingWorkReport(workReport);
+    
+    // Convert decimal hours back to hours and minutes
+    const totalHours = parseFloat(workReport.hoursWorked.toString());
+    const hours = Math.floor(totalHours);
+    const minutes = Math.round((totalHours - hours) * 60);
+    
     editForm.reset({
       title: workReport.title,
       description: workReport.description,
-      hoursWorked: workReport.hoursWorked.toString(),
+      hours: hours.toString(),
+      minutes: minutes.toString(),
       date: new Date(workReport.date),
       status: workReport.status,
       userId: workReport.userId,
@@ -724,27 +762,51 @@ export default function WorkReportsPage() {
                   )}
                 />
 
-                <FormField
-                  control={createForm.control}
-                  name="hoursWorked"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Working Time (hours)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.1" 
-                          min="0.1"
-                          placeholder="8.0" 
-                          {...field}
-                          onChange={(e) => field.onChange(e.target.value)}
-                          data-testid="input-working-time"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Working Time - Hours and Minutes */}
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={createForm.control}
+                    name="hours"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Hours</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="0"
+                            placeholder="0" 
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            data-testid="input-working-hours"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={createForm.control}
+                    name="minutes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Minutes</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="0"
+                            max="59"
+                            placeholder="0" 
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            data-testid="input-working-minutes"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={createForm.control}
@@ -886,27 +948,51 @@ export default function WorkReportsPage() {
                   )}
                 />
 
-                <FormField
-                  control={editForm.control}
-                  name="hoursWorked"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Working Time (hours)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.1" 
-                          min="0.1"
-                          placeholder="8.0" 
-                          {...field}
-                          onChange={(e) => field.onChange(e.target.value)}
-                          data-testid="input-edit-working-time"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Working Time - Hours and Minutes */}
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="hours"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Hours</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="0"
+                            placeholder="0" 
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            data-testid="input-edit-working-hours"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="minutes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Minutes</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="0"
+                            max="59"
+                            placeholder="0" 
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            data-testid="input-edit-working-minutes"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={editForm.control}

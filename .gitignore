@@ -4,3 +4,32 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Environment and local files
+.env*
+*.local
+.replit.local
+
+# User-specific and generated files
+cookies.txt
+*.log
+
+# Asset files that shouldn't be tracked
+attached_assets/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+
+# Build and cache directories
+coverage/
+.vite/
+.cache/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
