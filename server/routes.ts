@@ -19,6 +19,7 @@ import {
   insertTagSchema,
   insertEmployeeSchema,
   insertUserMenuPermissionSchema,
+  insertSalarySchema,
   type Campaign,
   type Client,
   type User,
@@ -34,6 +35,7 @@ import {
   type Tag,
   type Employee,
   type UserMenuPermission,
+  type Salary,
   UserRole 
 } from "@shared/schema";
 import { z } from "zod";
@@ -1638,6 +1640,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Employee deleted successfully" });
     } catch (error) {
       console.error("Delete employee error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Salary Management API Routes
+  
+  // Get all salaries
+  app.get("/api/salaries", authenticate, requirePagePermission('salaries', 'view'), async (req: Request, res: Response) => {
+    try {
+      const salaries = await storage.getSalaries();
+      res.json(salaries);
+    } catch (error) {
+      console.error("Get salaries error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get single salary
+  app.get("/api/salaries/:id", authenticate, requirePagePermission('salaries', 'view'), async (req: Request, res: Response) => {
+    try {
+      const salary = await storage.getSalary(req.params.id);
+      if (!salary) {
+        return res.status(404).json({ message: "Salary record not found" });
+      }
+      res.json(salary);
+    } catch (error) {
+      console.error("Get salary error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create new salary
+  app.post("/api/salaries", authenticate, requirePagePermission('salaries', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertSalarySchema.parse(req.body);
+      const salary = await storage.createSalary(validatedData);
+      res.status(201).json(salary);
+    } catch (error) {
+      console.error("Create salary error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update salary
+  app.put("/api/salaries/:id", authenticate, requirePagePermission('salaries', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertSalarySchema.partial().parse(req.body);
+      const salary = await storage.updateSalary(req.params.id, validatedData);
+      if (!salary) {
+        return res.status(404).json({ message: "Salary record not found" });
+      }
+      res.json(salary);
+    } catch (error) {
+      console.error("Update salary error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete salary
+  app.delete("/api/salaries/:id", authenticate, requirePagePermission('salaries', 'delete'), async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteSalary(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Salary record not found" });
+      }
+      res.json({ message: "Salary record deleted successfully" });
+    } catch (error) {
+      console.error("Delete salary error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

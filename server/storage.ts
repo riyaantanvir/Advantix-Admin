@@ -31,6 +31,8 @@ import {
   type InsertEmployee,
   type UserMenuPermission,
   type InsertUserMenuPermission,
+  type Salary,
+  type InsertSalary,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -138,6 +140,13 @@ export interface IStorage {
   updateTag(id: string, tag: Partial<InsertTag>): Promise<Tag | undefined>;
   deleteTag(id: string): Promise<boolean>;
 
+  // Salary methods
+  getSalaries(): Promise<Salary[]>;
+  getSalary(id: string): Promise<Salary | undefined>;
+  createSalary(salary: InsertSalary): Promise<Salary>;
+  updateSalary(id: string, salary: Partial<InsertSalary>): Promise<Salary | undefined>;
+  deleteSalary(id: string): Promise<boolean>;
+
   // Employee methods
   getEmployees(): Promise<Employee[]>;
   getEmployee(id: string): Promise<Employee | undefined>;
@@ -171,6 +180,7 @@ export class MemStorage implements IStorage {
   private tags: Map<string, Tag>;
   private employees: Map<string, Employee>;
   private userMenuPermissions: Map<string, UserMenuPermission>;
+  private salaries: Map<string, Salary>;
 
   constructor() {
     this.users = new Map();
@@ -189,6 +199,7 @@ export class MemStorage implements IStorage {
     this.tags = new Map();
     this.employees = new Map();
     this.userMenuPermissions = new Map();
+    this.salaries = new Map();
     
     // Initialize default finance settings
     this.initializeFinanceSettings();
@@ -1240,6 +1251,43 @@ export class MemStorage implements IStorage {
     if (!existing) return false;
     
     return this.userMenuPermissions.delete(existing[0]);
+  }
+
+  // Salary methods
+  async getSalaries(): Promise<Salary[]> {
+    return Array.from(this.salaries.values());
+  }
+
+  async getSalary(id: string): Promise<Salary | undefined> {
+    return this.salaries.get(id);
+  }
+
+  async createSalary(salary: InsertSalary): Promise<Salary> {
+    const newSalary: Salary = {
+      ...salary,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.salaries.set(newSalary.id, newSalary);
+    return newSalary;
+  }
+
+  async updateSalary(id: string, salary: Partial<InsertSalary>): Promise<Salary | undefined> {
+    const existing = this.salaries.get(id);
+    if (!existing) return undefined;
+    
+    const updated: Salary = {
+      ...existing,
+      ...salary,
+      updatedAt: new Date(),
+    };
+    this.salaries.set(id, updated);
+    return updated;
+  }
+
+  async deleteSalary(id: string): Promise<boolean> {
+    return this.salaries.delete(id);
   }
 
 }

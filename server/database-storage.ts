@@ -30,6 +30,8 @@ import {
   type InsertEmployee,
   type UserMenuPermission,
   type InsertUserMenuPermission,
+  type Salary,
+  type InsertSalary,
   UserRole,
   users,
   sessions,
@@ -46,7 +48,8 @@ import {
   financeSettings,
   tags,
   employees,
-  userMenuPermissions
+  userMenuPermissions,
+  salaries
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, and, desc } from "drizzle-orm";
@@ -1311,6 +1314,81 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`[DB ERROR] Failed to delete user menu permission for user ${userId}:`, error);
       throw new Error(`Failed to delete user menu permission: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Salary methods implementation
+  async getSalaries(): Promise<Salary[]> {
+    try {
+      const result = await db.select().from(salaries).orderBy(desc(salaries.createdAt));
+      return result;
+    } catch (error) {
+      console.error('[DB ERROR] Failed to get salaries:', error);
+      throw new Error(`Failed to get salaries: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getSalary(id: string): Promise<Salary | undefined> {
+    try {
+      const result = await db.select().from(salaries).where(eq(salaries.id, id)).limit(1);
+      return result[0];
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get salary with ID ${id}:`, error);
+      throw new Error(`Failed to get salary: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async createSalary(salary: InsertSalary): Promise<Salary> {
+    try {
+      const newSalary = {
+        ...salary,
+        id: randomUUID(),
+      };
+      
+      await db.insert(salaries).values(newSalary);
+      console.log(`[DB] Created salary record for employee: ${newSalary.employeeName} (ID: ${newSalary.id})`);
+      
+      // Re-query the inserted row to get all default values including createdAt/updatedAt
+      const insertedSalary = await this.getSalary(newSalary.id);
+      if (!insertedSalary) {
+        throw new Error('Failed to retrieve created salary record');
+      }
+      return insertedSalary;
+    } catch (error) {
+      console.error('[DB ERROR] Failed to create salary:', error);
+      throw new Error(`Failed to create salary: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async updateSalary(id: string, salary: Partial<InsertSalary>): Promise<Salary | undefined> {
+    try {
+      const updateData = {
+        ...salary,
+        updatedAt: new Date(),
+      };
+      
+      await db.update(salaries).set(updateData).where(eq(salaries.id, id));
+      console.log(`[DB] Updated salary record with ID: ${id}`);
+      return this.getSalary(id);
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to update salary with ID ${id}:`, error);
+      throw new Error(`Failed to update salary: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async deleteSalary(id: string): Promise<boolean> {
+    try {
+      const result = await db.delete(salaries).where(eq(salaries.id, id));
+      const deleted = (result.rowCount ?? 0) > 0;
+      if (deleted) {
+        console.log(`[DB] Deleted salary record with ID: ${id}`);
+      } else {
+        console.warn(`[DB] No salary record found to delete with ID: ${id}`);
+      }
+      return deleted;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to delete salary with ID ${id}:`, error);
+      throw new Error(`Failed to delete salary: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }
