@@ -29,6 +29,8 @@ import {
   type InsertTag,
   type Employee,
   type InsertEmployee,
+  type UserMenuPermission,
+  type InsertUserMenuPermission,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -143,6 +145,13 @@ export interface IStorage {
   updateEmployee(id: string, employee: Partial<InsertEmployee>): Promise<Employee | undefined>;
   deleteEmployee(id: string): Promise<boolean>;
 
+  // User Menu Permission methods
+  getUserMenuPermissions(userId?: string): Promise<UserMenuPermission[]>; // If userId provided, filter by user; otherwise get all
+  getUserMenuPermission(userId: string): Promise<UserMenuPermission | undefined>;
+  createUserMenuPermission(permission: InsertUserMenuPermission): Promise<UserMenuPermission>;
+  updateUserMenuPermission(userId: string, permission: Partial<InsertUserMenuPermission>): Promise<UserMenuPermission | undefined>;
+  deleteUserMenuPermission(userId: string): Promise<boolean>;
+
 }
 
 export class MemStorage implements IStorage {
@@ -161,6 +170,7 @@ export class MemStorage implements IStorage {
   private financeSettings: Map<string, FinanceSetting>;
   private tags: Map<string, Tag>;
   private employees: Map<string, Employee>;
+  private userMenuPermissions: Map<string, UserMenuPermission>;
 
   constructor() {
     this.users = new Map();
@@ -178,6 +188,7 @@ export class MemStorage implements IStorage {
     this.financeSettings = new Map();
     this.tags = new Map();
     this.employees = new Map();
+    this.userMenuPermissions = new Map();
     
     // Initialize default finance settings
     this.initializeFinanceSettings();
@@ -1183,6 +1194,52 @@ export class MemStorage implements IStorage {
 
   async deleteEmployee(id: string): Promise<boolean> {
     return this.employees.delete(id);
+  }
+
+  // User Menu Permission methods implementation
+  async getUserMenuPermissions(userId?: string): Promise<UserMenuPermission[]> {
+    const allPermissions = Array.from(this.userMenuPermissions.values());
+    if (userId) {
+      return allPermissions.filter(permission => permission.userId === userId);
+    }
+    return allPermissions.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+  }
+
+  async getUserMenuPermission(userId: string): Promise<UserMenuPermission | undefined> {
+    return Array.from(this.userMenuPermissions.values()).find(permission => permission.userId === userId);
+  }
+
+  async createUserMenuPermission(insertPermission: InsertUserMenuPermission): Promise<UserMenuPermission> {
+    const id = randomUUID();
+    const now = new Date();
+    const permission: UserMenuPermission = {
+      id,
+      ...insertPermission,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.userMenuPermissions.set(id, permission);
+    return permission;
+  }
+
+  async updateUserMenuPermission(userId: string, updates: Partial<InsertUserMenuPermission>): Promise<UserMenuPermission | undefined> {
+    const existing = Array.from(this.userMenuPermissions.values()).find(permission => permission.userId === userId);
+    if (!existing) return undefined;
+
+    const updated: UserMenuPermission = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    this.userMenuPermissions.set(existing.id, updated);
+    return updated;
+  }
+
+  async deleteUserMenuPermission(userId: string): Promise<boolean> {
+    const existing = Array.from(this.userMenuPermissions.entries()).find(([_, permission]) => permission.userId === userId);
+    if (!existing) return false;
+    
+    return this.userMenuPermissions.delete(existing[0]);
   }
 
 }

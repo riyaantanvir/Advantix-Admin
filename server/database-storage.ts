@@ -28,6 +28,8 @@ import {
   type InsertTag,
   type Employee,
   type InsertEmployee,
+  type UserMenuPermission,
+  type InsertUserMenuPermission,
   UserRole,
   users,
   sessions,
@@ -43,7 +45,8 @@ import {
   financeExpenses,
   financeSettings,
   tags,
-  employees
+  employees,
+  userMenuPermissions
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, and, desc } from "drizzle-orm";
@@ -1236,6 +1239,78 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`[DB ERROR] Failed to delete employee with ID ${id}:`, error);
       throw new Error(`Failed to delete employee: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // User Menu Permission methods implementation
+  async getUserMenuPermissions(userId?: string): Promise<UserMenuPermission[]> {
+    try {
+      const query = db.select().from(userMenuPermissions);
+      
+      if (userId) {
+        return query
+          .where(eq(userMenuPermissions.userId, userId))
+          .orderBy(desc(userMenuPermissions.createdAt));
+      } else {
+        return query.orderBy(desc(userMenuPermissions.createdAt));
+      }
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get user menu permissions:`, error);
+      throw new Error(`Failed to get user menu permissions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getUserMenuPermission(userId: string): Promise<UserMenuPermission | undefined> {
+    try {
+      const result = await db.select().from(userMenuPermissions).where(eq(userMenuPermissions.userId, userId)).limit(1);
+      return result[0];
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get user menu permission for user ${userId}:`, error);
+      throw new Error(`Failed to get user menu permission: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async createUserMenuPermission(insertPermission: InsertUserMenuPermission): Promise<UserMenuPermission> {
+    try {
+      const id = randomUUID();
+      const newPermission = {
+        ...insertPermission,
+        id,
+      };
+      
+      await db.insert(userMenuPermissions).values(newPermission);
+      console.log(`[DB] Created user menu permission for user: ${newPermission.userId} (ID: ${newPermission.id})`);
+      return newPermission as UserMenuPermission;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to create user menu permission:`, error);
+      throw new Error(`Failed to create user menu permission: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async updateUserMenuPermission(userId: string, updateData: Partial<InsertUserMenuPermission>): Promise<UserMenuPermission | undefined> {
+    try {
+      await db.update(userMenuPermissions).set(updateData).where(eq(userMenuPermissions.userId, userId));
+      console.log(`[DB] Updated user menu permission for user: ${userId}`);
+      return this.getUserMenuPermission(userId);
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to update user menu permission for user ${userId}:`, error);
+      throw new Error(`Failed to update user menu permission: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async deleteUserMenuPermission(userId: string): Promise<boolean> {
+    try {
+      const result = await db.delete(userMenuPermissions).where(eq(userMenuPermissions.userId, userId));
+      const deleted = (result.rowCount ?? 0) > 0;
+      if (deleted) {
+        console.log(`[DB] Deleted user menu permission for user: ${userId}`);
+      } else {
+        console.warn(`[DB] No user menu permission found to delete for user: ${userId}`);
+      }
+      return deleted;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to delete user menu permission for user ${userId}:`, error);
+      throw new Error(`Failed to delete user menu permission: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }
