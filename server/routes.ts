@@ -174,12 +174,10 @@ async function sendWorkReportNotification(workReport: WorkReport, submittedByUse
 
 👤 <b>Employee:</b> ${reportUser.name} (@${reportUser.username})
 📅 <b>Date:</b> ${new Date(workReport.date).toLocaleDateString()}
-⏰ <b>Start Time:</b> ${workReport.startTime}
-⏰ <b>End Time:</b> ${workReport.endTime}
-📝 <b>Tasks:</b> ${workReport.tasksCompleted}
-💰 <b>Total Pay:</b> $${workReport.totalPay}
-
-${workReport.notes ? `📋 <b>Notes:</b> ${workReport.notes}` : ''}
+📝 <b>Title:</b> ${workReport.title}
+📋 <b>Description:</b> ${workReport.description}
+⏰ <b>Hours Worked:</b> ${workReport.hoursWorked}
+📊 <b>Status:</b> ${workReport.status}
 
 <i>Submitted by ${submittedByUser.username} at ${new Date().toLocaleString()}</i>
 `;
@@ -1752,7 +1750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalSalaryAmount = salaries.reduce((sum, salary) => sum + parseFloat(salary.finalPayment), 0);
       
       // Calculate work report statistics
-      const totalWorkHours = workReports.reduce((sum, report) => sum + parseFloat(report.totalHours), 0);
+      const totalWorkHours = workReports.reduce((sum, report) => sum + parseFloat(report.hoursWorked), 0);
       const totalSalaryHours = salaries.reduce((sum, salary) => sum + parseFloat(salary.actualWorkingHours), 0);
       
       // Group by user for comparison
@@ -1760,7 +1758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userSalaryHours: Record<string, number> = {};
       
       workReports.forEach(report => {
-        userWorkHours[report.userId] = (userWorkHours[report.userId] || 0) + parseFloat(report.totalHours);
+        userWorkHours[report.userId] = (userWorkHours[report.userId] || 0) + parseFloat(report.hoursWorked);
       });
       
       salaries.forEach(salary => {
