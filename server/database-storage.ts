@@ -1338,11 +1338,41 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createSalary(salary: InsertSalary): Promise<Salary> {
+  async createSalary(salary: any): Promise<Salary> {
     try {
+      // Calculate missing fields if not provided
+      const basicSalary = Number(salary.basicSalary);
+      const contractualHours = Number(salary.contractualHours);
+      const actualWorkingHours = Number(salary.actualWorkingHours);
+      const festivalBonus = Number(salary.festivalBonus || 0);
+      const performanceBonus = Number(salary.performanceBonus || 0);
+      const otherBonus = Number(salary.otherBonus || 0);
+      
+      const hourlyRate = basicSalary / contractualHours;
+      const basePayment = actualWorkingHours * hourlyRate;
+      const totalBonus = festivalBonus + performanceBonus + otherBonus;
+      const grossPayment = basePayment + totalBonus;
+      const finalPayment = grossPayment;
+      
       const newSalary = {
-        ...salary,
         id: randomUUID(),
+        employeeId: salary.employeeId,
+        employeeName: salary.employeeName,
+        basicSalary: String(basicSalary),
+        contractualHours: contractualHours,
+        actualWorkingHours: String(actualWorkingHours),
+        hourlyRate: String(hourlyRate),
+        basePayment: String(basePayment),
+        festivalBonus: String(festivalBonus),
+        performanceBonus: String(performanceBonus),
+        otherBonus: String(otherBonus),
+        totalBonus: String(totalBonus),
+        grossPayment: String(grossPayment),
+        finalPayment: String(finalPayment),
+        paymentMethod: salary.paymentMethod || 'bank_transfer',
+        paymentStatus: salary.paymentStatus || 'unpaid',
+        remarks: salary.remarks || null,
+        month: salary.month,
       };
       
       await db.insert(salaries).values(newSalary);
@@ -1360,12 +1390,53 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateSalary(id: string, salary: Partial<InsertSalary>): Promise<Salary | undefined> {
+  async updateSalary(id: string, salary: any): Promise<Salary | undefined> {
     try {
-      const updateData = {
-        ...salary,
+      const updateData: any = {
         updatedAt: new Date(),
       };
+      
+      // Update basic fields and recalculate if needed
+      if (salary.employeeId !== undefined) updateData.employeeId = salary.employeeId;
+      if (salary.employeeName !== undefined) updateData.employeeName = salary.employeeName;
+      if (salary.basicSalary !== undefined) updateData.basicSalary = String(salary.basicSalary);
+      if (salary.contractualHours !== undefined) updateData.contractualHours = salary.contractualHours;
+      if (salary.actualWorkingHours !== undefined) updateData.actualWorkingHours = String(salary.actualWorkingHours);
+      if (salary.festivalBonus !== undefined) updateData.festivalBonus = String(salary.festivalBonus);
+      if (salary.performanceBonus !== undefined) updateData.performanceBonus = String(salary.performanceBonus);
+      if (salary.otherBonus !== undefined) updateData.otherBonus = String(salary.otherBonus);
+      if (salary.paymentMethod !== undefined) updateData.paymentMethod = salary.paymentMethod;
+      if (salary.paymentStatus !== undefined) updateData.paymentStatus = salary.paymentStatus;
+      if (salary.remarks !== undefined) updateData.remarks = salary.remarks;
+      if (salary.month !== undefined) updateData.month = salary.month;
+      
+      // Recalculate derived fields if basic fields were updated
+      if (salary.basicSalary !== undefined || salary.contractualHours !== undefined || 
+          salary.actualWorkingHours !== undefined || salary.festivalBonus !== undefined ||
+          salary.performanceBonus !== undefined || salary.otherBonus !== undefined) {
+        
+        const existing = await this.getSalary(id);
+        if (existing) {
+          const basicSalary = Number(salary.basicSalary !== undefined ? salary.basicSalary : existing.basicSalary);
+          const contractualHours = Number(salary.contractualHours !== undefined ? salary.contractualHours : existing.contractualHours);
+          const actualWorkingHours = Number(salary.actualWorkingHours !== undefined ? salary.actualWorkingHours : existing.actualWorkingHours);
+          const festivalBonus = Number(salary.festivalBonus !== undefined ? salary.festivalBonus : existing.festivalBonus);
+          const performanceBonus = Number(salary.performanceBonus !== undefined ? salary.performanceBonus : existing.performanceBonus);
+          const otherBonus = Number(salary.otherBonus !== undefined ? salary.otherBonus : existing.otherBonus);
+          
+          const hourlyRate = basicSalary / contractualHours;
+          const basePayment = actualWorkingHours * hourlyRate;
+          const totalBonus = festivalBonus + performanceBonus + otherBonus;
+          const grossPayment = basePayment + totalBonus;
+          const finalPayment = grossPayment;
+          
+          updateData.hourlyRate = String(hourlyRate);
+          updateData.basePayment = String(basePayment);
+          updateData.totalBonus = String(totalBonus);
+          updateData.grossPayment = String(grossPayment);
+          updateData.finalPayment = String(finalPayment);
+        }
+      }
       
       await db.update(salaries).set(updateData).where(eq(salaries.id, id));
       console.log(`[DB] Updated salary record with ID: ${id}`);
