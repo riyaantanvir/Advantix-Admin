@@ -21,22 +21,10 @@ interface SalaryFormData {
   contractualHours: number;
   actualWorkingHours: number;
   
-  // Allowances
-  transportAllowance: number;
-  foodAllowance: number;
-  internetAllowance: number;
-  otherAllowances: number;
-  
   // Bonus
   festivalBonus: number;
   performanceBonus: number;
   otherBonus: number;
-  
-  // Deductions
-  leaveDeduction: number;
-  loanDeduction: number;
-  penaltyDeduction: number;
-  taxDeduction: number;
   
   paymentMethod: 'cash' | 'bank_transfer' | 'mobile_banking';
   paymentStatus: 'paid' | 'unpaid';
@@ -48,9 +36,7 @@ interface SalaryRecord extends SalaryFormData {
   id: string;
   hourlyRate: number;
   basePayment: number;
-  totalAllowances: number;
   totalBonus: number;
-  totalDeductions: number;
   grossPayment: number;
   finalPayment: number;
   createdAt: string;
@@ -61,7 +47,7 @@ export default function FinanceSalaryManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingSalary, setEditingSalary] = useState<SalaryRecord | null>(null);
   const [filterMonth, setFilterMonth] = useState("");
-  const [filterUserType, setFilterUserType] = useState("all");
+  const [filterEmployee, setFilterEmployee] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -73,17 +59,9 @@ export default function FinanceSalaryManagement() {
     basicSalary: 0,
     contractualHours: 160, // Default: 8 hours * 20 working days
     actualWorkingHours: 0,
-    transportAllowance: 0,
-    foodAllowance: 0,
-    internetAllowance: 0,
-    otherAllowances: 0,
     festivalBonus: 0,
     performanceBonus: 0,
     otherBonus: 0,
-    leaveDeduction: 0,
-    loanDeduction: 0,
-    penaltyDeduction: 0,
-    taxDeduction: 0,
     paymentMethod: 'bank_transfer',
     paymentStatus: 'unpaid',
     remarks: '',
@@ -94,9 +72,7 @@ export default function FinanceSalaryManagement() {
   const [calculations, setCalculations] = useState({
     hourlyRate: 0,
     basePayment: 0,
-    totalAllowances: 0,
     totalBonus: 0,
-    totalDeductions: 0,
     grossPayment: 0,
     finalPayment: 0,
   });
@@ -105,18 +81,14 @@ export default function FinanceSalaryManagement() {
   useEffect(() => {
     const hourlyRate = formData.contractualHours > 0 ? formData.basicSalary / formData.contractualHours : 0;
     const basePayment = formData.actualWorkingHours * hourlyRate;
-    const totalAllowances = formData.transportAllowance + formData.foodAllowance + formData.internetAllowance + formData.otherAllowances;
     const totalBonus = formData.festivalBonus + formData.performanceBonus + formData.otherBonus;
-    const totalDeductions = formData.leaveDeduction + formData.loanDeduction + formData.penaltyDeduction + formData.taxDeduction;
-    const grossPayment = basePayment + totalBonus + totalAllowances;
-    const finalPayment = grossPayment - totalDeductions;
+    const grossPayment = basePayment + totalBonus;
+    const finalPayment = grossPayment;
 
     setCalculations({
       hourlyRate,
       basePayment,
-      totalAllowances,
       totalBonus,
-      totalDeductions,
       grossPayment,
       finalPayment,
     });
@@ -124,17 +96,9 @@ export default function FinanceSalaryManagement() {
     formData.basicSalary,
     formData.contractualHours,
     formData.actualWorkingHours,
-    formData.transportAllowance,
-    formData.foodAllowance,
-    formData.internetAllowance,
-    formData.otherAllowances,
     formData.festivalBonus,
     formData.performanceBonus,
     formData.otherBonus,
-    formData.leaveDeduction,
-    formData.loanDeduction,
-    formData.penaltyDeduction,
-    formData.taxDeduction,
   ]);
 
   // Fetch salary records
@@ -231,17 +195,9 @@ export default function FinanceSalaryManagement() {
       basicSalary: 0,
       contractualHours: 160,
       actualWorkingHours: 0,
-      transportAllowance: 0,
-      foodAllowance: 0,
-      internetAllowance: 0,
-      otherAllowances: 0,
       festivalBonus: 0,
       performanceBonus: 0,
       otherBonus: 0,
-      leaveDeduction: 0,
-      loanDeduction: 0,
-      penaltyDeduction: 0,
-      taxDeduction: 0,
       paymentMethod: 'bank_transfer',
       paymentStatus: 'unpaid',
       remarks: '',
@@ -308,17 +264,9 @@ export default function FinanceSalaryManagement() {
       basicSalary: typeof salary.basicSalary === 'string' ? parseFloat(salary.basicSalary) : salary.basicSalary,
       contractualHours: typeof salary.contractualHours === 'string' ? parseInt(salary.contractualHours) : salary.contractualHours,
       actualWorkingHours: typeof salary.actualWorkingHours === 'string' ? parseFloat(salary.actualWorkingHours) : salary.actualWorkingHours,
-      transportAllowance: typeof salary.transportAllowance === 'string' ? parseFloat(salary.transportAllowance) : salary.transportAllowance,
-      foodAllowance: typeof salary.foodAllowance === 'string' ? parseFloat(salary.foodAllowance) : salary.foodAllowance,
-      internetAllowance: typeof salary.internetAllowance === 'string' ? parseFloat(salary.internetAllowance) : salary.internetAllowance,
-      otherAllowances: typeof salary.otherAllowances === 'string' ? parseFloat(salary.otherAllowances) : salary.otherAllowances,
       festivalBonus: typeof salary.festivalBonus === 'string' ? parseFloat(salary.festivalBonus) : salary.festivalBonus,
       performanceBonus: typeof salary.performanceBonus === 'string' ? parseFloat(salary.performanceBonus) : salary.performanceBonus,
       otherBonus: typeof salary.otherBonus === 'string' ? parseFloat(salary.otherBonus) : salary.otherBonus,
-      leaveDeduction: typeof salary.leaveDeduction === 'string' ? parseFloat(salary.leaveDeduction) : salary.leaveDeduction,
-      loanDeduction: typeof salary.loanDeduction === 'string' ? parseFloat(salary.loanDeduction) : salary.loanDeduction,
-      penaltyDeduction: typeof salary.penaltyDeduction === 'string' ? parseFloat(salary.penaltyDeduction) : salary.penaltyDeduction,
-      taxDeduction: typeof salary.taxDeduction === 'string' ? parseFloat(salary.taxDeduction) : salary.taxDeduction,
       paymentMethod: salary.paymentMethod,
       paymentStatus: salary.paymentStatus,
       remarks: salary.remarks || '',
@@ -356,7 +304,7 @@ export default function FinanceSalaryManagement() {
   // Filter salaries based on selected filters
   const filteredSalaries = salaries.filter((salary: SalaryRecord) => {
     if (filterMonth && salary.month !== filterMonth) return false;
-    if (filterUserType && filterUserType !== 'all' && salary.employeeId !== filterUserType) return false;
+    if (filterEmployee && filterEmployee !== 'all' && salary.employeeId !== filterEmployee) return false;
     if (filterStatus && filterStatus !== 'all' && salary.paymentStatus !== filterStatus) return false;
     return true;
   });
@@ -368,7 +316,7 @@ export default function FinanceSalaryManagement() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Salary Management</h1>
             <p className="text-muted-foreground">
-              Manage comprehensive employee salary records with automatic calculations
+              Manage employee salary records with automatic calculations
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -389,26 +337,26 @@ export default function FinanceSalaryManagement() {
                   Add Salary Record
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+              <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Add Salary Record</DialogTitle>
                   <DialogDescription>
-                    Create a comprehensive salary record with automatic calculations
+                    Create a salary record with automatic calculations
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-6">
-                  {/* UserType and Basic Info */}
+                  {/* Employee and Basic Info */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="employee">UserType Name *</Label>
+                      <Label htmlFor="employee">User Name *</Label>
                       <Select onValueChange={handleUserChange} data-testid="select-employee">
                         <SelectTrigger>
-                          <SelectValue placeholder="Select employee" />
+                          <SelectValue placeholder="Select user" />
                         </SelectTrigger>
                         <SelectContent>
-                          {users.map((employee: UserType) => (
-                            <SelectItem key={employee.id} value={employee.id}>
-                              {employee.name}
+                          {users.map((user: UserType) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.name || user.username}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -453,7 +401,7 @@ export default function FinanceSalaryManagement() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="actualWorkingHours">Actual Working Hours (Billing Hours) *</Label>
+                          <Label htmlFor="actualWorkingHours">Actual Working Hours (Auto-filled from reports) *</Label>
                           <Input
                             type="number"
                             step="0.1"
@@ -474,60 +422,6 @@ export default function FinanceSalaryManagement() {
                           <div>Base Payment: <span className="font-medium">{formatCurrency(calculations.basePayment)}</span></div>
                           <div>Final Payment: <span className="font-bold text-green-600">{formatCurrency(calculations.finalPayment)}</span></div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Allowances */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Allowances</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="transportAllowance">Transport (BDT)</Label>
-                          <Input
-                            type="number"
-                            value={formData.transportAllowance > 0 ? formData.transportAllowance : ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, transportAllowance: parseFloat(e.target.value) || 0 }))}
-                            placeholder="5000"
-                            data-testid="input-transport"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="foodAllowance">Food (BDT)</Label>
-                          <Input
-                            type="number"
-                            value={formData.foodAllowance > 0 ? formData.foodAllowance : ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, foodAllowance: parseFloat(e.target.value) || 0 }))}
-                            placeholder="3000"
-                            data-testid="input-food"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="internetAllowance">Internet (BDT)</Label>
-                          <Input
-                            type="number"
-                            value={formData.internetAllowance > 0 ? formData.internetAllowance : ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, internetAllowance: parseFloat(e.target.value) || 0 }))}
-                            placeholder="1500"
-                            data-testid="input-internet"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="otherAllowances">Other (BDT)</Label>
-                          <Input
-                            type="number"
-                            value={formData.otherAllowances > 0 ? formData.otherAllowances : ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, otherAllowances: parseFloat(e.target.value) || 0 }))}
-                            placeholder="2000"
-                            data-testid="input-other-allowances"
-                          />
-                        </div>
-                      </div>
-                      <div className="mt-2 text-sm text-muted-foreground">
-                        Total Allowances: <span className="font-medium">{formatCurrency(calculations.totalAllowances)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -572,60 +466,6 @@ export default function FinanceSalaryManagement() {
                       </div>
                       <div className="mt-2 text-sm text-muted-foreground">
                         Total Bonus: <span className="font-medium">{formatCurrency(calculations.totalBonus)}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Deductions */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Deductions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="leaveDeduction">Leave (BDT)</Label>
-                          <Input
-                            type="number"
-                            value={formData.leaveDeduction > 0 ? formData.leaveDeduction : ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, leaveDeduction: parseFloat(e.target.value) || 0 }))}
-                            placeholder="2000"
-                            data-testid="input-leave-deduction"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="loanDeduction">Loan (BDT)</Label>
-                          <Input
-                            type="number"
-                            value={formData.loanDeduction > 0 ? formData.loanDeduction : ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, loanDeduction: parseFloat(e.target.value) || 0 }))}
-                            placeholder="5000"
-                            data-testid="input-loan-deduction"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="penaltyDeduction">Penalty (BDT)</Label>
-                          <Input
-                            type="number"
-                            value={formData.penaltyDeduction > 0 ? formData.penaltyDeduction : ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, penaltyDeduction: parseFloat(e.target.value) || 0 }))}
-                            placeholder="1000"
-                            data-testid="input-penalty-deduction"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="taxDeduction">Tax (BDT)</Label>
-                          <Input
-                            type="number"
-                            value={formData.taxDeduction > 0 ? formData.taxDeduction : ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, taxDeduction: parseFloat(e.target.value) || 0 }))}
-                            placeholder="3000"
-                            data-testid="input-tax-deduction"
-                          />
-                        </div>
-                      </div>
-                      <div className="mt-2 text-sm text-muted-foreground">
-                        Total Deductions: <span className="font-medium text-red-600">{formatCurrency(calculations.totalDeductions)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -685,45 +525,6 @@ export default function FinanceSalaryManagement() {
                     </CardContent>
                   </Card>
 
-                  {/* Final Calculation Summary */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Payment Summary</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span>Base Payment:</span>
-                            <span>{formatCurrency(calculations.basePayment)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Total Allowances:</span>
-                            <span className="text-green-600">+{formatCurrency(calculations.totalAllowances)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Total Bonus:</span>
-                            <span className="text-green-600">+{formatCurrency(calculations.totalBonus)}</span>
-                          </div>
-                          <div className="flex justify-between font-medium">
-                            <span>Gross Payment:</span>
-                            <span>{formatCurrency(calculations.grossPayment)}</span>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span>Total Deductions:</span>
-                            <span className="text-red-600">-{formatCurrency(calculations.totalDeductions)}</span>
-                          </div>
-                          <div className="flex justify-between text-xl font-bold">
-                            <span>Final Payment:</span>
-                            <span className="text-blue-600">{formatCurrency(calculations.finalPayment)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
                   <div className="flex justify-end gap-2 pt-4">
                     <Button 
                       type="button" 
@@ -767,16 +568,16 @@ export default function FinanceSalaryManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Filter by UserType</Label>
-                <Select value={filterUserType} onValueChange={setFilterUserType} data-testid="filter-employee">
+                <Label>Filter by User</Label>
+                <Select value={filterEmployee} onValueChange={setFilterEmployee} data-testid="filter-employee">
                   <SelectTrigger>
                     <SelectValue placeholder="All users" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All users</SelectItem>
-                    {users.map((employee: UserType) => (
-                      <SelectItem key={employee.id} value={employee.id}>
-                        {employee.name}
+                    {users.map((user: UserType) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name || user.username}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -801,7 +602,7 @@ export default function FinanceSalaryManagement() {
                   variant="outline" 
                   onClick={() => {
                     setFilterMonth("");
-                    setFilterUserType("all");
+                    setFilterEmployee("all");
                     setFilterStatus("all");
                   }}
                   data-testid="button-clear-filters"
@@ -821,7 +622,7 @@ export default function FinanceSalaryManagement() {
               Salary Records ({filteredSalaries.length})
             </CardTitle>
             <CardDescription>
-              Comprehensive salary records with automatic calculations
+              Salary records with automatic calculations
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -835,7 +636,7 @@ export default function FinanceSalaryManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>UserType</TableHead>
+                      <TableHead>User</TableHead>
                       <TableHead>Month</TableHead>
                       <TableHead>Basic Salary</TableHead>
                       <TableHead>Contract Hrs</TableHead>
@@ -843,8 +644,6 @@ export default function FinanceSalaryManagement() {
                       <TableHead>Hourly Rate</TableHead>
                       <TableHead>Base Payment</TableHead>
                       <TableHead>Bonus</TableHead>
-                      <TableHead>Allowances</TableHead>
-                      <TableHead>Deductions</TableHead>
                       <TableHead>Final Payment</TableHead>
                       <TableHead>Method</TableHead>
                       <TableHead>Status</TableHead>
@@ -854,7 +653,7 @@ export default function FinanceSalaryManagement() {
                   <TableBody>
                     {filteredSalaries.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={14} className="text-center text-muted-foreground">
+                        <TableCell colSpan={12} className="text-center text-muted-foreground">
                           {salaries.length === 0 
                             ? "No salary records found. Create your first salary record to get started."
                             : "No records match the selected filters."
@@ -882,8 +681,6 @@ export default function FinanceSalaryManagement() {
                           <TableCell>{formatCurrency(salary.hourlyRate)}</TableCell>
                           <TableCell>{formatCurrency(salary.basePayment)}</TableCell>
                           <TableCell className="text-green-600">{formatCurrency(salary.totalBonus)}</TableCell>
-                          <TableCell className="text-green-600">{formatCurrency(salary.totalAllowances)}</TableCell>
-                          <TableCell className="text-red-600">{formatCurrency(salary.totalDeductions)}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="font-bold">
                               {formatCurrency(salary.finalPayment)}
@@ -932,9 +729,9 @@ export default function FinanceSalaryManagement() {
           </CardContent>
         </Card>
 
-        {/* Edit Dialog - Similar structure to create dialog but pre-populated */}
+        {/* Edit Dialog */}
         <Dialog open={!!editingSalary} onOpenChange={() => setEditingSalary(null)}>
-          <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Salary Record</DialogTitle>
               <DialogDescription>
@@ -942,18 +739,18 @@ export default function FinanceSalaryManagement() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6">
-              {/* UserType and Basic Info */}
+              {/* Employee and Basic Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="employee">UserType Name *</Label>
+                  <Label htmlFor="employee">User Name *</Label>
                   <Select value={formData.employeeId} onValueChange={handleUserChange} data-testid="select-edit-employee">
                     <SelectTrigger>
-                      <SelectValue placeholder="Select employee" />
+                      <SelectValue placeholder="Select user" />
                     </SelectTrigger>
                     <SelectContent>
-                      {users.map((employee: UserType) => (
-                        <SelectItem key={employee.id} value={employee.id}>
-                          {employee.name}
+                      {users.map((user: UserType) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name || user.username}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -998,7 +795,7 @@ export default function FinanceSalaryManagement() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="actualWorkingHours">Actual Working Hours (Billing Hours) *</Label>
+                      <Label htmlFor="actualWorkingHours">Actual Working Hours (Auto-filled from reports) *</Label>
                       <Input
                         type="number"
                         step="0.1"
@@ -1019,60 +816,6 @@ export default function FinanceSalaryManagement() {
                       <div>Base Payment: <span className="font-medium">{formatCurrency(calculations.basePayment)}</span></div>
                       <div>Final Payment: <span className="font-bold text-green-600">{formatCurrency(calculations.finalPayment)}</span></div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Allowances */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Allowances</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="transportAllowance">Transport (BDT)</Label>
-                      <Input
-                        type="number"
-                        value={formData.transportAllowance > 0 ? formData.transportAllowance : ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, transportAllowance: parseFloat(e.target.value) || 0 }))}
-                        placeholder="5000"
-                        data-testid="input-edit-transport"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="foodAllowance">Food (BDT)</Label>
-                      <Input
-                        type="number"
-                        value={formData.foodAllowance > 0 ? formData.foodAllowance : ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, foodAllowance: parseFloat(e.target.value) || 0 }))}
-                        placeholder="3000"
-                        data-testid="input-edit-food"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="internetAllowance">Internet (BDT)</Label>
-                      <Input
-                        type="number"
-                        value={formData.internetAllowance > 0 ? formData.internetAllowance : ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, internetAllowance: parseFloat(e.target.value) || 0 }))}
-                        placeholder="1500"
-                        data-testid="input-edit-internet"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="otherAllowances">Other (BDT)</Label>
-                      <Input
-                        type="number"
-                        value={formData.otherAllowances > 0 ? formData.otherAllowances : ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, otherAllowances: parseFloat(e.target.value) || 0 }))}
-                        placeholder="2000"
-                        data-testid="input-edit-other-allowances"
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    Total Allowances: <span className="font-medium">{formatCurrency(calculations.totalAllowances)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1117,60 +860,6 @@ export default function FinanceSalaryManagement() {
                   </div>
                   <div className="mt-2 text-sm text-muted-foreground">
                     Total Bonus: <span className="font-medium">{formatCurrency(calculations.totalBonus)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Deductions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Deductions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="leaveDeduction">Leave (BDT)</Label>
-                      <Input
-                        type="number"
-                        value={formData.leaveDeduction > 0 ? formData.leaveDeduction : ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, leaveDeduction: parseFloat(e.target.value) || 0 }))}
-                        placeholder="2000"
-                        data-testid="input-edit-leave-deduction"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="loanDeduction">Loan (BDT)</Label>
-                      <Input
-                        type="number"
-                        value={formData.loanDeduction > 0 ? formData.loanDeduction : ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, loanDeduction: parseFloat(e.target.value) || 0 }))}
-                        placeholder="5000"
-                        data-testid="input-edit-loan-deduction"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="penaltyDeduction">Penalty (BDT)</Label>
-                      <Input
-                        type="number"
-                        value={formData.penaltyDeduction > 0 ? formData.penaltyDeduction : ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, penaltyDeduction: parseFloat(e.target.value) || 0 }))}
-                        placeholder="1000"
-                        data-testid="input-edit-penalty-deduction"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="taxDeduction">Tax (BDT)</Label>
-                      <Input
-                        type="number"
-                        value={formData.taxDeduction > 0 ? formData.taxDeduction : ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, taxDeduction: parseFloat(e.target.value) || 0 }))}
-                        placeholder="3000"
-                        data-testid="input-edit-tax-deduction"
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    Total Deductions: <span className="font-medium text-red-600">{formatCurrency(calculations.totalDeductions)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1226,45 +915,6 @@ export default function FinanceSalaryManagement() {
                       placeholder="Additional notes or comments"
                       data-testid="input-edit-remarks"
                     />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Final Calculation Summary */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Payment Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>Base Payment:</span>
-                        <span>{formatCurrency(calculations.basePayment)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Total Allowances:</span>
-                        <span className="text-green-600">+{formatCurrency(calculations.totalAllowances)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Total Bonus:</span>
-                        <span className="text-green-600">+{formatCurrency(calculations.totalBonus)}</span>
-                      </div>
-                      <div className="flex justify-between font-medium">
-                        <span>Gross Payment:</span>
-                        <span>{formatCurrency(calculations.grossPayment)}</span>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>Total Deductions:</span>
-                        <span className="text-red-600">-{formatCurrency(calculations.totalDeductions)}</span>
-                      </div>
-                      <div className="flex justify-between text-xl font-bold">
-                        <span>Final Payment:</span>
-                        <span className="text-blue-600">{formatCurrency(calculations.finalPayment)}</span>
-                      </div>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
