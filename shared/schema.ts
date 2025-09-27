@@ -81,22 +81,60 @@ export const clients = pgTable("clients", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Salary Management
+// Comprehensive Salary Management
 export const salaries = pgTable("salaries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  employeeId: varchar("employee_id").references(() => employees.id, { onDelete: "restrict" }).notNull(),
   employeeName: text("employee_name").notNull(), // Denormalized for display
-  salaryAmount: decimal("salary_amount", { precision: 10, scale: 2 }).notNull(),
-  totalHours: integer("total_hours").notNull(),
-  hourlyRate: decimal("hourly_rate", { precision: 8, scale: 2 }).notNull(),
-  bonus: decimal("bonus", { precision: 10, scale: 2 }).default("0"),
-  calculatedTotal: decimal("calculated_total", { precision: 10, scale: 2 }),
+  
+  // Basic Salary Information
+  basicSalary: decimal("basic_salary", { precision: 12, scale: 2 }).notNull(), // BDT
+  contractualHours: integer("contractual_hours").notNull(), // Per month
+  actualWorkingHours: decimal("actual_working_hours", { precision: 6, scale: 2 }).notNull(), // Billing hours
+  hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }).notNull(), // Auto-calculated: Basic Salary ÷ Contractual Hours
+  
+  // Payment Calculations
+  basePayment: decimal("base_payment", { precision: 12, scale: 2 }).notNull(), // Actual Working Hours × Hourly Rate
+  
+  // Allowances
+  transportAllowance: decimal("transport_allowance", { precision: 10, scale: 2 }).default("0"),
+  foodAllowance: decimal("food_allowance", { precision: 10, scale: 2 }).default("0"),
+  internetAllowance: decimal("internet_allowance", { precision: 10, scale: 2 }).default("0"),
+  otherAllowances: decimal("other_allowances", { precision: 10, scale: 2 }).default("0"),
+  totalAllowances: decimal("total_allowances", { precision: 12, scale: 2 }).default("0"), // Sum of all allowances
+  
+  // Bonus
+  festivalBonus: decimal("festival_bonus", { precision: 10, scale: 2 }).default("0"),
+  performanceBonus: decimal("performance_bonus", { precision: 10, scale: 2 }).default("0"),
+  otherBonus: decimal("other_bonus", { precision: 10, scale: 2 }).default("0"),
+  totalBonus: decimal("total_bonus", { precision: 12, scale: 2 }).default("0"), // Sum of all bonuses
+  
+  // Deductions
+  leaveDeduction: decimal("leave_deduction", { precision: 10, scale: 2 }).default("0"),
+  loanDeduction: decimal("loan_deduction", { precision: 10, scale: 2 }).default("0"),
+  penaltyDeduction: decimal("penalty_deduction", { precision: 10, scale: 2 }).default("0"),
+  taxDeduction: decimal("tax_deduction", { precision: 10, scale: 2 }).default("0"),
+  totalDeductions: decimal("total_deductions", { precision: 12, scale: 2 }).default("0"), // Sum of all deductions
+  
+  // Final Calculations
+  grossPayment: decimal("gross_payment", { precision: 12, scale: 2 }).notNull(), // Base Payment + Total Bonus + Total Allowances
+  finalPayment: decimal("final_payment", { precision: 12, scale: 2 }).notNull(), // Gross Payment - Total Deductions
+  
+  // Payment Information
+  paymentMethod: text("payment_method").notNull().default("bank_transfer"), // "cash", "bank_transfer", "mobile_banking"
+  paymentStatus: text("payment_status").notNull().default("unpaid"), // "paid", "unpaid"
+  
+  // Additional Information
+  remarks: text("remarks"),
   month: text("month").notNull(), // "YYYY-MM" format
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => {
   return {
-    uniqueUserMonth: sql`UNIQUE(${table.userId}, ${table.month})`
+    paymentMethodCheck: sql`CHECK (${table.paymentMethod} IN ('cash', 'bank_transfer', 'mobile_banking'))`,
+    paymentStatusCheck: sql`CHECK (${table.paymentStatus} IN ('paid', 'unpaid'))`,
+    uniqueEmployeeMonth: sql`UNIQUE(${table.employeeId}, ${table.month})`
   }
 });
 
@@ -204,9 +242,30 @@ export const insertClientSchema = createInsertSchema(clients).omit({
 
 export const insertSalarySchema = createInsertSchema(salaries).omit({
   id: true,
-  calculatedTotal: true,
+  hourlyRate: true, // Auto-calculated
+  basePayment: true, // Auto-calculated
+  totalAllowances: true, // Auto-calculated
+  totalBonus: true, // Auto-calculated
+  totalDeductions: true, // Auto-calculated
+  grossPayment: true, // Auto-calculated
+  finalPayment: true, // Auto-calculated
   createdAt: true,
   updatedAt: true,
+}).extend({
+  basicSalary: z.coerce.number().min(0.01, "Basic salary must be greater than 0"),
+  contractualHours: z.coerce.number().int().min(1, "Contractual hours must be at least 1"),
+  actualWorkingHours: z.coerce.number().min(0, "Actual working hours must be positive"),
+  transportAllowance: z.coerce.number().min(0, "Transport allowance must be positive").optional(),
+  foodAllowance: z.coerce.number().min(0, "Food allowance must be positive").optional(),
+  internetAllowance: z.coerce.number().min(0, "Internet allowance must be positive").optional(),
+  otherAllowances: z.coerce.number().min(0, "Other allowances must be positive").optional(),
+  festivalBonus: z.coerce.number().min(0, "Festival bonus must be positive").optional(),
+  performanceBonus: z.coerce.number().min(0, "Performance bonus must be positive").optional(),
+  otherBonus: z.coerce.number().min(0, "Other bonus must be positive").optional(),
+  leaveDeduction: z.coerce.number().min(0, "Leave deduction must be positive").optional(),
+  loanDeduction: z.coerce.number().min(0, "Loan deduction must be positive").optional(),
+  penaltyDeduction: z.coerce.number().min(0, "Penalty deduction must be positive").optional(),
+  taxDeduction: z.coerce.number().min(0, "Tax deduction must be positive").optional(),
 });
 
 export const insertWorkReportSchema = createInsertSchema(workReports).omit({
