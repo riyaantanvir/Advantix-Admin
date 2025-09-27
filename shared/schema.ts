@@ -367,12 +367,40 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({
   updatedAt: true,
 });
 
+// User Menu Permissions - Controls access to specific menu items per user
+export const userMenuPermissions = pgTable("user_menu_permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  dashboard: boolean("dashboard").default(false),
+  expenseEntry: boolean("expense_entry").default(false),
+  adminPanel: boolean("admin_panel").default(false),
+  advantixAgency: boolean("advantix_agency").default(false),
+  investmentMgmt: boolean("investment_mgmt").default(false),
+  fundMgmt: boolean("fund_mgmt").default(false),
+  subscriptions: boolean("subscriptions").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => {
+  return {
+    uniqueUser: sql`UNIQUE(${table.userId})`
+  }
+});
+
+export const insertUserMenuPermissionSchema = createInsertSchema(userMenuPermissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertUserWithRole = z.infer<typeof insertUserWithRoleSchema>;
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type LoginRequest = z.infer<typeof loginSchema>;
+
+export type InsertUserMenuPermission = z.infer<typeof insertUserMenuPermissionSchema>;
+export type UserMenuPermission = typeof userMenuPermissions.$inferSelect;
 
 export type InsertAdAccount = z.infer<typeof insertAdAccountSchema>;
 export type AdAccount = typeof adAccounts.$inferSelect;
