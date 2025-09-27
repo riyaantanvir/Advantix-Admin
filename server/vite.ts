@@ -71,15 +71,43 @@ export function serveStatic(app: Express) {
   const distPath = path.resolve(import.meta.dirname, "public");
 
   if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
+    console.error(`Build directory not found: ${distPath}`);
+    console.error("Make sure to run 'npm run build' first");
+    
+    // Graceful fallback - serve a simple error page instead of crashing
+    app.use("*", (_req, res) => {
+      res.status(500).json({ 
+        error: "Application not built", 
+        message: "Static files not found. Please run the build process." 
+      });
+    });
+    return;
+  }
+
+  const indexPath = path.resolve(distPath, "index.html");
+  if (!fs.existsSync(indexPath)) {
+    console.error(`Index file not found: ${indexPath}`);
+    app.use("*", (_req, res) => {
+      res.status(500).json({ 
+        error: "Application build incomplete", 
+        message: "Main application file not found." 
+      });
+    });
+    return;
   }
 
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+    res.sendFile(indexPath, (err) => {
+      if (err) {
+        console.error("Error serving index.html:", err);
+        res.status(500).json({ 
+          error: "Failed to serve application", 
+          message: "Unable to load the main application file." 
+        });
+      }
+    });
   });
 }
