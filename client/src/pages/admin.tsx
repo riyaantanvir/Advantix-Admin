@@ -51,8 +51,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign, Tag as TagIcon, Plus, Database, Download, Upload, FileText, AlertCircle } from "lucide-react";
-import type { User, InsertUserWithRole, Page, RolePermission, Tag, InsertTag, UserMenuPermission, InsertUserMenuPermission, Employee, InsertEmployee } from "@shared/schema";
+import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign, Tag as TagIcon, Plus, Database, Download, Upload, FileText, AlertCircle, Send, MessageSquare, Bot } from "lucide-react";
+import type { User, InsertUserWithRole, Page, RolePermission, Tag, InsertTag, UserMenuPermission, InsertUserMenuPermission, Employee, InsertEmployee, TelegramConfig, InsertTelegramConfig, TelegramChatId, InsertTelegramChatId } from "@shared/schema";
 
 interface UserFormData {
   name: string;
@@ -2498,6 +2498,633 @@ function DataImportExport() {
   );
 }
 
+function TelegramManagement() {
+  const { toast } = useToast();
+  
+  // State for token management
+  const [tokenInput, setTokenInput] = useState("");
+  const [showToken, setShowToken] = useState(false);
+  
+  // State for chat ID management
+  const [chatIdInput, setChatIdInput] = useState("");
+  const [chatNameInput, setChatNameInput] = useState("");
+  const [chatDescriptionInput, setChatDescriptionInput] = useState("");
+  const [isAddChatIdOpen, setIsAddChatIdOpen] = useState(false);
+  const [editingChatId, setEditingChatId] = useState<TelegramChatId | null>(null);
+  const [isEditChatIdOpen, setIsEditChatIdOpen] = useState(false);
+  
+  // State for test message
+  const [testMessageInput, setTestMessageInput] = useState("");
+  
+  // Fetch Telegram configuration
+  const { 
+    data: telegramConfig, 
+    isLoading: configLoading,
+    refetch: refetchConfig 
+  } = useQuery<TelegramConfig>({
+    queryKey: ["/api/telegram/config"],
+  });
+
+  // Fetch chat IDs
+  const { 
+    data: chatIds = [], 
+    isLoading: chatIdsLoading,
+    refetch: refetchChatIds 
+  } = useQuery<TelegramChatId[]>({
+    queryKey: ["/api/telegram/chat-ids"],
+  });
+
+  // Token mutations
+  const saveTokenMutation = useMutation({
+    mutationFn: async (token: string) => {
+      const method = telegramConfig ? "PUT" : "POST";
+      const response = await apiRequest(method, "/api/telegram/config", { 
+        botToken: token, 
+        isActive: true 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/telegram/config"] });
+      toast({
+        title: "Bot token saved",
+        description: "Telegram bot token has been saved successfully.",
+      });
+      setTokenInput("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error saving token",
+        description: error.message || "Failed to save bot token",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTokenMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", "/api/telegram/config");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/telegram/config"] });
+      toast({
+        title: "Bot token deleted",
+        description: "Telegram bot token has been removed.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error deleting token",
+        description: error.message || "Failed to delete bot token",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Chat ID mutations
+  const addChatIdMutation = useMutation({
+    mutationFn: async (data: { chatId: string; name: string; description?: string }) => {
+      const response = await apiRequest("POST", "/api/telegram/chat-ids", {
+        chatId: data.chatId,
+        name: data.name,
+        description: data.description,
+        isActive: true
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/telegram/chat-ids"] });
+      toast({
+        title: "Chat ID added",
+        description: "Telegram chat ID has been added successfully.",
+      });
+      setIsAddChatIdOpen(false);
+      resetChatIdForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error adding chat ID",
+        description: error.message || "Failed to add chat ID",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateChatIdMutation = useMutation({
+    mutationFn: async (data: { id: string; chatId: string; name: string; description?: string }) => {
+      const response = await apiRequest("PUT", `/api/telegram/chat-ids/${data.id}`, {
+        chatId: data.chatId,
+        name: data.name,
+        description: data.description
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/telegram/chat-ids"] });
+      toast({
+        title: "Chat ID updated",
+        description: "Telegram chat ID has been updated successfully.",
+      });
+      setIsEditChatIdOpen(false);
+      setEditingChatId(null);
+      resetChatIdForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error updating chat ID",
+        description: error.message || "Failed to update chat ID",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteChatIdMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/telegram/chat-ids/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/telegram/chat-ids"] });
+      toast({
+        title: "Chat ID deleted",
+        description: "Telegram chat ID has been removed.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error deleting chat ID",
+        description: error.message || "Failed to delete chat ID",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Test message mutation
+  const sendTestMessageMutation = useMutation({
+    mutationFn: async (message: string) => {
+      const response = await apiRequest("POST", "/api/telegram/test-message", {
+        message: message
+      });
+      return response.json();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "Test message sent",
+        description: `Message sent successfully to ${result.sentCount} chat(s).`,
+      });
+      setTestMessageInput("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error sending test message",
+        description: error.message || "Failed to send test message",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetChatIdForm = () => {
+    setChatIdInput("");
+    setChatNameInput("");
+    setChatDescriptionInput("");
+  };
+
+  const handleEditChatId = (chatId: TelegramChatId) => {
+    setEditingChatId(chatId);
+    setChatIdInput(chatId.chatId);
+    setChatNameInput(chatId.name);
+    setChatDescriptionInput(chatId.description || "");
+    setIsEditChatIdOpen(true);
+  };
+
+  const handleSaveToken = () => {
+    if (!tokenInput.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Bot token is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    saveTokenMutation.mutate(tokenInput.trim());
+  };
+
+  const handleAddChatId = () => {
+    if (!chatIdInput.trim() || !chatNameInput.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Chat ID and name are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    addChatIdMutation.mutate({
+      chatId: chatIdInput.trim(),
+      name: chatNameInput.trim(),
+      description: chatDescriptionInput.trim() || undefined
+    });
+  };
+
+  const handleUpdateChatId = () => {
+    if (!editingChatId || !chatIdInput.trim() || !chatNameInput.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Chat ID and name are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateChatIdMutation.mutate({
+      id: editingChatId.id,
+      chatId: chatIdInput.trim(),
+      name: chatNameInput.trim(),
+      description: chatDescriptionInput.trim() || undefined
+    });
+  };
+
+  const handleSendTestMessage = () => {
+    if (!testMessageInput.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Test message is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!telegramConfig?.botToken) {
+      toast({
+        title: "Configuration Error",
+        description: "Please set up a bot token first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (chatIds.length === 0) {
+      toast({
+        title: "Configuration Error",
+        description: "Please add at least one chat ID first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    sendTestMessageMutation.mutate(testMessageInput.trim());
+  };
+
+  if (configLoading || chatIdsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2 text-gray-600 dark:text-gray-400">Loading Telegram configuration...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Token Setup Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            Bot Token Setup
+          </CardTitle>
+          <CardDescription>
+            Configure your Telegram bot token for sending notifications
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {telegramConfig?.botToken ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <div>
+                    <p className="font-medium text-green-800 dark:text-green-200">Bot Token Configured</p>
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      Token: {showToken ? telegramConfig.botToken : '••••••••••••••••••••••••••••••••••••••••••••'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowToken(!showToken)}
+                    data-testid="button-toggle-token-visibility"
+                  >
+                    {showToken ? "Hide" : "Show"}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => deleteTokenMutation.mutate()}
+                    disabled={deleteTokenMutation.isPending}
+                    data-testid="button-delete-token"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="bot-token">Bot Token</Label>
+                <Input
+                  id="bot-token"
+                  type="password"
+                  placeholder="Enter your Telegram bot token"
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value)}
+                  data-testid="input-bot-token"
+                />
+                <p className="text-sm text-gray-500">
+                  Get your bot token from @BotFather on Telegram
+                </p>
+              </div>
+              <Button
+                onClick={handleSaveToken}
+                disabled={saveTokenMutation.isPending}
+                data-testid="button-save-token"
+              >
+                {saveTokenMutation.isPending ? "Saving..." : "Save Token"}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Chat ID Setup Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Chat ID Management
+              </CardTitle>
+              <CardDescription>
+                Manage Telegram chat IDs for sending notifications
+              </CardDescription>
+            </div>
+            <Button
+              onClick={() => setIsAddChatIdOpen(true)}
+              data-testid="button-add-chat-id"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Chat ID
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {chatIds.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No chat IDs configured</p>
+              <p className="text-sm">Add chat IDs to send notifications</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {chatIds.map((chatId) => (
+                <div
+                  key={chatId.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                  data-testid={`chat-id-item-${chatId.id}`}
+                >
+                  <div>
+                    <h4 className="font-medium">{chatId.name}</h4>
+                    <p className="text-sm text-gray-500">ID: {chatId.chatId}</p>
+                    {chatId.description && (
+                      <p className="text-sm text-gray-400 mt-1">{chatId.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditChatId(chatId)}
+                      data-testid={`button-edit-chat-id-${chatId.id}`}
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => deleteChatIdMutation.mutate(chatId.id)}
+                      disabled={deleteChatIdMutation.isPending}
+                      data-testid={`button-delete-chat-id-${chatId.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Test Message Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            Test Message
+          </CardTitle>
+          <CardDescription>
+            Send a test notification to all configured chat IDs
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="test-message">Test Message</Label>
+            <Input
+              id="test-message"
+              placeholder="Enter test message"
+              value={testMessageInput}
+              onChange={(e) => setTestMessageInput(e.target.value)}
+              data-testid="input-test-message"
+            />
+          </div>
+          <Button
+            onClick={handleSendTestMessage}
+            disabled={sendTestMessageMutation.isPending || !telegramConfig?.botToken || chatIds.length === 0}
+            data-testid="button-send-test-message"
+          >
+            {sendTestMessageMutation.isPending ? "Sending..." : "Send Test Message"}
+          </Button>
+          {(!telegramConfig?.botToken || chatIds.length === 0) && (
+            <p className="text-sm text-amber-600">
+              {!telegramConfig?.botToken && "Please configure a bot token first. "}
+              {chatIds.length === 0 && "Please add at least one chat ID first."}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Automation Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Automation Settings
+          </CardTitle>
+          <CardDescription>
+            Configure automatic notifications for work reports
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div>
+              <h4 className="font-medium text-blue-800 dark:text-blue-200">Work Report Notifications</h4>
+              <p className="text-sm text-blue-600 dark:text-blue-400">
+                Automatically send notifications when users submit work reports
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={true}
+                disabled={!telegramConfig?.botToken || chatIds.length === 0}
+                data-testid="switch-work-report-automation"
+              />
+              <span className="text-sm font-medium text-green-600">Active</span>
+            </div>
+          </div>
+          {(!telegramConfig?.botToken || chatIds.length === 0) && (
+            <p className="text-sm text-amber-600 mt-2">
+              Configure bot token and chat IDs to enable automation
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add Chat ID Dialog */}
+      <Dialog open={isAddChatIdOpen} onOpenChange={setIsAddChatIdOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Chat ID</DialogTitle>
+            <DialogDescription>
+              Add a new Telegram chat ID for notifications
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="chat-id">Chat ID</Label>
+              <Input
+                id="chat-id"
+                placeholder="Enter chat ID (e.g., -1001234567890)"
+                value={chatIdInput}
+                onChange={(e) => setChatIdInput(e.target.value)}
+                data-testid="input-add-chat-id"
+              />
+            </div>
+            <div>
+              <Label htmlFor="chat-name">Name</Label>
+              <Input
+                id="chat-name"
+                placeholder="Enter friendly name"
+                value={chatNameInput}
+                onChange={(e) => setChatNameInput(e.target.value)}
+                data-testid="input-add-chat-name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="chat-description">Description (Optional)</Label>
+              <Input
+                id="chat-description"
+                placeholder="Enter description"
+                value={chatDescriptionInput}
+                onChange={(e) => setChatDescriptionInput(e.target.value)}
+                data-testid="input-add-chat-description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsAddChatIdOpen(false);
+              resetChatIdForm();
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddChatId}
+              disabled={addChatIdMutation.isPending}
+              data-testid="button-confirm-add-chat-id"
+            >
+              {addChatIdMutation.isPending ? "Adding..." : "Add Chat ID"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Chat ID Dialog */}
+      <Dialog open={isEditChatIdOpen} onOpenChange={setIsEditChatIdOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Chat ID</DialogTitle>
+            <DialogDescription>
+              Update the chat ID information
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-chat-id">Chat ID</Label>
+              <Input
+                id="edit-chat-id"
+                placeholder="Enter chat ID"
+                value={chatIdInput}
+                onChange={(e) => setChatIdInput(e.target.value)}
+                data-testid="input-edit-chat-id"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-chat-name">Name</Label>
+              <Input
+                id="edit-chat-name"
+                placeholder="Enter friendly name"
+                value={chatNameInput}
+                onChange={(e) => setChatNameInput(e.target.value)}
+                data-testid="input-edit-chat-name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-chat-description">Description (Optional)</Label>
+              <Input
+                id="edit-chat-description"
+                placeholder="Enter description"
+                value={chatDescriptionInput}
+                onChange={(e) => setChatDescriptionInput(e.target.value)}
+                data-testid="input-edit-chat-description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsEditChatIdOpen(false);
+              setEditingChatId(null);
+              resetChatIdForm();
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateChatId}
+              disabled={updateChatIdMutation.isPending}
+              data-testid="button-confirm-edit-chat-id"
+            >
+              {updateChatIdMutation.isPending ? "Updating..." : "Update Chat ID"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   return (
     <Sidebar>
@@ -2516,7 +3143,7 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="users" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2 max-w-2xl">
+            <TabsList className="grid w-full grid-cols-3 max-w-3xl">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 User Management
@@ -2524,6 +3151,12 @@ export default function AdminPage() {
               <TabsTrigger value="data" className="flex items-center gap-2">
                 <Database className="w-4 h-4" />
                 Data Import/Export
+              </TabsTrigger>
+              <TabsTrigger value="telegram" className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                </svg>
+                Telegram Management
               </TabsTrigger>
             </TabsList>
 
@@ -2533,6 +3166,10 @@ export default function AdminPage() {
             
             <TabsContent value="data">
               <DataImportExport />
+            </TabsContent>
+            
+            <TabsContent value="telegram">
+              <TelegramManagement />
             </TabsContent>
           </Tabs>
         </div>
