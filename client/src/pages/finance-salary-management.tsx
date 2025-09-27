@@ -101,6 +101,7 @@ export default function FinanceSalaryManagement() {
     formData.otherBonus,
   ]);
 
+
   // Fetch salary records
   const { data: salaries = [], isLoading: salariesLoading, refetch: refetchSalaries } = useQuery({
     queryKey: ["/api/salaries"],
@@ -118,6 +119,34 @@ export default function FinanceSalaryManagement() {
     queryKey: ["/api/work-reports"],
     select: (data: any) => data || [],
   });
+
+  // Auto-sync work hours when work reports data becomes available or employee changes
+  useEffect(() => {
+    if (formData.employeeId && workReports.length > 0) {
+      // Calculate total work hours for the currently selected user
+      const userWorkReports = workReports.filter((report: any) => report.userId === formData.employeeId);
+      const totalWorkHours = userWorkReports.reduce((sum: number, report: any) => {
+        const hours = parseFloat(report.hoursWorked) || 0;
+        return sum + hours;
+      }, 0);
+
+      // Only update if the calculated hours differ from current value
+      if (totalWorkHours !== formData.actualWorkingHours) {
+        setFormData(prev => ({
+          ...prev,
+          actualWorkingHours: totalWorkHours,
+        }));
+
+        // Show toast notification for user feedback
+        if (totalWorkHours > 0) {
+          toast({
+            title: "Hours Auto-Synced",
+            description: `Updated to ${totalWorkHours.toFixed(2)} hours from ${userWorkReports.length} work reports`,
+          });
+        }
+      }
+    }
+  }, [workReports, formData.employeeId, formData.actualWorkingHours, toast]);
 
   // Fetch salary statistics
   const { data: salaryStats, isLoading: statsLoading } = useQuery({
@@ -287,17 +316,12 @@ export default function FinanceSalaryManagement() {
   const handleUserChange = (userId: string) => {
     const selectedUser = users.find((u: UserType) => u.id === userId);
     if (selectedUser) {
-      // Calculate total work hours for this user
-      const userWorkReports = workReports.filter((report: any) => report.userId === userId);
-      const totalWorkHours = userWorkReports.reduce((sum: number, report: any) => {
-        return sum + (parseFloat(report.hoursWorked) || 0);
-      }, 0);
-
+      // Set basic user info immediately - hours will be auto-synced by useEffect
       setFormData(prev => ({
         ...prev,
         employeeId: userId, // Using userId for employeeId
         employeeName: selectedUser.name || selectedUser.username,
-        actualWorkingHours: totalWorkHours, // Auto-populate actual working hours
+        actualWorkingHours: 0, // Will be updated by useEffect when workReports are available
       }));
     }
   };
