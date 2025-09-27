@@ -18,6 +18,7 @@ import {
   insertFinanceSettingSchema,
   insertTagSchema,
   insertEmployeeSchema,
+  insertUserMenuPermissionSchema,
   type Campaign,
   type Client,
   type User,
@@ -32,6 +33,7 @@ import {
   type FinanceSetting,
   type Tag,
   type Employee,
+  type UserMenuPermission,
   UserRole 
 } from "@shared/schema";
 import { z } from "zod";
@@ -446,6 +448,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "User deleted successfully" });
     } catch (error) {
       console.error("Delete user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // User Menu Permissions Routes
+  // Get all user menu permissions or for a specific user
+  app.get("/api/user-menu-permissions", authenticate, requirePagePermission('admin', 'view', { superAdminBypass: true }), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.query;
+      const permissions = await storage.getUserMenuPermissions(userId as string);
+      res.json(permissions);
+    } catch (error) {
+      console.error("Get user menu permissions error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get user menu permission for a specific user
+  app.get("/api/user-menu-permissions/:userId", authenticate, requirePagePermission('admin', 'view', { superAdminBypass: true }), async (req: Request, res: Response) => {
+    try {
+      const permission = await storage.getUserMenuPermission(req.params.userId);
+      if (!permission) {
+        return res.status(404).json({ message: "User menu permission not found" });
+      }
+      res.json(permission);
+    } catch (error) {
+      console.error("Get user menu permission error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create new user menu permission
+  app.post("/api/user-menu-permissions", authenticate, requirePagePermission('admin', 'edit', { superAdminBypass: true }), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertUserMenuPermissionSchema.parse(req.body);
+      
+      // Validate that user exists
+      const user = await storage.getUser(validatedData.userId);
+      if (!user) {
+        return res.status(400).json({ message: "User not found" });
+      }
+      
+      const permission = await storage.createUserMenuPermission(validatedData);
+      res.status(201).json(permission);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Create user menu permission error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update user menu permission
+  app.put("/api/user-menu-permissions/:userId", authenticate, requirePagePermission('admin', 'edit', { superAdminBypass: true }), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertUserMenuPermissionSchema.partial().parse(req.body);
+      const permission = await storage.updateUserMenuPermission(req.params.userId, validatedData);
+      if (!permission) {
+        return res.status(404).json({ message: "User menu permission not found" });
+      }
+      res.json(permission);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Update user menu permission error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete user menu permission
+  app.delete("/api/user-menu-permissions/:userId", authenticate, requirePagePermission('admin', 'edit', { superAdminBypass: true }), async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteUserMenuPermission(req.params.userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "User menu permission not found" });
+      }
+      res.json({ message: "User menu permission deleted successfully" });
+    } catch (error) {
+      console.error("Delete user menu permission error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
