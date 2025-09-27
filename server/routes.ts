@@ -20,6 +20,8 @@ import {
   insertEmployeeSchema,
   insertUserMenuPermissionSchema,
   insertSalarySchema,
+  insertTelegramConfigSchema,
+  insertTelegramChatIdSchema,
   type Campaign,
   type Client,
   type User,
@@ -36,6 +38,8 @@ import {
   type Employee,
   type UserMenuPermission,
   type Salary,
+  type TelegramConfig,
+  type TelegramChatId,
   UserRole 
 } from "@shared/schema";
 import { z } from "zod";
@@ -2517,6 +2521,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
         importedAt: new Date().toISOString(),
         importedBy: req.user?.username
       });
+    }
+  });
+
+  // Telegram Configuration Routes
+  // Get Telegram configuration
+  app.get("/api/telegram/config", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const config = await storage.getTelegramConfig();
+      res.json(config);
+    } catch (error) {
+      console.error("Get Telegram config error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create or update Telegram configuration
+  app.post("/api/telegram/config", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertTelegramConfigSchema.parse(req.body);
+      const config = await storage.createTelegramConfig(validatedData);
+      res.status(201).json(config);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Create Telegram config error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update Telegram configuration
+  app.put("/api/telegram/config", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertTelegramConfigSchema.parse(req.body);
+      const config = await storage.updateTelegramConfig(validatedData);
+      if (!config) {
+        return res.status(404).json({ message: "Telegram configuration not found" });
+      }
+      res.json(config);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Update Telegram config error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete Telegram configuration
+  app.delete("/api/telegram/config", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      await storage.deleteTelegramConfig();
+      res.json({ message: "Telegram configuration deleted successfully" });
+    } catch (error) {
+      console.error("Delete Telegram config error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Telegram Chat ID Routes
+  // Get all chat IDs
+  app.get("/api/telegram/chat-ids", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const chatIds = await storage.getTelegramChatIds();
+      res.json(chatIds);
+    } catch (error) {
+      console.error("Get Telegram chat IDs error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create chat ID
+  app.post("/api/telegram/chat-ids", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertTelegramChatIdSchema.parse(req.body);
+      const chatId = await storage.createTelegramChatId(validatedData);
+      res.status(201).json(chatId);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Create Telegram chat ID error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update chat ID
+  app.put("/api/telegram/chat-ids/:id", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertTelegramChatIdSchema.parse(req.body);
+      const chatId = await storage.updateTelegramChatId(req.params.id, validatedData);
+      if (!chatId) {
+        return res.status(404).json({ message: "Chat ID not found" });
+      }
+      res.json(chatId);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Update Telegram chat ID error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete chat ID
+  app.delete("/api/telegram/chat-ids/:id", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      await storage.deleteTelegramChatId(req.params.id);
+      res.json({ message: "Chat ID deleted successfully" });
+    } catch (error) {
+      console.error("Delete Telegram chat ID error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Test message endpoint
+  app.post("/api/telegram/test-message", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { message } = req.body;
+      if (!message || typeof message !== 'string' || !message.trim()) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      const config = await storage.getTelegramConfig();
+      if (!config || !config.botToken) {
+        return res.status(400).json({ message: "Telegram bot token not configured" });
+      }
+
+      const chatIds = await storage.getTelegramChatIds();
+      if (chatIds.length === 0) {
+        return res.status(400).json({ message: "No chat IDs configured" });
+      }
+
+      // Send message to all configured chat IDs
+      let sentCount = 0;
+      let errors: string[] = [];
+
+      for (const chatId of chatIds) {
+        if (!chatId.isActive) continue;
+
+        try {
+          const telegramApiUrl = `https://api.telegram.org/bot${config.botToken}/sendMessage`;
+          const telegramResponse = await fetch(telegramApiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              chat_id: chatId.chatId,
+              text: message.trim(),
+              parse_mode: 'HTML'
+            })
+          });
+
+          if (telegramResponse.ok) {
+            sentCount++;
+          } else {
+            const errorData = await telegramResponse.json();
+            errors.push(`${chatId.name}: ${errorData.description || 'Unknown error'}`);
+          }
+        } catch (error: any) {
+          errors.push(`${chatId.name}: ${error.message}`);
+        }
+      }
+
+      if (sentCount === 0) {
+        return res.status(500).json({ 
+          message: "Failed to send test message to any chat", 
+          errors: errors 
+        });
+      }
+
+      res.json({ 
+        message: "Test message sent successfully",
+        sentCount: sentCount,
+        totalChatIds: chatIds.filter(c => c.isActive).length,
+        errors: errors.length > 0 ? errors : undefined
+      });
+
+    } catch (error) {
+      console.error("Send test message error:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
