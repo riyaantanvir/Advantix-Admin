@@ -119,6 +119,13 @@ export default function FinanceSalaryManagement() {
     select: (data: any) => data || [],
   });
 
+  // Fetch salary statistics
+  const { data: salaryStats, isLoading: statsLoading } = useQuery({
+    queryKey: ["/api/salaries/stats"],
+    select: (data: any) => data || {},
+    refetchInterval: 30000, // Auto-refresh every 30 seconds for live sync
+  });
+
   // Create salary mutation
   const createSalaryMutation = useMutation({
     mutationFn: async (data: SalaryFormData & typeof calculations) => {
@@ -133,6 +140,7 @@ export default function FinanceSalaryManagement() {
       setIsCreateDialogOpen(false);
       resetForm();
       queryClient.invalidateQueries({ queryKey: ["/api/salaries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/salaries/stats"] });
     },
     onError: (error: any) => {
       toast({
@@ -157,6 +165,7 @@ export default function FinanceSalaryManagement() {
       setEditingSalary(null);
       resetForm();
       queryClient.invalidateQueries({ queryKey: ["/api/salaries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/salaries/stats"] });
     },
     onError: (error: any) => {
       toast({
@@ -178,6 +187,7 @@ export default function FinanceSalaryManagement() {
         description: "Salary record deleted successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/salaries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/salaries/stats"] });
     },
     onError: (error: any) => {
       toast({
@@ -546,6 +556,74 @@ export default function FinanceSalaryManagement() {
               </DialogContent>
             </Dialog>
           </div>
+        </div>
+
+        {/* Dashboard Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Pending</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {statsLoading ? '...' : formatCurrency(Number(salaryStats?.totalPendingAmount) || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {statsLoading ? '...' : `${Number(salaryStats?.unpaidSalaries) || 0} unpaid records`}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
+              <Receipt className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {statsLoading ? '...' : formatCurrency(Number(salaryStats?.totalPaidAmount) || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {statsLoading ? '...' : `${Number(salaryStats?.paidSalaries) || 0} paid records`}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Work Hours Sync</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {statsLoading ? '...' : (Number(salaryStats?.totalWorkHours) || 0).toFixed(1)}h
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {statsLoading ? '...' : `Salary: ${(Number(salaryStats?.totalSalaryHours) || 0).toFixed(1)}h`}
+              </p>
+              {!statsLoading && salaryStats?.hoursDifference !== undefined && salaryStats?.hoursDifference !== null && Number(salaryStats?.hoursDifference) !== 0 && (
+                <p className={`text-xs ${(Number(salaryStats?.hoursDifference) || 0) > 0 ? 'text-orange-600' : 'text-blue-600'}`}>
+                  {(Number(salaryStats?.hoursDifference) || 0) > 0 ? '+' : ''}{(Number(salaryStats?.hoursDifference) || 0).toFixed(1)}h difference
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Payment Rate</CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {statsLoading ? '...' : `${(Number(salaryStats?.paymentRate) || 0).toFixed(1)}%`}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {statsLoading ? '...' : `Avg: ${formatCurrency(Number(salaryStats?.averageSalary) || 0)}`}
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Filters */}

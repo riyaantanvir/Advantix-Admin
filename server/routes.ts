@@ -1657,6 +1657,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get salary statistics (MUST be before /:id route)
+  app.get("/api/salaries/stats", authenticate, requirePagePermission('salaries', 'view'), async (req: Request, res: Response) => {
+    try {
+      const [salaries, workReports] = await Promise.all([
+        storage.getSalaries(),
+        storage.getWorkReports()
+      ]);
+
+      // Calculate salary statistics
+      const totalSalaries = salaries.length;
+      const paidSalaries = salaries.filter(s => s.paymentStatus === 'paid');
+      const unpaidSalaries = salaries.filter(s => s.paymentStatus === 'unpaid');
+      
+      const totalPaidAmount = paidSalaries.reduce((sum, salary) => sum + parseFloat(salary.finalPayment), 0);
+      const totalPendingAmount = unpaidSalaries.reduce((sum, salary) => sum + parseFloat(salary.finalPayment), 0);
+      const totalSalaryAmount = salaries.reduce((sum, salary) => sum + parseFloat(salary.finalPayment), 0);
+      
+      // Calculate work report statistics
+      const totalWorkHours = workReports.reduce((sum, report) => sum + parseFloat(report.totalHours), 0);
+      const totalSalaryHours = salaries.reduce((sum, salary) => sum + parseFloat(salary.actualWorkingHours), 0);
+      
+      // Group by user for comparison
+      const userWorkHours: Record<string, number> = {};
+      const userSalaryHours: Record<string, number> = {};
+      
+      workReports.forEach(report => {
+        userWorkHours[report.userId] = (userWorkHours[report.userId] || 0) + parseFloat(report.totalHours);
+      });
+      
+      salaries.forEach(salary => {
+        userSalaryHours[salary.employeeId] = (userSalaryHours[salary.employeeId] || 0) + parseFloat(salary.actualWorkingHours);
+      });
+
+      const stats = {
+        totalSalaries,
+        paidSalaries: paidSalaries.length,
+        unpaidSalaries: unpaidSalaries.length,
+        totalPaidAmount,
+        totalPendingAmount,
+        totalSalaryAmount,
+        totalWorkHours,
+        totalSalaryHours,
+        hoursDifference: totalWorkHours - totalSalaryHours,
+        userWorkHours,
+        userSalaryHours,
+        averageSalary: totalSalaries > 0 ? totalSalaryAmount / totalSalaries : 0,
+        paymentRate: totalSalaries > 0 ? (paidSalaries.length / totalSalaries) * 100 : 0
+      };
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Get salary stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Get single salary
   app.get("/api/salaries/:id", authenticate, requirePagePermission('salaries', 'view'), async (req: Request, res: Response) => {
     try {
@@ -1718,6 +1774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Internal server error" });
     }
   });
+
 
   // Data Backup and Export Endpoints - Super Admin Only
   
