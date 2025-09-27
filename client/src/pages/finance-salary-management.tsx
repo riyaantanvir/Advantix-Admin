@@ -11,11 +11,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, DollarSign, Calendar, User, Clock, RefreshCw, Filter, Calculator, Receipt, CreditCard } from "lucide-react";
-import { type Employee } from "@shared/schema";
+import { type User as UserType } from "@shared/schema";
 import Sidebar from "@/components/layout/Sidebar";
 
 interface SalaryFormData {
-  employeeId: string;
+  employeeId: string; // Actually userId, keeping name for backend compatibility
   employeeName: string;
   basicSalary: number;
   contractualHours: number;
@@ -61,7 +61,7 @@ export default function FinanceSalaryManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingSalary, setEditingSalary] = useState<SalaryRecord | null>(null);
   const [filterMonth, setFilterMonth] = useState("");
-  const [filterEmployee, setFilterEmployee] = useState("all");
+  const [filterUserType, setFilterUserType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -143,9 +143,15 @@ export default function FinanceSalaryManagement() {
     select: (data: any) => data || [],
   });
 
-  // Fetch employees for the dropdown
-  const { data: employees = [] } = useQuery({
-    queryKey: ["/api/employees"],
+  // Fetch users for the dropdown
+  const { data: users = [] } = useQuery({
+    queryKey: ["/api/users"],
+    select: (data: any) => data || [],
+  });
+
+  // Fetch user work reports to calculate total hours
+  const { data: workReports = [] } = useQuery({
+    queryKey: ["/api/work-reports"],
     select: (data: any) => data || [],
   });
 
@@ -320,13 +326,20 @@ export default function FinanceSalaryManagement() {
     });
   };
 
-  const handleEmployeeChange = (employeeId: string) => {
-    const selectedEmployee = employees.find((e: Employee) => e.id === employeeId);
-    if (selectedEmployee) {
+  const handleUserChange = (userId: string) => {
+    const selectedUser = users.find((u: UserType) => u.id === userId);
+    if (selectedUser) {
+      // Calculate total work hours for this user
+      const userWorkReports = workReports.filter((report: any) => report.userId === userId);
+      const totalWorkHours = userWorkReports.reduce((sum: number, report: any) => {
+        return sum + (parseFloat(report.hoursWorked) || 0);
+      }, 0);
+
       setFormData(prev => ({
         ...prev,
-        employeeId,
-        employeeName: selectedEmployee.name,
+        employeeId: userId, // Using userId for employeeId
+        employeeName: selectedUser.name || selectedUser.username,
+        actualWorkingHours: totalWorkHours, // Auto-populate actual working hours
       }));
     }
   };
@@ -343,7 +356,7 @@ export default function FinanceSalaryManagement() {
   // Filter salaries based on selected filters
   const filteredSalaries = salaries.filter((salary: SalaryRecord) => {
     if (filterMonth && salary.month !== filterMonth) return false;
-    if (filterEmployee && filterEmployee !== 'all' && salary.employeeId !== filterEmployee) return false;
+    if (filterUserType && filterUserType !== 'all' && salary.employeeId !== filterUserType) return false;
     if (filterStatus && filterStatus !== 'all' && salary.paymentStatus !== filterStatus) return false;
     return true;
   });
@@ -384,16 +397,16 @@ export default function FinanceSalaryManagement() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-6">
-                  {/* Employee and Basic Info */}
+                  {/* UserType and Basic Info */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="employee">Employee Name *</Label>
-                      <Select onValueChange={handleEmployeeChange} data-testid="select-employee">
+                      <Label htmlFor="employee">UserType Name *</Label>
+                      <Select onValueChange={handleUserChange} data-testid="select-employee">
                         <SelectTrigger>
                           <SelectValue placeholder="Select employee" />
                         </SelectTrigger>
                         <SelectContent>
-                          {employees.map((employee: Employee) => (
+                          {users.map((employee: UserType) => (
                             <SelectItem key={employee.id} value={employee.id}>
                               {employee.name}
                             </SelectItem>
@@ -754,14 +767,14 @@ export default function FinanceSalaryManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Filter by Employee</Label>
-                <Select value={filterEmployee} onValueChange={setFilterEmployee} data-testid="filter-employee">
+                <Label>Filter by UserType</Label>
+                <Select value={filterUserType} onValueChange={setFilterUserType} data-testid="filter-employee">
                   <SelectTrigger>
-                    <SelectValue placeholder="All employees" />
+                    <SelectValue placeholder="All users" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All employees</SelectItem>
-                    {employees.map((employee: Employee) => (
+                    <SelectItem value="all">All users</SelectItem>
+                    {users.map((employee: UserType) => (
                       <SelectItem key={employee.id} value={employee.id}>
                         {employee.name}
                       </SelectItem>
@@ -788,7 +801,7 @@ export default function FinanceSalaryManagement() {
                   variant="outline" 
                   onClick={() => {
                     setFilterMonth("");
-                    setFilterEmployee("all");
+                    setFilterUserType("all");
                     setFilterStatus("all");
                   }}
                   data-testid="button-clear-filters"
@@ -822,7 +835,7 @@ export default function FinanceSalaryManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Employee</TableHead>
+                      <TableHead>UserType</TableHead>
                       <TableHead>Month</TableHead>
                       <TableHead>Basic Salary</TableHead>
                       <TableHead>Contract Hrs</TableHead>
@@ -929,16 +942,16 @@ export default function FinanceSalaryManagement() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6">
-              {/* Employee and Basic Info */}
+              {/* UserType and Basic Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="employee">Employee Name *</Label>
-                  <Select value={formData.employeeId} onValueChange={handleEmployeeChange} data-testid="select-edit-employee">
+                  <Label htmlFor="employee">UserType Name *</Label>
+                  <Select value={formData.employeeId} onValueChange={handleUserChange} data-testid="select-edit-employee">
                     <SelectTrigger>
                       <SelectValue placeholder="Select employee" />
                     </SelectTrigger>
                     <SelectContent>
-                      {employees.map((employee: Employee) => (
+                      {users.map((employee: UserType) => (
                         <SelectItem key={employee.id} value={employee.id}>
                           {employee.name}
                         </SelectItem>
