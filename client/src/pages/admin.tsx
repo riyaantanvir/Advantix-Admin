@@ -87,6 +87,20 @@ function UserManagement() {
     }
   });
 
+  // User editing state
+  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUserFormData, setEditUserFormData] = useState({
+    name: "",
+    username: "",
+    password: "",
+    role: "user",
+  });
+
+  // User deletion state
+  const [isDeleteUserOpen, setIsDeleteUserOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+
   // Get current user to check permissions
   const { data: currentUser } = useQuery<{ id: string; username: string; role: string }>({
     queryKey: ["/api/auth/user"],
@@ -218,6 +232,56 @@ function UserManagement() {
     },
   });
 
+  // Edit user mutation
+  const editUserMutation = useMutation({
+    mutationFn: async (userData: { id: string; name: string; username: string; password?: string; role: string }) => {
+      const response = await apiRequest("PUT", `/api/users/${userData.id}`, userData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "User updated successfully",
+        description: "User information has been updated.",
+      });
+      setIsEditUserOpen(false);
+      setEditingUser(null);
+      resetEditUserForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error updating user",
+        description: error.message || "Failed to update user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await apiRequest("DELETE", `/api/users/${userId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user-menu-permissions"] });
+      toast({
+        title: "User deleted successfully",
+        description: "User has been removed from the system.",
+      });
+      setIsDeleteUserOpen(false);
+      setUserToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error deleting user",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetCreateUserForm = () => {
     setCreateUserFormData({
       name: "",
@@ -238,6 +302,63 @@ function UserManagement() {
         adminPanel: false,
       }
     });
+  };
+
+  const resetEditUserForm = () => {
+    setEditUserFormData({
+      name: "",
+      username: "",
+      password: "",
+      role: "user",
+    });
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setEditUserFormData({
+      name: user.name || "",
+      username: user.username,
+      password: "",
+      role: user.role,
+    });
+    setIsEditUserOpen(true);
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setUserToDelete(user);
+    setIsDeleteUserOpen(true);
+  };
+
+  const handleEditUserSubmit = () => {
+    if (!editUserFormData.username.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Username is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!editingUser) return;
+
+    const updateData: any = {
+      id: editingUser.id,
+      name: editUserFormData.name,
+      username: editUserFormData.username,
+      role: editUserFormData.role
+    };
+
+    // Only include password if it's provided
+    if (editUserFormData.password.trim()) {
+      updateData.password = editUserFormData.password;
+    }
+
+    editUserMutation.mutate(updateData);
+  };
+
+  const handleDeleteUserConfirm = () => {
+    if (!userToDelete) return;
+    deleteUserMutation.mutate(userToDelete.id);
   };
 
   const handleCreateUser = () => {
@@ -519,6 +640,7 @@ function UserManagement() {
                             <Button
                               variant="outline"
                               size="sm"
+                              onClick={() => handleEditUser(user)}
                               data-testid={`button-edit-permissions-${user.id}`}
                             >
                               <Edit3 className="h-4 w-4" />
@@ -527,6 +649,7 @@ function UserManagement() {
                               variant="outline"
                               size="sm"
                               className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDeleteUser(user)}
                               data-testid={`button-delete-permissions-${user.id}`}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -674,6 +797,106 @@ function UserManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user information and password
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Full Name</Label>
+              <Input
+                id="edit-name"
+                value={editUserFormData.name}
+                onChange={(e) => setEditUserFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter full name"
+                data-testid="input-edit-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-username">Username *</Label>
+              <Input
+                id="edit-username"
+                value={editUserFormData.username}
+                onChange={(e) => setEditUserFormData(prev => ({ ...prev, username: e.target.value }))}
+                placeholder="Enter username"
+                data-testid="input-edit-username"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-password">New Password</Label>
+              <Input
+                id="edit-password"
+                type="password"
+                value={editUserFormData.password}
+                onChange={(e) => setEditUserFormData(prev => ({ ...prev, password: e.target.value }))}
+                placeholder="Leave empty to keep current password"
+                data-testid="input-edit-password"
+              />
+              <p className="text-xs text-gray-500">Leave empty to keep current password</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-role">Role</Label>
+              <Select value={editUserFormData.role} onValueChange={(value) => setEditUserFormData(prev => ({ ...prev, role: value }))}>
+                <SelectTrigger data-testid="select-edit-role">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsEditUserOpen(false)}
+              data-testid="button-cancel-edit-user"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleEditUserSubmit}
+              disabled={editUserMutation.isPending}
+              data-testid="button-confirm-edit-user"
+            >
+              {editUserMutation.isPending ? "Updating..." : "Update User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <AlertDialog open={isDeleteUserOpen} onOpenChange={setIsDeleteUserOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete user "{userToDelete?.username}"? This action cannot be undone and will remove all associated permissions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-user">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteUserConfirm}
+              disabled={deleteUserMutation.isPending}
+              data-testid="button-confirm-delete-user"
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteUserMutation.isPending ? "Deleting..." : "Delete User"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
