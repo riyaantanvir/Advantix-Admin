@@ -60,7 +60,9 @@ import {
   Trash2,
   Calendar,
   Clock,
-  FileText
+  FileText,
+  Download,
+  Upload
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -271,6 +273,216 @@ export default function WorkReportsPage() {
   // Handle delete
   const handleDelete = (id: string) => {
     deleteMutation.mutate(id);
+  };
+
+  // CSV Export function
+  const handleExportCSV = () => {
+    if (filteredWorkReports.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "There are no work reports to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prepare CSV data
+    const csvHeaders = [
+      "Date",
+      "Title", 
+      "Description",
+      "Hours Worked",
+      "Status",
+      "User",
+      "User ID"
+    ];
+
+    const csvData = filteredWorkReports.map(report => {
+      const user = users.find(u => u.id === report.userId);
+      return [
+        format(new Date(report.date), "yyyy-MM-dd"),
+        `"${report.title.replace(/"/g, '""')}"`, // Escape quotes in title
+        `"${(report.description || '').replace(/"/g, '""')}"`, // Escape quotes in description
+        report.hoursWorked.toString(),
+        report.status,
+        `"${(user?.name || user?.username || 'Unknown').replace(/"/g, '""')}"`, // Escape quotes in user name
+        report.userId
+      ];
+    });
+
+    // Create CSV content
+    const csvContent = [csvHeaders.join(","), ...csvData.map(row => row.join(","))].join("\n");
+    
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `work-reports-${format(new Date(), "yyyy-MM-dd")}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Export successful",
+      description: `Exported ${filteredWorkReports.length} work reports to CSV.`,
+    });
+  };
+
+  // CSV Import function
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== "text/csv" && !file.name.endsWith(".csv")) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select a CSV file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // For multi-user import, ensure admin privileges and users data is loaded
+    if (isAdmin && (!users || users.length === 0)) {
+      toast({
+        title: "User data not loaded",
+        description: "Please wait for user data to load before importing CSV files.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const csvContent = e.target?.result as string;
+        const lines = csvContent.split("\n").filter(line => line.trim());
+        
+        if (lines.length < 2) {
+          toast({
+            title: "Empty file",
+            description: "The CSV file appears to be empty or has no data rows.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Parse CSV (simple parsing - assumes proper formatting)
+        const headers = lines[0].split(",").map(h => h.trim());
+        const expectedHeaders = ["Date", "Title", "Description", "Hours Worked", "Status", "User", "User ID"];
+        
+        // Validate headers
+        const hasRequiredHeaders = ["Date", "Title", "Hours Worked"].every(required => 
+          headers.some(h => h.toLowerCase().includes(required.toLowerCase()))
+        );
+
+        if (!hasRequiredHeaders) {
+          toast({
+            title: "Invalid CSV format",
+            description: "CSV must contain at least: Date, Title, Hours Worked columns.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const dataRows = lines.slice(1);
+        let importedCount = 0;
+        let skippedCount = 0;
+
+        // Process each row
+        dataRows.forEach((line, index) => {
+          try {
+            // Simple CSV parsing - split by comma and handle quoted values
+            const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+            const cleanValues = values.map(v => v.replace(/^"/, '').replace(/"$/, '').trim());
+
+            if (cleanValues.length < 4) {
+              skippedCount++;
+              return;
+            }
+
+            const [dateStr, title, description, hoursStr, status = "submitted", userName, userIdFromCsv] = cleanValues;
+            
+            // Validate required fields
+            if (!dateStr || !title || !hoursStr) {
+              skippedCount++;
+              return;
+            }
+
+            // Parse date
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) {
+              skippedCount++;
+              return;
+            }
+
+            // Parse hours
+            const hoursWorked = parseFloat(hoursStr);
+            if (isNaN(hoursWorked) || hoursWorked <= 0) {
+              skippedCount++;
+              return;
+            }
+
+            // Determine the user ID to use
+            let finalUserId = currentUser?.id || "";
+            
+            // If User ID is provided in CSV, validate it (only for admins with loaded user data)
+            if (userIdFromCsv && userIdFromCsv.trim() && isAdmin && users.length > 0) {
+              const userExists = users.find(u => u.id === userIdFromCsv.trim());
+              if (userExists) {
+                finalUserId = userIdFromCsv.trim();
+              }
+              // If User ID doesn't exist, fall back to current user but don't skip the row
+            }
+
+            // Create work report data
+            const workReportData = {
+              title: title.trim(),
+              description: description?.trim() || "",
+              date,
+              hoursWorked,
+              status: (status.trim() || "submitted") as "submitted" | "approved" | "rejected",
+              userId: finalUserId,
+            };
+
+            // Submit via mutation
+            createMutation.mutate({
+              title: workReportData.title,
+              description: workReportData.description,
+              hoursWorked: workReportData.hoursWorked.toString(),
+              hours: Math.floor(workReportData.hoursWorked).toString(),
+              minutes: Math.round((workReportData.hoursWorked % 1) * 60).toString(),
+              date: workReportData.date,
+              status: workReportData.status,
+              userId: workReportData.userId,
+            });
+
+            importedCount++;
+          } catch (error) {
+            skippedCount++;
+          }
+        });
+
+        toast({
+          title: "Import completed",
+          description: `Imported ${importedCount} work reports. ${skippedCount > 0 ? `Skipped ${skippedCount} invalid rows.` : ''}`,
+        });
+
+      } catch (error) {
+        toast({
+          title: "Import failed",
+          description: "Failed to parse CSV file. Please check the format.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    reader.readAsText(file);
+    
+    // Reset the input
+    event.target.value = "";
   };
 
   // Get date range based on time period filter
@@ -506,6 +718,37 @@ export default function WorkReportsPage() {
             </div>
             
             <div className="flex gap-2">
+              {/* CSV Export Button */}
+              <Button 
+                variant="outline" 
+                onClick={handleExportCSV}
+                disabled={isLoading || filteredWorkReports.length === 0}
+                data-testid="button-export-csv"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
+
+              {/* CSV Import Button */}
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImportCSV}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  data-testid="input-import-csv"
+                />
+                <Button 
+                  variant="outline"
+                  disabled={isLoading || (isAdmin && (!users || users.length === 0))}
+                  data-testid="button-import-csv"
+                  title={isAdmin && (!users || users.length === 0) ? "Waiting for user data to load..." : "Import CSV file"}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import CSV
+                </Button>
+              </div>
+
               <Button 
                 variant="outline" 
                 onClick={() => refetch()}
