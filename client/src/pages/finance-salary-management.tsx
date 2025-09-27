@@ -61,8 +61,8 @@ export default function FinanceSalaryManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingSalary, setEditingSalary] = useState<SalaryRecord | null>(null);
   const [filterMonth, setFilterMonth] = useState("");
-  const [filterEmployee, setFilterEmployee] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterEmployee, setFilterEmployee] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -253,6 +253,16 @@ export default function FinanceSalaryManagement() {
       return;
     }
 
+    // Validate calculations are not NaN
+    if (isNaN(calculations.finalPayment) || isNaN(calculations.grossPayment) || isNaN(calculations.hourlyRate)) {
+      toast({
+        title: "Calculation Error",
+        description: "Invalid calculation values detected. Please check your input.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const salaryData = { ...formData, ...calculations };
     createSalaryMutation.mutate(salaryData);
   };
@@ -260,29 +270,49 @@ export default function FinanceSalaryManagement() {
   const handleUpdateSalary = () => {
     if (!editingSalary) return;
     
+    if (!formData.employeeId || !formData.basicSalary || !formData.contractualHours) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate calculations are not NaN
+    if (isNaN(calculations.finalPayment) || isNaN(calculations.grossPayment) || isNaN(calculations.hourlyRate)) {
+      toast({
+        title: "Calculation Error",
+        description: "Invalid calculation values detected. Please check your input.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const salaryData = { ...formData, ...calculations };
     updateSalaryMutation.mutate({ id: editingSalary.id, data: salaryData });
   };
 
   const handleEditSalary = (salary: SalaryRecord) => {
     setEditingSalary(salary);
+    // Convert all string numbers to actual numbers to fix calculation issues
     setFormData({
       employeeId: salary.employeeId,
       employeeName: salary.employeeName,
-      basicSalary: salary.basicSalary,
-      contractualHours: salary.contractualHours,
-      actualWorkingHours: salary.actualWorkingHours,
-      transportAllowance: salary.transportAllowance,
-      foodAllowance: salary.foodAllowance,
-      internetAllowance: salary.internetAllowance,
-      otherAllowances: salary.otherAllowances,
-      festivalBonus: salary.festivalBonus,
-      performanceBonus: salary.performanceBonus,
-      otherBonus: salary.otherBonus,
-      leaveDeduction: salary.leaveDeduction,
-      loanDeduction: salary.loanDeduction,
-      penaltyDeduction: salary.penaltyDeduction,
-      taxDeduction: salary.taxDeduction,
+      basicSalary: typeof salary.basicSalary === 'string' ? parseFloat(salary.basicSalary) : salary.basicSalary,
+      contractualHours: typeof salary.contractualHours === 'string' ? parseInt(salary.contractualHours) : salary.contractualHours,
+      actualWorkingHours: typeof salary.actualWorkingHours === 'string' ? parseFloat(salary.actualWorkingHours) : salary.actualWorkingHours,
+      transportAllowance: typeof salary.transportAllowance === 'string' ? parseFloat(salary.transportAllowance) : salary.transportAllowance,
+      foodAllowance: typeof salary.foodAllowance === 'string' ? parseFloat(salary.foodAllowance) : salary.foodAllowance,
+      internetAllowance: typeof salary.internetAllowance === 'string' ? parseFloat(salary.internetAllowance) : salary.internetAllowance,
+      otherAllowances: typeof salary.otherAllowances === 'string' ? parseFloat(salary.otherAllowances) : salary.otherAllowances,
+      festivalBonus: typeof salary.festivalBonus === 'string' ? parseFloat(salary.festivalBonus) : salary.festivalBonus,
+      performanceBonus: typeof salary.performanceBonus === 'string' ? parseFloat(salary.performanceBonus) : salary.performanceBonus,
+      otherBonus: typeof salary.otherBonus === 'string' ? parseFloat(salary.otherBonus) : salary.otherBonus,
+      leaveDeduction: typeof salary.leaveDeduction === 'string' ? parseFloat(salary.leaveDeduction) : salary.leaveDeduction,
+      loanDeduction: typeof salary.loanDeduction === 'string' ? parseFloat(salary.loanDeduction) : salary.loanDeduction,
+      penaltyDeduction: typeof salary.penaltyDeduction === 'string' ? parseFloat(salary.penaltyDeduction) : salary.penaltyDeduction,
+      taxDeduction: typeof salary.taxDeduction === 'string' ? parseFloat(salary.taxDeduction) : salary.taxDeduction,
       paymentMethod: salary.paymentMethod,
       paymentStatus: salary.paymentStatus,
       remarks: salary.remarks || '',
@@ -899,7 +929,333 @@ export default function FinanceSalaryManagement() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6">
-              {/* Same form structure as create dialog but with update handler */}
+              {/* Employee and Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="employee">Employee Name *</Label>
+                  <Select value={formData.employeeId} onValueChange={handleEmployeeChange} data-testid="select-edit-employee">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select employee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((employee: Employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="month">Month *</Label>
+                  <Input
+                    type="month"
+                    value={formData.month}
+                    onChange={(e) => setFormData(prev => ({ ...prev, month: e.target.value }))}
+                    data-testid="input-edit-month"
+                  />
+                </div>
+              </div>
+
+              {/* Basic Salary Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Basic Salary Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="basicSalary">Basic Salary (BDT) *</Label>
+                      <Input
+                        type="number"
+                        value={formData.basicSalary > 0 ? formData.basicSalary : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, basicSalary: parseFloat(e.target.value) || 0 }))}
+                        placeholder="50000"
+                        data-testid="input-edit-basic-salary"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contractualHours">Contractual Hours (Per Month) *</Label>
+                      <Input
+                        type="number"
+                        value={formData.contractualHours > 0 ? formData.contractualHours : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, contractualHours: parseInt(e.target.value) || 0 }))}
+                        placeholder="160"
+                        data-testid="input-edit-contractual-hours"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="actualWorkingHours">Actual Working Hours (Billing Hours) *</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={formData.actualWorkingHours > 0 ? formData.actualWorkingHours : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, actualWorkingHours: parseFloat(e.target.value) || 0 }))}
+                        placeholder="150"
+                        data-testid="input-edit-actual-hours"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Calculator className="h-4 w-4" />
+                      <span className="font-medium">Auto-Calculated Values</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>Per Hour Rate: <span className="font-medium">{formatCurrency(calculations.hourlyRate)}</span></div>
+                      <div>Base Payment: <span className="font-medium">{formatCurrency(calculations.basePayment)}</span></div>
+                      <div>Final Payment: <span className="font-bold text-green-600">{formatCurrency(calculations.finalPayment)}</span></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Allowances */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Allowances</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="transportAllowance">Transport (BDT)</Label>
+                      <Input
+                        type="number"
+                        value={formData.transportAllowance > 0 ? formData.transportAllowance : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, transportAllowance: parseFloat(e.target.value) || 0 }))}
+                        placeholder="5000"
+                        data-testid="input-edit-transport"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="foodAllowance">Food (BDT)</Label>
+                      <Input
+                        type="number"
+                        value={formData.foodAllowance > 0 ? formData.foodAllowance : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, foodAllowance: parseFloat(e.target.value) || 0 }))}
+                        placeholder="3000"
+                        data-testid="input-edit-food"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="internetAllowance">Internet (BDT)</Label>
+                      <Input
+                        type="number"
+                        value={formData.internetAllowance > 0 ? formData.internetAllowance : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, internetAllowance: parseFloat(e.target.value) || 0 }))}
+                        placeholder="1500"
+                        data-testid="input-edit-internet"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="otherAllowances">Other (BDT)</Label>
+                      <Input
+                        type="number"
+                        value={formData.otherAllowances > 0 ? formData.otherAllowances : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, otherAllowances: parseFloat(e.target.value) || 0 }))}
+                        placeholder="2000"
+                        data-testid="input-edit-other-allowances"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    Total Allowances: <span className="font-medium">{formatCurrency(calculations.totalAllowances)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Bonus */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Bonus</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="festivalBonus">Festival (BDT)</Label>
+                      <Input
+                        type="number"
+                        value={formData.festivalBonus > 0 ? formData.festivalBonus : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, festivalBonus: parseFloat(e.target.value) || 0 }))}
+                        placeholder="10000"
+                        data-testid="input-edit-festival-bonus"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="performanceBonus">Performance (BDT)</Label>
+                      <Input
+                        type="number"
+                        value={formData.performanceBonus > 0 ? formData.performanceBonus : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, performanceBonus: parseFloat(e.target.value) || 0 }))}
+                        placeholder="5000"
+                        data-testid="input-edit-performance-bonus"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="otherBonus">Other (BDT)</Label>
+                      <Input
+                        type="number"
+                        value={formData.otherBonus > 0 ? formData.otherBonus : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, otherBonus: parseFloat(e.target.value) || 0 }))}
+                        placeholder="3000"
+                        data-testid="input-edit-other-bonus"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    Total Bonus: <span className="font-medium">{formatCurrency(calculations.totalBonus)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Deductions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Deductions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="leaveDeduction">Leave (BDT)</Label>
+                      <Input
+                        type="number"
+                        value={formData.leaveDeduction > 0 ? formData.leaveDeduction : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, leaveDeduction: parseFloat(e.target.value) || 0 }))}
+                        placeholder="2000"
+                        data-testid="input-edit-leave-deduction"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="loanDeduction">Loan (BDT)</Label>
+                      <Input
+                        type="number"
+                        value={formData.loanDeduction > 0 ? formData.loanDeduction : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, loanDeduction: parseFloat(e.target.value) || 0 }))}
+                        placeholder="5000"
+                        data-testid="input-edit-loan-deduction"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="penaltyDeduction">Penalty (BDT)</Label>
+                      <Input
+                        type="number"
+                        value={formData.penaltyDeduction > 0 ? formData.penaltyDeduction : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, penaltyDeduction: parseFloat(e.target.value) || 0 }))}
+                        placeholder="1000"
+                        data-testid="input-edit-penalty-deduction"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="taxDeduction">Tax (BDT)</Label>
+                      <Input
+                        type="number"
+                        value={formData.taxDeduction > 0 ? formData.taxDeduction : ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, taxDeduction: parseFloat(e.target.value) || 0 }))}
+                        placeholder="3000"
+                        data-testid="input-edit-tax-deduction"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    Total Deductions: <span className="font-medium text-red-600">{formatCurrency(calculations.totalDeductions)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Payment Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Payment Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="paymentMethod">Payment Method</Label>
+                      <Select 
+                        value={formData.paymentMethod} 
+                        onValueChange={(value: 'cash' | 'bank_transfer' | 'mobile_banking') => 
+                          setFormData(prev => ({ ...prev, paymentMethod: value }))} 
+                        data-testid="select-edit-payment-method"
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cash">Cash</SelectItem>
+                          <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="mobile_banking">Mobile Banking</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="paymentStatus">Payment Status</Label>
+                      <Select 
+                        value={formData.paymentStatus} 
+                        onValueChange={(value: 'paid' | 'unpaid') => 
+                          setFormData(prev => ({ ...prev, paymentStatus: value }))} 
+                        data-testid="select-edit-payment-status"
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unpaid">Unpaid</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2 mt-4">
+                    <Label htmlFor="remarks">Remarks</Label>
+                    <Input
+                      value={formData.remarks}
+                      onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                      placeholder="Additional notes or comments"
+                      data-testid="input-edit-remarks"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Final Calculation Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Payment Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Base Payment:</span>
+                        <span>{formatCurrency(calculations.basePayment)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Allowances:</span>
+                        <span className="text-green-600">+{formatCurrency(calculations.totalAllowances)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Bonus:</span>
+                        <span className="text-green-600">+{formatCurrency(calculations.totalBonus)}</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>Gross Payment:</span>
+                        <span>{formatCurrency(calculations.grossPayment)}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Total Deductions:</span>
+                        <span className="text-red-600">-{formatCurrency(calculations.totalDeductions)}</span>
+                      </div>
+                      <div className="flex justify-between text-xl font-bold">
+                        <span>Final Payment:</span>
+                        <span className="text-blue-600">{formatCurrency(calculations.finalPayment)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="flex justify-end gap-2 pt-4">
                 <Button 
                   type="button" 
