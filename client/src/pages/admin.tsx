@@ -63,6 +63,28 @@ interface UserFormData {
 
 function UserManagement() {
   const { toast } = useToast();
+  
+  // User creation state
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
+  const [createUserFormData, setCreateUserFormData] = useState({
+    name: "",
+    username: "",
+    password: "",
+    role: "user",
+    menuPermissions: {
+      dashboard: false,
+      campaignManagement: false,
+      clientManagement: false,
+      adAccounts: false,
+      workReports: false,
+      advantixDashboard: false,
+      projects: false,
+      payments: false,
+      expensesSalaries: false,
+      reports: false,
+      adminPanel: false,
+    }
+  });
 
   // Get current user to check permissions
   const { data: currentUser } = useQuery<{ id: string; username: string; role: string }>({
@@ -158,6 +180,91 @@ function UserManagement() {
     updatePermissionMutation.mutate({ userId, permission, value });
   };
 
+  // Create user mutation
+  const createUserMutation = useMutation({
+    mutationFn: async (userData: { name: string; username: string; password: string; role: string }) => {
+      const response = await apiRequest("POST", "/api/users", userData);
+      return response.json();
+    },
+    onSuccess: async (newUser) => {
+      // Create menu permissions for the new user
+      const menuPermissionsData = {
+        userId: newUser.id,
+        ...createUserFormData.menuPermissions
+      };
+      
+      const permissionsResponse = await apiRequest("POST", "/api/user-menu-permissions", menuPermissionsData);
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user-menu-permissions"] });
+      
+      toast({
+        title: "User created successfully",
+        description: `User ${newUser.username} has been created with the selected permissions.`,
+      });
+      
+      setIsCreateUserOpen(false);
+      resetCreateUserForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error creating user",
+        description: error.message || "Failed to create user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetCreateUserForm = () => {
+    setCreateUserFormData({
+      name: "",
+      username: "",
+      password: "",
+      role: "user",
+      menuPermissions: {
+        dashboard: false,
+        campaignManagement: false,
+        clientManagement: false,
+        adAccounts: false,
+        workReports: false,
+        advantixDashboard: false,
+        projects: false,
+        payments: false,
+        expensesSalaries: false,
+        reports: false,
+        adminPanel: false,
+      }
+    });
+  };
+
+  const handleCreateUser = () => {
+    if (!createUserFormData.username.trim() || !createUserFormData.password.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Username and password are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createUserMutation.mutate({
+      name: createUserFormData.name,
+      username: createUserFormData.username,
+      password: createUserFormData.password,
+      role: createUserFormData.role
+    });
+  };
+
+  const handleMenuPermissionChange = (permission: string, value: boolean) => {
+    setCreateUserFormData(prev => ({
+      ...prev,
+      menuPermissions: {
+        ...prev.menuPermissions,
+        [permission]: value
+      }
+    }));
+  };
+
   // Check if current user is Super Admin
   const isSupeAdmin = currentUser?.role === 'super_admin';
 
@@ -187,227 +294,371 @@ function UserManagement() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              User Management
-            </CardTitle>
-            <CardDescription>
-              Manage user access to different menu options
-            </CardDescription>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                User Management
+              </CardTitle>
+              <CardDescription>
+                Manage user access to different menu options
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setIsCreateUserOpen(true)}
+                className="flex items-center gap-2"
+                data-testid="button-create-user"
+              >
+                <UserPlus className="h-4 w-4" />
+                Create New User
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  refetchUsers();
+                  refetchPermissions();
+                }}
+                disabled={usersLoading || permissionsLoading}
+                data-testid="button-refresh-permissions"
+              >
+                <RefreshCw className={`h-4 w-4 ${usersLoading || permissionsLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              refetchUsers();
-              refetchPermissions();
-            }}
-            disabled={usersLoading || permissionsLoading}
-            data-testid="button-refresh-permissions"
-          >
-            <RefreshCw className={`h-4 w-4 ${usersLoading || permissionsLoading ? 'animate-spin' : ''}`} />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="font-semibold">Username</TableHead>
-                <TableHead className="text-center font-semibold">Dashboard</TableHead>
-                <TableHead className="text-center font-semibold">Campaign Mgmt</TableHead>
-                <TableHead className="text-center font-semibold">Client Mgmt</TableHead>
-                <TableHead className="text-center font-semibold">Ad Accounts</TableHead>
-                <TableHead className="text-center font-semibold">Work Reports</TableHead>
-                <TableHead className="text-center font-semibold">Advantix Dashboard</TableHead>
-                <TableHead className="text-center font-semibold">Projects</TableHead>
-                <TableHead className="text-center font-semibold">Payments</TableHead>
-                <TableHead className="text-center font-semibold">Expenses & Salaries</TableHead>
-                <TableHead className="text-center font-semibold">Reports</TableHead>
-                <TableHead className="text-center font-semibold">Admin Panel</TableHead>
-                <TableHead className="text-center font-semibold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.length === 0 ? (
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={13} className="text-center py-8 text-gray-500">
-                    No users found
-                  </TableCell>
+                  <TableHead className="font-semibold">Username</TableHead>
+                  <TableHead className="text-center font-semibold">Dashboard</TableHead>
+                  <TableHead className="text-center font-semibold">Campaign Mgmt</TableHead>
+                  <TableHead className="text-center font-semibold">Client Mgmt</TableHead>
+                  <TableHead className="text-center font-semibold">Ad Accounts</TableHead>
+                  <TableHead className="text-center font-semibold">Work Reports</TableHead>
+                  <TableHead className="text-center font-semibold">Advantix Dashboard</TableHead>
+                  <TableHead className="text-center font-semibold">Projects</TableHead>
+                  <TableHead className="text-center font-semibold">Payments</TableHead>
+                  <TableHead className="text-center font-semibold">Expenses & Salaries</TableHead>
+                  <TableHead className="text-center font-semibold">Reports</TableHead>
+                  <TableHead className="text-center font-semibold">Admin Panel</TableHead>
+                  <TableHead className="text-center font-semibold">Actions</TableHead>
                 </TableRow>
-              ) : (
-                users.map((user) => {
-                  const permissions = getUserPermissions(user.id);
-                  return (
-                    <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                      <TableCell className="font-medium" data-testid={`text-username-${user.id}`}>
-                        {user.username}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={permissions.dashboard || false}
-                            onCheckedChange={(checked) => handlePermissionToggle(user.id, 'dashboard', checked)}
-                            data-testid={`switch-dashboard-${user.id}`}
-                          />
-                        </div>
-                        <span className={`text-sm font-medium ${permissions.dashboard ? 'text-green-600' : 'text-red-600'}`}>
-                          {permissions.dashboard ? 'Yes' : 'No'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={permissions.campaignManagement || false}
-                            onCheckedChange={(checked) => handlePermissionToggle(user.id, 'campaignManagement', checked)}
-                            data-testid={`switch-campaign-management-${user.id}`}
-                          />
-                        </div>
-                        <span className={`text-sm font-medium ${permissions.campaignManagement ? 'text-green-600' : 'text-red-600'}`}>
-                          {permissions.campaignManagement ? 'Yes' : 'No'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={permissions.clientManagement || false}
-                            onCheckedChange={(checked) => handlePermissionToggle(user.id, 'clientManagement', checked)}
-                            data-testid={`switch-client-management-${user.id}`}
-                          />
-                        </div>
-                        <span className={`text-sm font-medium ${permissions.clientManagement ? 'text-green-600' : 'text-red-600'}`}>
-                          {permissions.clientManagement ? 'Yes' : 'No'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={permissions.adAccounts || false}
-                            onCheckedChange={(checked) => handlePermissionToggle(user.id, 'adAccounts', checked)}
-                            data-testid={`switch-ad-accounts-${user.id}`}
-                          />
-                        </div>
-                        <span className={`text-sm font-medium ${permissions.adAccounts ? 'text-green-600' : 'text-red-600'}`}>
-                          {permissions.adAccounts ? 'Yes' : 'No'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={permissions.workReports || false}
-                            onCheckedChange={(checked) => handlePermissionToggle(user.id, 'workReports', checked)}
-                            data-testid={`switch-work-reports-${user.id}`}
-                          />
-                        </div>
-                        <span className={`text-sm font-medium ${permissions.workReports ? 'text-green-600' : 'text-red-600'}`}>
-                          {permissions.workReports ? 'Yes' : 'No'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={permissions.advantixDashboard || false}
-                            onCheckedChange={(checked) => handlePermissionToggle(user.id, 'advantixDashboard', checked)}
-                            data-testid={`switch-advantix-dashboard-${user.id}`}
-                          />
-                        </div>
-                        <span className={`text-sm font-medium ${permissions.advantixDashboard ? 'text-green-600' : 'text-red-600'}`}>
-                          {permissions.advantixDashboard ? 'Yes' : 'No'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={permissions.projects || false}
-                            onCheckedChange={(checked) => handlePermissionToggle(user.id, 'projects', checked)}
-                            data-testid={`switch-projects-${user.id}`}
-                          />
-                        </div>
-                        <span className={`text-sm font-medium ${permissions.projects ? 'text-green-600' : 'text-red-600'}`}>
-                          {permissions.projects ? 'Yes' : 'No'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={permissions.payments || false}
-                            onCheckedChange={(checked) => handlePermissionToggle(user.id, 'payments', checked)}
-                            data-testid={`switch-payments-${user.id}`}
-                          />
-                        </div>
-                        <span className={`text-sm font-medium ${permissions.payments ? 'text-green-600' : 'text-red-600'}`}>
-                          {permissions.payments ? 'Yes' : 'No'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={permissions.expensesSalaries || false}
-                            onCheckedChange={(checked) => handlePermissionToggle(user.id, 'expensesSalaries', checked)}
-                            data-testid={`switch-expenses-salaries-${user.id}`}
-                          />
-                        </div>
-                        <span className={`text-sm font-medium ${permissions.expensesSalaries ? 'text-green-600' : 'text-red-600'}`}>
-                          {permissions.expensesSalaries ? 'Yes' : 'No'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={permissions.reports || false}
-                            onCheckedChange={(checked) => handlePermissionToggle(user.id, 'reports', checked)}
-                            data-testid={`switch-reports-${user.id}`}
-                          />
-                        </div>
-                        <span className={`text-sm font-medium ${permissions.reports ? 'text-green-600' : 'text-red-600'}`}>
-                          {permissions.reports ? 'Yes' : 'No'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={permissions.adminPanel || false}
-                            onCheckedChange={(checked) => handlePermissionToggle(user.id, 'adminPanel', checked)}
-                            data-testid={`switch-admin-panel-${user.id}`}
-                          />
-                        </div>
-                        <span className={`text-sm font-medium ${permissions.adminPanel ? 'text-green-600' : 'text-red-600'}`}>
-                          {permissions.adminPanel ? 'Yes' : 'No'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            data-testid={`button-edit-permissions-${user.id}`}
-                          >
-                            <Edit3 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700"
-                            data-testid={`button-delete-permissions-${user.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+              </TableHeader>
+              <TableBody>
+                {users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={13} className="text-center py-8 text-gray-500">
+                      No users found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  users.map((user) => {
+                    const permissions = getUserPermissions(user.id);
+                    return (
+                      <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                        <TableCell className="font-medium" data-testid={`text-username-${user.id}`}>
+                          {user.username}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.dashboard || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'dashboard', checked)}
+                              data-testid={`switch-dashboard-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.dashboard ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.dashboard ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.campaignManagement || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'campaignManagement', checked)}
+                              data-testid={`switch-campaign-management-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.campaignManagement ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.campaignManagement ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.clientManagement || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'clientManagement', checked)}
+                              data-testid={`switch-client-management-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.clientManagement ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.clientManagement ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.adAccounts || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'adAccounts', checked)}
+                              data-testid={`switch-ad-accounts-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.adAccounts ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.adAccounts ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.workReports || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'workReports', checked)}
+                              data-testid={`switch-work-reports-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.workReports ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.workReports ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.advantixDashboard || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'advantixDashboard', checked)}
+                              data-testid={`switch-advantix-dashboard-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.advantixDashboard ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.advantixDashboard ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.projects || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'projects', checked)}
+                              data-testid={`switch-projects-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.projects ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.projects ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.payments || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'payments', checked)}
+                              data-testid={`switch-payments-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.payments ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.payments ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.expensesSalaries || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'expensesSalaries', checked)}
+                              data-testid={`switch-expenses-salaries-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.expensesSalaries ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.expensesSalaries ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.reports || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'reports', checked)}
+                              data-testid={`switch-reports-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.reports ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.reports ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.adminPanel || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'adminPanel', checked)}
+                              data-testid={`switch-admin-panel-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.adminPanel ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.adminPanel ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              data-testid={`button-edit-permissions-${user.id}`}
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700"
+                              data-testid={`button-delete-permissions-${user.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Create New User Dialog */}
+      <Dialog open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New User</DialogTitle>
+            <DialogDescription>
+              Create a new user and assign menu permissions
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* User Basic Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-name">Full Name</Label>
+                <Input
+                  id="create-name"
+                  value={createUserFormData.name}
+                  onChange={(e) => setCreateUserFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Enter full name"
+                  data-testid="input-create-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-username">Username *</Label>
+                <Input
+                  id="create-username"
+                  value={createUserFormData.username}
+                  onChange={(e) => setCreateUserFormData(prev => ({ ...prev, username: e.target.value }))}
+                  placeholder="Enter username"
+                  data-testid="input-create-username"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-password">Password *</Label>
+                <Input
+                  id="create-password"
+                  type="password"
+                  value={createUserFormData.password}
+                  onChange={(e) => setCreateUserFormData(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Enter password"
+                  data-testid="input-create-password"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-role">Role</Label>
+                <Select value={createUserFormData.role} onValueChange={(value) => setCreateUserFormData(prev => ({ ...prev, role: value }))}>
+                  <SelectTrigger data-testid="select-create-role">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Menu Permissions */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                <Label className="text-base font-semibold">Menu Access Permissions</Label>
+              </div>
+              <div className="grid grid-cols-2 gap-4 border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">Main Navigation</h4>
+                  {[
+                    { key: 'dashboard', label: 'Dashboard' },
+                    { key: 'campaignManagement', label: 'Campaign Management' },
+                    { key: 'clientManagement', label: 'Client Management' },
+                    { key: 'adAccounts', label: 'Ad Accounts' },
+                    { key: 'workReports', label: 'Work Reports' },
+                  ].map((permission) => (
+                    <div key={permission.key} className="flex items-center justify-between">
+                      <Label htmlFor={`create-${permission.key}`} className="text-sm">
+                        {permission.label}
+                      </Label>
+                      <Switch
+                        id={`create-${permission.key}`}
+                        checked={createUserFormData.menuPermissions[permission.key as keyof typeof createUserFormData.menuPermissions]}
+                        onCheckedChange={(checked) => handleMenuPermissionChange(permission.key, checked)}
+                        data-testid={`switch-create-${permission.key}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">Advantix Finance</h4>
+                  {[
+                    { key: 'advantixDashboard', label: 'Advantix Dashboard' },
+                    { key: 'projects', label: 'Projects' },
+                    { key: 'payments', label: 'Payments' },
+                    { key: 'expensesSalaries', label: 'Expenses & Salaries' },
+                    { key: 'reports', label: 'Reports' },
+                    { key: 'adminPanel', label: 'Admin Panel' },
+                  ].map((permission) => (
+                    <div key={permission.key} className="flex items-center justify-between">
+                      <Label htmlFor={`create-${permission.key}`} className="text-sm">
+                        {permission.label}
+                      </Label>
+                      <Switch
+                        id={`create-${permission.key}`}
+                        checked={createUserFormData.menuPermissions[permission.key as keyof typeof createUserFormData.menuPermissions]}
+                        onCheckedChange={(checked) => handleMenuPermissionChange(permission.key, checked)}
+                        data-testid={`switch-create-${permission.key}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateUserOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateUser}
+              disabled={createUserMutation.isPending}
+              data-testid="button-confirm-create-user"
+            >
+              {createUserMutation.isPending ? "Creating..." : "Create User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
