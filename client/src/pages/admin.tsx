@@ -3149,6 +3149,263 @@ function TelegramManagement() {
   );
 }
 
+function FacebookSettings() {
+  const { toast } = useToast();
+  const [appId, setAppId] = useState("");
+  const [appSecret, setAppSecret] = useState("");
+  const [accessToken, setAccessToken] = useState("");
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastTestedAt, setLastTestedAt] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  // Fetch Facebook settings
+  const { data: settings, isLoading: settingsLoading } = useQuery<any>({
+    queryKey: ["/api/facebook/settings"],
+  });
+
+  // Save settings mutation
+  const saveSettingsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/facebook/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ appId, appSecret, accessToken }),
+      });
+      if (!response.ok) throw new Error("Failed to save settings");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Facebook settings saved successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/facebook/settings"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Test connection mutation
+  const testConnectionMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/facebook/test-connection", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Connection failed");
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      setIsConnected(data.success);
+      if (data.success) {
+        toast({
+          title: "Connection Successful",
+          description: `Connected as: ${data.userName || 'User'}`,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/facebook/settings"] });
+    },
+    onError: (error: any) => {
+      setIsConnected(false);
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Failed to connect to Facebook",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Load settings when available
+  useEffect(() => {
+    if (settings) {
+      setAppId(settings.appId || "");
+      setAppSecret(settings.appSecret === '••••••••' ? "" : settings.appSecret || "");
+      setAccessToken(settings.accessToken || "");
+      setIsConnected(settings.isConnected || false);
+      setLastTestedAt(settings.lastTestedAt || null);
+      setConnectionError(settings.connectionError || null);
+    }
+  }, [settings]);
+
+  const handleSaveSettings = () => {
+    if (!appId || !appSecret || !accessToken) {
+      toast({
+        title: "Validation Error",
+        description: "All fields are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    saveSettingsMutation.mutate();
+  };
+
+  const handleTestConnection = () => {
+    if (!settings) {
+      toast({
+        title: "Error",
+        description: "Please save settings first",
+        variant: "destructive",
+      });
+      return;
+    }
+    testConnectionMutation.mutate();
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+            Facebook App Settings
+          </CardTitle>
+          <CardDescription>
+            Configure your Facebook App credentials to enable FB Ad Management features
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Connection Status */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {isConnected ? 'Connected' : 'Not Connected'}
+                </p>
+                {lastTestedAt && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Last tested: {new Date(lastTestedAt).toLocaleString()}
+                  </p>
+                )}
+                {connectionError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    Error: {connectionError}
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button
+              onClick={handleTestConnection}
+              disabled={testConnectionMutation.isPending || !settings}
+              variant="outline"
+              data-testid="button-test-fb-connection"
+            >
+              {testConnectionMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Test Connection
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Settings Form */}
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="fb-app-id">Facebook App ID</Label>
+              <Input
+                id="fb-app-id"
+                type="text"
+                placeholder="Enter your Facebook App ID"
+                value={appId}
+                onChange={(e) => setAppId(e.target.value)}
+                data-testid="input-fb-app-id"
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Find this in Meta for Developers → Your App → Settings → Basic
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fb-app-secret">Facebook App Secret</Label>
+              <Input
+                id="fb-app-secret"
+                type="password"
+                placeholder="Enter your Facebook App Secret"
+                value={appSecret}
+                onChange={(e) => setAppSecret(e.target.value)}
+                data-testid="input-fb-app-secret"
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Find this in Meta for Developers → Your App → Settings → Basic → Show
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fb-access-token">Access Token (Long-Lived)</Label>
+              <Input
+                id="fb-access-token"
+                type="password"
+                placeholder="Enter your Facebook Access Token"
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+                data-testid="input-fb-access-token"
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Generate a long-lived token with ads_read, ads_management, and read_insights permissions
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                onClick={handleSaveSettings}
+                disabled={saveSettingsMutation.isPending}
+                className="flex-1"
+                data-testid="button-save-fb-settings"
+              >
+                {saveSettingsMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Save Settings
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Help Text */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">How to Get Your Credentials:</h4>
+            <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800 dark:text-blue-200">
+              <li>Go to <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="underline">developers.facebook.com</a></li>
+              <li>Create or select your app</li>
+              <li>Go to Settings → Basic to find App ID and App Secret</li>
+              <li>Generate a long-lived access token with required permissions</li>
+              <li>Paste the credentials here and click "Save Settings"</li>
+              <li>Click "Test Connection" to verify everything works</li>
+            </ol>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   return (
     <Sidebar>
@@ -3167,7 +3424,7 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="users" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 max-w-3xl">
+            <TabsList className="grid w-full grid-cols-4 max-w-4xl">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 User Management
@@ -3180,7 +3437,13 @@ export default function AdminPage() {
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
                 </svg>
-                Telegram Management
+                Telegram
+              </TabsTrigger>
+              <TabsTrigger value="facebook" className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
+                FB Settings
               </TabsTrigger>
             </TabsList>
 
@@ -3194,6 +3457,10 @@ export default function AdminPage() {
             
             <TabsContent value="telegram">
               <TelegramManagement />
+            </TabsContent>
+
+            <TabsContent value="facebook">
+              <FacebookSettings />
             </TabsContent>
           </Tabs>
         </div>

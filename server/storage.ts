@@ -186,6 +186,18 @@ export interface IStorage {
   updateTelegramChatId(id: string, chatId: Partial<InsertTelegramChatId>): Promise<TelegramChatId | undefined>;
   deleteTelegramChatId(id: string): Promise<boolean>;
 
+  // Facebook Settings methods
+  getFacebookSettings(): Promise<any>;
+  saveFacebookSettings(data: any): Promise<any>;
+  updateFacebookConnectionStatus(isConnected: boolean, error?: string): Promise<void>;
+
+  // Facebook Account Insights methods
+  getFacebookAccountInsights(adAccountId: string, startDate: Date, endDate: Date): Promise<any[]>;
+  upsertFacebookAccountInsight(data: any): Promise<any>;
+
+  // Facebook Campaign Insights methods
+  getFacebookCampaignInsights(adAccountId: string, startDate: Date, endDate: Date): Promise<any[]>;
+  upsertFacebookCampaignInsight(data: any): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -1394,6 +1406,37 @@ export class MemStorage implements IStorage {
 
   async deleteTelegramChatId(id: string): Promise<boolean> {
     return this.telegramChatIds.delete(id);
+  }
+
+  // Facebook Settings methods (stub implementations - use DatabaseStorage in production)
+  async getFacebookSettings(): Promise<any> {
+    return undefined;
+  }
+
+  async saveFacebookSettings(data: any): Promise<any> {
+    return data;
+  }
+
+  async updateFacebookConnectionStatus(isConnected: boolean, error?: string): Promise<void> {
+    // Stub implementation
+  }
+
+  // Facebook Account Insights methods (stub implementations)
+  async getFacebookAccountInsights(adAccountId: string, startDate: Date, endDate: Date): Promise<any[]> {
+    return [];
+  }
+
+  async upsertFacebookAccountInsight(data: any): Promise<any> {
+    return data;
+  }
+
+  // Facebook Campaign Insights methods (stub implementations)
+  async getFacebookCampaignInsights(adAccountId: string, startDate: Date, endDate: Date): Promise<any[]> {
+    return [];
+  }
+
+  async upsertFacebookCampaignInsight(data: any): Promise<any> {
+    return data;
   }
 
 }

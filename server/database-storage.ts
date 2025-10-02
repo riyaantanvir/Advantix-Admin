@@ -38,6 +38,16 @@ import {
   type InsertTelegramConfig,
   type TelegramChatId,
   type InsertTelegramChatId,
+  type FacebookSetting,
+  type InsertFacebookSetting,
+  type FacebookAccountInsight,
+  type InsertFacebookAccountInsight,
+  type FacebookCampaignInsight,
+  type InsertFacebookCampaignInsight,
+  type FacebookAdSetInsight,
+  type InsertFacebookAdSetInsight,
+  type FacebookAdInsight,
+  type InsertFacebookAdInsight,
   UserRole,
   users,
   sessions,
@@ -58,7 +68,12 @@ import {
   userMenuPermissions,
   salaries,
   telegramConfig,
-  telegramChatIds
+  telegramChatIds,
+  facebookSettings,
+  facebookAccountInsights,
+  facebookCampaignInsights,
+  facebookAdSetInsights,
+  facebookAdInsights
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, and, desc } from "drizzle-orm";
@@ -1734,6 +1749,153 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`[DB ERROR] Failed to delete Telegram chat ID with ID ${id}:`, error);
       throw new Error(`Failed to delete Telegram chat ID: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Facebook Settings methods
+  async getFacebookSettings(): Promise<FacebookSetting | undefined> {
+    try {
+      const result = await db.select()
+        .from(facebookSettings)
+        .limit(1);
+      
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get Facebook settings:", error);
+      throw new Error(`Failed to get Facebook settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async saveFacebookSettings(data: InsertFacebookSetting): Promise<FacebookSetting> {
+    try {
+      const existing = await this.getFacebookSettings();
+      
+      if (existing) {
+        const result = await db.update(facebookSettings)
+          .set({
+            ...data,
+            updatedAt: new Date(),
+          })
+          .where(eq(facebookSettings.id, existing.id))
+          .returning();
+        
+        console.log(`[DB] Updated Facebook settings`);
+        return result[0];
+      } else {
+        const result = await db.insert(facebookSettings).values({
+          ...data,
+          id: randomUUID(),
+        }).returning();
+        
+        console.log(`[DB] Created Facebook settings`);
+        return result[0];
+      }
+    } catch (error) {
+      console.error("[DB ERROR] Failed to save Facebook settings:", error);
+      throw new Error(`Failed to save Facebook settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async updateFacebookConnectionStatus(isConnected: boolean, error?: string): Promise<void> {
+    try {
+      const existing = await this.getFacebookSettings();
+      
+      if (existing) {
+        await db.update(facebookSettings)
+          .set({
+            isConnected,
+            lastTestedAt: new Date(),
+            connectionError: error || null,
+            updatedAt: new Date(),
+          })
+          .where(eq(facebookSettings.id, existing.id));
+        
+        console.log(`[DB] Updated Facebook connection status: ${isConnected ? 'connected' : 'disconnected'}`);
+      }
+    } catch (error) {
+      console.error("[DB ERROR] Failed to update Facebook connection status:", error);
+      throw new Error(`Failed to update Facebook connection status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Facebook Account Insights methods
+  async getFacebookAccountInsights(adAccountId: string, startDate: Date, endDate: Date): Promise<FacebookAccountInsight[]> {
+    try {
+      const result = await db.select()
+        .from(facebookAccountInsights)
+        .where(
+          and(
+            eq(facebookAccountInsights.adAccountId, adAccountId),
+            // Date filtering would go here
+          )
+        )
+        .orderBy(desc(facebookAccountInsights.date));
+      
+      return result;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get Facebook account insights:", error);
+      throw new Error(`Failed to get Facebook account insights: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async upsertFacebookAccountInsight(data: InsertFacebookAccountInsight): Promise<FacebookAccountInsight> {
+    try {
+      const result = await db.insert(facebookAccountInsights)
+        .values({
+          ...data,
+          id: randomUUID(),
+        })
+        .onConflictDoUpdate({
+          target: [facebookAccountInsights.adAccountId, facebookAccountInsights.date],
+          set: {
+            ...data,
+            updatedAt: new Date(),
+          }
+        })
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to upsert Facebook account insight:", error);
+      throw new Error(`Failed to upsert Facebook account insight: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Facebook Campaign Insights methods
+  async getFacebookCampaignInsights(adAccountId: string, startDate: Date, endDate: Date): Promise<FacebookCampaignInsight[]> {
+    try {
+      const result = await db.select()
+        .from(facebookCampaignInsights)
+        .where(eq(facebookCampaignInsights.adAccountId, adAccountId))
+        .orderBy(desc(facebookCampaignInsights.date));
+      
+      return result;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get Facebook campaign insights:", error);
+      throw new Error(`Failed to get Facebook campaign insights: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async upsertFacebookCampaignInsight(data: InsertFacebookCampaignInsight): Promise<FacebookCampaignInsight> {
+    try {
+      const result = await db.insert(facebookCampaignInsights)
+        .values({
+          ...data,
+          id: randomUUID(),
+        })
+        .onConflictDoUpdate({
+          target: [facebookCampaignInsights.fbCampaignId, facebookCampaignInsights.date],
+          set: {
+            ...data,
+            updatedAt: new Date(),
+          }
+        })
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to upsert Facebook campaign insight:", error);
+      throw new Error(`Failed to upsert Facebook campaign insight: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }

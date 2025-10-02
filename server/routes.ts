@@ -3276,6 +3276,190 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Facebook Settings Routes
+  // Get Facebook settings
+  app.get("/api/facebook/settings", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getFacebookSettings();
+      if (!settings) {
+        return res.json(null);
+      }
+      
+      // Don't send app secret to frontend for security
+      const safeSettings = {
+        ...settings,
+        appSecret: settings.appSecret ? '••••••••' : ''
+      };
+      
+      res.json(safeSettings);
+    } catch (error) {
+      console.error("Get Facebook settings error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Save Facebook settings
+  app.post("/api/facebook/settings", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { appId, appSecret, accessToken } = req.body;
+      
+      if (!appId || !appSecret || !accessToken) {
+        return res.status(400).json({ message: "App ID, App Secret, and Access Token are required" });
+      }
+
+      // Save settings
+      await storage.saveFacebookSettings({
+        appId,
+        appSecret,
+        accessToken,
+        isConnected: false
+      });
+
+      res.json({ message: "Facebook settings saved successfully" });
+    } catch (error) {
+      console.error("Save Facebook settings error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Test Facebook connection
+  app.post("/api/facebook/test-connection", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getFacebookSettings();
+      
+      if (!settings) {
+        return res.status(400).json({ message: "Facebook settings not configured" });
+      }
+
+      // Test API connection by making a simple request
+      const testUrl = `https://graph.facebook.com/v18.0/me?access_token=${settings.accessToken}`;
+      const response = await fetch(testUrl);
+      
+      if (response.ok) {
+        const data = await response.json();
+        await storage.updateFacebookConnectionStatus(true);
+        res.json({ 
+          success: true, 
+          message: "Connection successful",
+          userId: data.id,
+          userName: data.name
+        });
+      } else {
+        const errorData = await response.json();
+        await storage.updateFacebookConnectionStatus(false, errorData.error?.message || 'Connection failed');
+        res.status(400).json({ 
+          success: false, 
+          message: errorData.error?.message || "Connection failed" 
+        });
+      }
+    } catch (error: any) {
+      await storage.updateFacebookConnectionStatus(false, error.message);
+      console.error("Test Facebook connection error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "Internal server error" 
+      });
+    }
+  });
+
+  // Get Facebook ad accounts (from existing ad_accounts table filtered by platform)
+  app.get("/api/facebook/ad-accounts", authenticate, async (req: Request, res: Response) => {
+    try {
+      const allAdAccounts = await storage.getAdAccounts();
+      const facebookAccounts = allAdAccounts.filter(acc => acc.platform.toLowerCase() === 'facebook');
+      res.json(facebookAccounts);
+    } catch (error) {
+      console.error("Get Facebook ad accounts error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get Facebook account insights
+  app.get("/api/facebook/insights/:adAccountId", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { adAccountId } = req.params;
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
+      
+      const insights = await storage.getFacebookAccountInsights(adAccountId, startDate, endDate);
+      res.json(insights);
+    } catch (error) {
+      console.error("Get Facebook account insights error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get Facebook campaign insights
+  app.get("/api/facebook/campaigns/:adAccountId", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { adAccountId } = req.params;
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
+      
+      const insights = await storage.getFacebookCampaignInsights(adAccountId, startDate, endDate);
+      res.json(insights);
+    } catch (error) {
+      console.error("Get Facebook campaign insights error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Sync Facebook data
+  app.post("/api/facebook/sync/:adAccountId", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { adAccountId } = req.params;
+      const settings = await storage.getFacebookSettings();
+      
+      if (!settings || !settings.isConnected) {
+        return res.status(400).json({ message: "Facebook not connected. Please configure settings first." });
+      }
+
+      const adAccount = await storage.getAdAccount(adAccountId);
+      if (!adAccount || adAccount.platform.toLowerCase() !== 'facebook') {
+        return res.status(404).json({ message: "Facebook ad account not found" });
+      }
+
+      // Fetch insights from Facebook API
+      const today = new Date().toISOString().split('T')[0];
+      const apiUrl = `https://graph.facebook.com/v18.0/act_${adAccount.accountId}/insights?access_token=${settings.accessToken}&time_range={'since':'${today}','until':'${today}'}&fields=spend,impressions,clicks,ctr,cpc,cpm,reach,frequency,actions`;
+      
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        return res.status(400).json({ message: errorData.error?.message || "Failed to fetch data from Facebook" });
+      }
+
+      const data = await response.json();
+      
+      // Store insights in database
+      if (data.data && data.data.length > 0) {
+        const insight = data.data[0];
+        await storage.upsertFacebookAccountInsight({
+          adAccountId: adAccount.id,
+          date: new Date(today),
+          spend: insight.spend || "0",
+          impressions: parseInt(insight.impressions) || 0,
+          clicks: parseInt(insight.clicks) || 0,
+          ctr: insight.ctr || "0",
+          cpc: insight.cpc || "0",
+          cpm: insight.cpm || "0",
+          reach: parseInt(insight.reach) || 0,
+          frequency: insight.frequency || "0",
+          conversions: 0,
+          costPerConversion: "0",
+          conversionRate: "0",
+          roas: "0"
+        });
+      }
+
+      res.json({ message: "Data synced successfully", recordsUpdated: data.data?.length || 0 });
+    } catch (error: any) {
+      console.error("Sync Facebook data error:", error);
+      res.status(500).json({ message: error.message || "Internal server error" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
