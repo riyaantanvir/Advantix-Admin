@@ -434,6 +434,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export campaigns to CSV
+  app.get("/api/campaigns/export/csv", authenticate, requirePagePermission('campaigns', 'view'), async (req: Request, res: Response) => {
+    try {
+      const campaigns = await storage.getCampaigns();
+      
+      // Get daily spends for all campaigns
+      const campaignsWithSpends = await Promise.all(
+        campaigns.map(async (campaign) => {
+          const dailySpends = await storage.getCampaignDailySpends(campaign.id);
+          return {
+            ...campaign,
+            dailySpends: JSON.stringify(dailySpends.map(spend => ({
+              date: new Date(spend.date).toISOString(),
+              amount: spend.amount
+            })))
+          };
+        })
+      );
+
+      // Create CSV header
+      const headers = [
+        'id', 'name', 'clientId', 'adAccountId', 'startDate', 'endDate', 
+        'status', 'spend', 'budget', 'tags', 'notes', 'isActive', 
+        'createdAt', 'updatedAt', 'dailySpends'
+      ];
+
+      // Create CSV rows
+      const csvRows = [headers.join(',')];
+      
+      campaignsWithSpends.forEach(campaign => {
+        const row = headers.map(header => {
+          let value = campaign[header as keyof typeof campaign] ?? '';
+          
+          // Handle special formatting
+          if (header === 'startDate' || header === 'endDate' || header === 'createdAt' || header === 'updatedAt') {
+            value = value ? new Date(value as string).toISOString() : '';
+          }
+          
+          // Escape commas and quotes in values
+          const stringValue = String(value);
+          if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          }
+          return stringValue;
+        });
+        csvRows.push(row.join(','));
+      });
+
+      const csvContent = csvRows.join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=campaigns-export.csv');
+      res.send(csvContent);
+    } catch (error) {
+      console.error("Export campaigns CSV error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Import campaigns from CSV
+  const upload = multer({ storage: multer.memoryStorage() });
+  app.post("/api/campaigns/import/csv", authenticate, requirePagePermission('campaigns', 'edit'), upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const fileContent = req.file.buffer.toString('utf-8');
+      const records = parse(fileContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true
+      });
+
+      // Validate CSV structure
+      const requiredHeaders = [
+        'id', 'name', 'clientId', 'adAccountId', 'startDate', 'endDate',
+        'status', 'spend', 'budget', 'tags', 'notes', 'isActive',
+        'createdAt', 'updatedAt', 'dailySpends'
+      ];
+
+      if (records.length === 0) {
+        return res.status(400).json({ message: "CSV file is empty" });
+      }
+
+      const firstRecord = records[0];
+      const missingHeaders = requiredHeaders.filter(header => !(header in firstRecord));
+      
+      if (missingHeaders.length > 0) {
+        return res.status(400).json({ 
+          message: `Invalid CSV format. Missing columns: ${missingHeaders.join(', ')}` 
+        });
+      }
+
+      let importedCount = 0;
+      const errors: string[] = [];
+
+      for (const record of records) {
+        try {
+          // Parse campaign data
+          const campaignData = {
+            name: record.name,
+            clientId: record.clientId || null,
+            adAccountId: record.adAccountId || null,
+            startDate: record.startDate ? new Date(record.startDate) : null,
+            endDate: record.endDate ? new Date(record.endDate) : null,
+            status: record.status,
+            spend: record.spend || '0',
+            budget: record.budget || null,
+            tags: record.tags || null,
+            notes: record.notes || null,
+            isActive: record.isActive === 'true',
+          };
+
+          // Create or update campaign
+          const campaign = await storage.createCampaign(campaignData);
+          
+          // Import daily spends if present
+          if (record.dailySpends) {
+            try {
+              const dailySpends = JSON.parse(record.dailySpends);
+              for (const spend of dailySpends) {
+                await storage.upsertCampaignDailySpend({
+                  campaignId: campaign.id,
+                  date: new Date(spend.date),
+                  amount: parseFloat(spend.amount)
+                });
+              }
+            } catch (jsonError) {
+              errors.push(`Failed to parse daily spends for campaign "${record.name}"`);
+            }
+          }
+
+          importedCount++;
+        } catch (error) {
+          errors.push(`Failed to import campaign "${record.name}": ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      res.json({
+        message: `Successfully imported ${importedCount} campaign(s)`,
+        imported: importedCount,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error) {
+      console.error("Import campaigns CSV error:", error);
+      res.status(500).json({ message: "Failed to import CSV file" });
+    }
+  });
+
   // Client Routes
   // Get all clients
   app.get("/api/clients", authenticate, requirePagePermission('clients', 'view'), async (req: Request, res: Response) => {
