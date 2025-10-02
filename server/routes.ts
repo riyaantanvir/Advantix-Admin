@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
 import { 
@@ -41,7 +42,10 @@ import {
   type Salary,
   type TelegramConfig,
   type TelegramChatId,
-  UserRole 
+  UserRole,
+  clients,
+  campaigns,
+  campaignDailySpends
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -453,10 +457,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      // Create CSV header
+      // Create CSV header - include ALL fields for lossless export/import
       const headers = [
-        'id', 'name', 'clientId', 'adAccountId', 'startDate', 'endDate', 
-        'status', 'spend', 'budget', 'tags', 'notes', 'isActive', 
+        'id', 'name', 'clientId', 'adAccountId', 'startDate', 'status', 
+        'spend', 'budget', 'objective', 'comments',
         'createdAt', 'updatedAt', 'dailySpends'
       ];
 
@@ -510,8 +514,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Validate CSV structure
       const requiredHeaders = [
-        'id', 'name', 'clientId', 'adAccountId', 'startDate', 'endDate',
-        'status', 'spend', 'budget', 'tags', 'notes', 'isActive',
+        'id', 'name', 'clientId', 'adAccountId', 'startDate', 'status',
+        'spend', 'budget', 'objective', 'comments',
         'createdAt', 'updatedAt', 'dailySpends'
       ];
 
@@ -533,35 +537,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const record of records) {
         try {
-          // Parse campaign data
+          // Parse campaign data with preserved ID and timestamps
           const campaignData = {
+            id: record.id,
             name: record.name,
             clientId: record.clientId || null,
             adAccountId: record.adAccountId || '',
             startDate: record.startDate ? new Date(record.startDate) : new Date(),
-            endDate: record.endDate ? new Date(record.endDate) : null,
             status: record.status || 'active',
             spend: record.spend || '0',
             budget: record.budget || '0',
-            objective: '',
-            tags: record.tags || null,
-            notes: record.notes || null,
-            isActive: record.isActive === 'true',
+            objective: record.objective || 'awareness',
+            comments: record.comments || null,
+            createdAt: record.createdAt ? new Date(record.createdAt) : new Date(),
+            updatedAt: record.updatedAt ? new Date(record.updatedAt) : new Date(),
           };
 
-          // Create or update campaign
-          const campaign = await storage.createCampaign(campaignData);
+          // Upsert campaign (insert with preserved ID or update if exists)
+          await db.insert(campaigns).values(campaignData)
+            .onConflictDoUpdate({
+              target: campaigns.id,
+              set: {
+                name: campaignData.name,
+                clientId: campaignData.clientId,
+                adAccountId: campaignData.adAccountId,
+                startDate: campaignData.startDate,
+                status: campaignData.status,
+                spend: campaignData.spend,
+                budget: campaignData.budget,
+                objective: campaignData.objective,
+                comments: campaignData.comments,
+                updatedAt: campaignData.updatedAt,
+              }
+            });
           
           // Import daily spends if present
           if (record.dailySpends && record.dailySpends !== '') {
             try {
               const dailySpends = JSON.parse(record.dailySpends);
               for (const spend of dailySpends) {
-                await storage.upsertCampaignDailySpend({
-                  campaignId: campaign.id,
+                const spendData = {
+                  campaignId: record.id,
                   date: new Date(spend.date),
-                  amount: parseFloat(spend.amount)
-                });
+                  amount: spend.amount
+                };
+                
+                // Upsert daily spend
+                await db.insert(campaignDailySpends).values(spendData)
+                  .onConflictDoUpdate({
+                    target: [campaignDailySpends.campaignId, campaignDailySpends.date],
+                    set: {
+                      amount: spendData.amount
+                    }
+                  });
               }
             } catch (jsonError) {
               errors.push(`Failed to parse daily spends for campaign "${record.name}"`);
@@ -740,20 +768,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const record of records) {
         try {
-          // Parse client data
+          // Parse client data with preserved ID and timestamps
           const clientData = {
+            id: record.id,
             clientName: record.clientName,
             businessName: record.businessName,
             contactPerson: record.contactPerson,
             email: record.email,
             phone: record.phone,
-            address: record.address || '',
-            notes: record.notes || '',
+            address: record.address || null,
+            notes: record.notes || null,
             status: record.status || 'active',
+            createdAt: record.createdAt ? new Date(record.createdAt) : new Date(),
+            updatedAt: record.updatedAt ? new Date(record.updatedAt) : new Date(),
           };
 
-          // Create client
-          await storage.createClient(clientData);
+          // Upsert client (insert with preserved ID or update if exists)
+          await db.insert(clients).values(clientData)
+            .onConflictDoUpdate({
+              target: clients.id,
+              set: {
+                clientName: clientData.clientName,
+                businessName: clientData.businessName,
+                contactPerson: clientData.contactPerson,
+                email: clientData.email,
+                phone: clientData.phone,
+                address: clientData.address,
+                notes: clientData.notes,
+                status: clientData.status,
+                updatedAt: clientData.updatedAt,
+              }
+            });
+          
           importedCount++;
         } catch (error) {
           errors.push(`Failed to import client "${record.clientName}": ${error instanceof Error ? error.message : 'Unknown error'}`);
