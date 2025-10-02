@@ -473,6 +473,7 @@ export const userMenuPermissions = pgTable("user_menu_permissions", {
   expensesSalaries: boolean("expenses_salaries").default(false),
   salaryManagement: boolean("salary_management").default(false),
   reports: boolean("reports").default(false),
+  fbAdManagement: boolean("fb_ad_management").default(false),
   adminPanel: boolean("admin_panel").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

@@ -990,6 +990,7 @@ export class DatabaseStorage implements IStorage {
       'clients': 'clientManagement',
       'ad_accounts': 'adAccounts',
       'work_reports': 'workReports',
+      'fb_ad_management': 'fbAdManagement',
       'finance': 'advantixDashboard', // Finance uses multiple fields, checking main one
       'admin': 'adminPanel'
     };
