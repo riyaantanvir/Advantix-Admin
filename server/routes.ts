@@ -3322,9 +3322,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[FB Settings] Settings saved successfully");
       res.json({ message: "Facebook settings saved successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("[FB Settings] Save error:", error);
-      res.status(500).json({ message: "Internal server error" });
+      const errorMessage = error?.message || "Internal server error";
+      
+      // Check if it's a database table error
+      if (errorMessage.includes("relation") && errorMessage.includes("does not exist")) {
+        return res.status(500).json({ 
+          message: "Database schema not initialized. Please run 'npm run db:push' to create required tables in production database." 
+        });
+      }
+      
+      res.status(500).json({ message: errorMessage });
     }
   });
 
