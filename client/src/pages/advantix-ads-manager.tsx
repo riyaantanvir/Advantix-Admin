@@ -8,36 +8,51 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Rocket, Plus, Trash2, Play, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Rocket, Plus, Trash2, Play, CheckCircle, XCircle, Clock, Upload, Image as ImageIcon, Video, X } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 
 export default function AdvantixAdsManager() {
   const { toast } = useToast();
   const [showWizard, setShowWizard] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Form state
+  // Form state - Campaign Setup
   const [draftName, setDraftName] = useState("");
   const [adAccountId, setAdAccountId] = useState("");
   const [objective, setObjective] = useState("");
   const [campaignName, setCampaignName] = useState("");
   const [budgetType, setBudgetType] = useState("daily");
   const [dailyBudget, setDailyBudget] = useState("");
+  
+  // Targeting state
+  const [ageMin, setAgeMin] = useState(18);
+  const [ageMax, setAgeMax] = useState(65);
+  const [genders, setGenders] = useState<string[]>(["all"]);
+  const [countries, setCountries] = useState("");
+  const [interests, setInterests] = useState("");
   const [adSetName, setAdSetName] = useState("");
+  
+  // Creative state
   const [adName, setAdName] = useState("");
   const [adCopy, setAdCopy] = useState("");
   const [headline, setHeadline] = useState("");
+  const [description, setDescription] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [callToAction, setCallToAction] = useState("LEARN_MORE");
+  const [imageUrl, setImageUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [imagePreview, setImagePreview] = useState("");
+  const [videoPreview, setVideoPreview] = useState("");
 
   // Fetch ad accounts
-  const { data: adAccounts = [] } = useQuery({
+  const { data: adAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/facebook/ad-accounts"],
   });
 
   // Fetch campaign drafts
-  const { data: drafts = [], isLoading: draftsLoading } = useQuery({
+  const { data: drafts = [], isLoading: draftsLoading } = useQuery<any[]>({
     queryKey: ["/api/campaign-drafts"],
   });
 
@@ -92,12 +107,22 @@ export default function AdvantixAdsManager() {
     setCampaignName("");
     setBudgetType("daily");
     setDailyBudget("");
+    setAgeMin(18);
+    setAgeMax(65);
+    setGenders(["all"]);
+    setCountries("");
+    setInterests("");
     setAdSetName("");
     setAdName("");
     setAdCopy("");
     setHeadline("");
+    setDescription("");
     setWebsiteUrl("");
     setCallToAction("LEARN_MORE");
+    setImageUrl("");
+    setVideoUrl("");
+    setImagePreview("");
+    setVideoPreview("");
     setCurrentStep(1);
   };
 
@@ -107,6 +132,14 @@ export default function AdvantixAdsManager() {
       return;
     }
 
+    const targeting = JSON.stringify({
+      age_min: ageMin,
+      age_max: ageMax,
+      genders: genders,
+      geo_locations: { countries: countries.split(',').map(c => c.trim()).filter(c => c) },
+      interests: interests.split(',').map(i => i.trim()).filter(i => i),
+    });
+
     const draftData = {
       draftName,
       adAccountId,
@@ -114,16 +147,55 @@ export default function AdvantixAdsManager() {
       campaignName,
       budgetType,
       dailyBudget: dailyBudget ? parseFloat(dailyBudget) : null,
+      targeting,
       adSetName,
       adName,
       adCopy,
       headline,
+      description,
       websiteUrl,
       callToAction,
+      imageUrl,
+      videoUrl,
       status: "draft",
     };
 
     createDraftMutation.mutate(draftData);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        setImageUrl(URL.createObjectURL(file));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setVideoPreview(url);
+      setVideoUrl(url);
+    }
+  };
+
+  const toggleGender = (gender: string) => {
+    if (gender === "all") {
+      setGenders(["all"]);
+    } else {
+      const newGenders = genders.filter(g => g !== "all");
+      if (newGenders.includes(gender)) {
+        const filtered = newGenders.filter(g => g !== gender);
+        setGenders(filtered.length === 0 ? ["all"] : filtered);
+      } else {
+        setGenders([...newGenders, gender]);
+      }
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -166,7 +238,7 @@ export default function AdvantixAdsManager() {
         <Card>
           <CardHeader>
             <CardTitle>Campaign Creation Wizard</CardTitle>
-            <CardDescription>Step {currentStep} of 3: {currentStep === 1 ? "Campaign Setup" : currentStep === 2 ? "Budget & Targeting" : "Creative Assets"}</CardDescription>
+            <CardDescription>Step {currentStep} of 3: {currentStep === 1 ? "Campaign Setup" : currentStep === 2 ? "Budget & Audience Targeting" : "Creative Assets & Media"}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {currentStep === 1 && (
@@ -228,106 +300,291 @@ export default function AdvantixAdsManager() {
             )}
 
             {currentStep === 2 && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="budget-type">Budget Type</Label>
-                  <Select value={budgetType} onValueChange={setBudgetType}>
-                    <SelectTrigger id="budget-type" data-testid="select-budget-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily Budget</SelectItem>
-                      <SelectItem value="lifetime">Lifetime Budget</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Budget</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="budget-type">Budget Type</Label>
+                      <Select value={budgetType} onValueChange={setBudgetType}>
+                        <SelectTrigger id="budget-type" data-testid="select-budget-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily Budget</SelectItem>
+                          <SelectItem value="lifetime">Lifetime Budget</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="daily-budget">{budgetType === "daily" ? "Daily" : "Lifetime"} Budget ($)</Label>
+                      <Input
+                        id="daily-budget"
+                        type="number"
+                        value={dailyBudget}
+                        onChange={(e) => setDailyBudget(e.target.value)}
+                        placeholder="100"
+                        data-testid="input-budget"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="adset-name">Ad Set Name</Label>
+                    <Input
+                      id="adset-name"
+                      value={adSetName}
+                      onChange={(e) => setAdSetName(e.target.value)}
+                      placeholder="Main Ad Set"
+                      data-testid="input-adset-name"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="daily-budget">{budgetType === "daily" ? "Daily" : "Lifetime"} Budget ($)</Label>
-                  <Input
-                    id="daily-budget"
-                    type="number"
-                    value={dailyBudget}
-                    onChange={(e) => setDailyBudget(e.target.value)}
-                    placeholder="100"
-                    data-testid="input-budget"
-                  />
-                </div>
+                <div className="space-y-4 pt-4 border-t">
+                  <h3 className="text-lg font-semibold">Audience Targeting</h3>
+                  
+                  <div className="space-y-2">
+                    <Label>Age Range: {ageMin} - {ageMax}</Label>
+                    <div className="flex gap-4 items-center">
+                      <span className="text-sm text-gray-600">18</span>
+                      <Slider
+                        min={18}
+                        max={65}
+                        step={1}
+                        value={[ageMin, ageMax]}
+                        onValueChange={(values) => {
+                          setAgeMin(values[0]);
+                          setAgeMax(values[1]);
+                        }}
+                        className="flex-1"
+                        data-testid="slider-age-range"
+                      />
+                      <span className="text-sm text-gray-600">65+</span>
+                    </div>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="adset-name">Ad Set Name</Label>
-                  <Input
-                    id="adset-name"
-                    value={adSetName}
-                    onChange={(e) => setAdSetName(e.target.value)}
-                    placeholder="Main Ad Set"
-                    data-testid="input-adset-name"
-                  />
+                  <div className="space-y-2">
+                    <Label>Gender</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={genders.includes("all") ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => toggleGender("all")}
+                        data-testid="button-gender-all"
+                      >
+                        All
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={genders.includes("male") ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => toggleGender("male")}
+                        data-testid="button-gender-male"
+                      >
+                        Male
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={genders.includes("female") ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => toggleGender("female")}
+                        data-testid="button-gender-female"
+                      >
+                        Female
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="countries">Countries (comma-separated)</Label>
+                    <Input
+                      id="countries"
+                      value={countries}
+                      onChange={(e) => setCountries(e.target.value)}
+                      placeholder="US, CA, GB, AU"
+                      data-testid="input-countries"
+                    />
+                    <p className="text-xs text-gray-500">Enter 2-letter country codes separated by commas</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="interests">Interests (comma-separated)</Label>
+                    <Textarea
+                      id="interests"
+                      value={interests}
+                      onChange={(e) => setInterests(e.target.value)}
+                      placeholder="Technology, E-commerce, Digital Marketing"
+                      rows={3}
+                      data-testid="textarea-interests"
+                    />
+                    <p className="text-xs text-gray-500">Enter interests or behaviors to target</p>
+                  </div>
                 </div>
               </div>
             )}
 
             {currentStep === 3 && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ad-name">Ad Name</Label>
-                  <Input
-                    id="ad-name"
-                    value={adName}
-                    onChange={(e) => setAdName(e.target.value)}
-                    placeholder="Main Ad"
-                    data-testid="input-ad-name"
-                  />
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Ad Details</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="ad-name">Ad Name</Label>
+                    <Input
+                      id="ad-name"
+                      value={adName}
+                      onChange={(e) => setAdName(e.target.value)}
+                      placeholder="Main Ad"
+                      data-testid="input-ad-name"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="headline">Headline</Label>
+                    <Input
+                      id="headline"
+                      value={headline}
+                      onChange={(e) => setHeadline(e.target.value)}
+                      placeholder="Get 50% Off Today!"
+                      data-testid="input-headline"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description (Optional)</Label>
+                    <Input
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Shop our latest collection"
+                      data-testid="input-description"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="ad-copy">Ad Copy</Label>
+                    <Textarea
+                      id="ad-copy"
+                      value={adCopy}
+                      onChange={(e) => setAdCopy(e.target.value)}
+                      placeholder="Limited time offer - shop now and save big!"
+                      rows={4}
+                      data-testid="textarea-ad-copy"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="website-url">Website URL</Label>
+                      <Input
+                        id="website-url"
+                        value={websiteUrl}
+                        onChange={(e) => setWebsiteUrl(e.target.value)}
+                        placeholder="https://example.com"
+                        data-testid="input-website-url"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cta">Call to Action</Label>
+                      <Select value={callToAction} onValueChange={setCallToAction}>
+                        <SelectTrigger id="cta" data-testid="select-cta">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="LEARN_MORE">Learn More</SelectItem>
+                          <SelectItem value="SHOP_NOW">Shop Now</SelectItem>
+                          <SelectItem value="SIGN_UP">Sign Up</SelectItem>
+                          <SelectItem value="DOWNLOAD">Download</SelectItem>
+                          <SelectItem value="GET_QUOTE">Get Quote</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="headline">Headline</Label>
-                  <Input
-                    id="headline"
-                    value={headline}
-                    onChange={(e) => setHeadline(e.target.value)}
-                    placeholder="Get 50% Off Today!"
-                    data-testid="input-headline"
-                  />
-                </div>
+                <div className="space-y-4 pt-4 border-t">
+                  <h3 className="text-lg font-semibold">Creative Assets</h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Ad Image</Label>
+                      <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                        {imagePreview ? (
+                          <div className="relative">
+                            <img src={imagePreview} alt="Preview" className="max-h-48 mx-auto rounded" />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="absolute top-2 right-2"
+                              onClick={() => {
+                                setImagePreview("");
+                                setImageUrl("");
+                              }}
+                              data-testid="button-remove-image"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <label htmlFor="image-upload" className="cursor-pointer">
+                            <ImageIcon className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+                            <p className="text-sm text-gray-600">Click to upload image</p>
+                            <p className="text-xs text-gray-400">JPG, PNG up to 10MB</p>
+                            <input
+                              id="image-upload"
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageUpload}
+                              className="hidden"
+                              data-testid="input-image-upload"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="ad-copy">Ad Copy</Label>
-                  <Textarea
-                    id="ad-copy"
-                    value={adCopy}
-                    onChange={(e) => setAdCopy(e.target.value)}
-                    placeholder="Limited time offer - shop now and save big!"
-                    rows={4}
-                    data-testid="textarea-ad-copy"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="website-url">Website URL</Label>
-                  <Input
-                    id="website-url"
-                    value={websiteUrl}
-                    onChange={(e) => setWebsiteUrl(e.target.value)}
-                    placeholder="https://example.com"
-                    data-testid="input-website-url"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cta">Call to Action</Label>
-                  <Select value={callToAction} onValueChange={setCallToAction}>
-                    <SelectTrigger id="cta" data-testid="select-cta">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="LEARN_MORE">Learn More</SelectItem>
-                      <SelectItem value="SHOP_NOW">Shop Now</SelectItem>
-                      <SelectItem value="SIGN_UP">Sign Up</SelectItem>
-                      <SelectItem value="DOWNLOAD">Download</SelectItem>
-                      <SelectItem value="GET_QUOTE">Get Quote</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <div className="space-y-2">
+                      <Label>Ad Video (Optional)</Label>
+                      <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                        {videoPreview ? (
+                          <div className="relative">
+                            <video src={videoPreview} controls className="max-h-48 mx-auto rounded" />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="absolute top-2 right-2"
+                              onClick={() => {
+                                setVideoPreview("");
+                                setVideoUrl("");
+                              }}
+                              data-testid="button-remove-video"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <label htmlFor="video-upload" className="cursor-pointer">
+                            <Video className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+                            <p className="text-sm text-gray-600">Click to upload video</p>
+                            <p className="text-xs text-gray-400">MP4, MOV up to 100MB</p>
+                            <input
+                              id="video-upload"
+                              type="file"
+                              accept="video/*"
+                              onChange={handleVideoUpload}
+                              className="hidden"
+                              data-testid="input-video-upload"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
