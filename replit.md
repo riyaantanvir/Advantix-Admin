@@ -1,6 +1,6 @@
 # Overview
 
-This is a full-stack web application built with React and Express.js, featuring a modern authentication system and admin dashboard. The application appears to be named "Advantix Admin" and provides a secure login interface with session management. It uses a PostgreSQL database with Drizzle ORM for data persistence and includes a comprehensive UI component library built with shadcn/ui and Tailwind CSS.
+This is a full-stack web application built with React and Express.js, featuring a modern authentication system and admin dashboard. The application is named "Advantix Admin" and provides comprehensive campaign management, client tracking, financial management, and work reporting capabilities. It uses a PostgreSQL database with Drizzle ORM for data persistence and includes a comprehensive UI component library built with shadcn/ui and Tailwind CSS.
 
 # User Preferences
 

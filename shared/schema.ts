@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, integer, decimal, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -135,7 +135,7 @@ export const campaignDailySpends = pgTable("campaign_daily_spends", {
 }, (table) => {
   return {
     // Unique constraint: one entry per campaign per day (date must be normalized to start of day)
-    uniqueCampaignDate: sql`UNIQUE(${table.campaignId}, ${table.date})`
+    uniqueCampaignDate: unique("unique_campaign_date").on(table.campaignId, table.date)
   }
 });
 
