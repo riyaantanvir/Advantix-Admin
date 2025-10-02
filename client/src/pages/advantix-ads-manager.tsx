@@ -59,7 +59,7 @@ export default function AdvantixAdsManager() {
   // Create draft mutation
   const createDraftMutation = useMutation({
     mutationFn: async (draftData: any) => {
-      return await apiRequest("/api/campaign-drafts", "POST", draftData);
+      return await apiRequest("POST", "/api/campaign-drafts", draftData);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Campaign draft saved successfully" });
@@ -75,7 +75,7 @@ export default function AdvantixAdsManager() {
   // Publish draft mutation
   const publishDraftMutation = useMutation({
     mutationFn: async (draftId: string) => {
-      return await apiRequest(`/api/campaign-drafts/${draftId}/publish`, "POST");
+      return await apiRequest("POST", `/api/campaign-drafts/${draftId}/publish`);
     },
     onSuccess: (data: any) => {
       toast({ title: "Campaign Published!", description: `Campaign ID: ${data.campaignId}` });
@@ -89,7 +89,7 @@ export default function AdvantixAdsManager() {
   // Delete draft mutation
   const deleteDraftMutation = useMutation({
     mutationFn: async (draftId: string) => {
-      return await apiRequest(`/api/campaign-drafts/${draftId}`, "DELETE");
+      return await apiRequest("DELETE", `/api/campaign-drafts/${draftId}`);
     },
     onSuccess: () => {
       toast({ title: "Deleted", description: "Draft deleted successfully" });
