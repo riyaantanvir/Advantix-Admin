@@ -3362,6 +3362,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sync Facebook ad accounts
+  app.post("/api/facebook/sync-accounts", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getFacebookSettings();
+      
+      if (!settings || !settings.accessToken) {
+        return res.status(400).json({ message: "Facebook settings not configured" });
+      }
+
+      // Fetch ad accounts from Facebook API
+      const adAccountsUrl = `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,account_id,account_status&access_token=${settings.accessToken}`;
+      const response = await fetch(adAccountsUrl);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        return res.status(400).json({ 
+          message: errorData.error?.message || "Failed to fetch ad accounts from Facebook" 
+        });
+      }
+
+      const data = await response.json();
+      const fbAdAccounts = data.data || [];
+
+      if (fbAdAccounts.length === 0) {
+        return res.json({ 
+          message: "No ad accounts found in your Facebook account",
+          count: 0
+        });
+      }
+
+      // Get all clients to use the first one as default
+      const clients = await storage.getClients();
+      let defaultClientId: string;
+      
+      if (clients.length === 0) {
+        // Create a default client for Facebook ads
+        const newClient = await storage.createClient({
+          name: "Facebook Ads Client",
+          email: "facebook@default.com",
+          phone: "",
+          company: "Facebook Advertising",
+          address: "",
+          notes: "Auto-created for Facebook ad accounts"
+        });
+        defaultClientId = newClient.id;
+      } else {
+        defaultClientId = clients[0].id;
+      }
+
+      // Save ad accounts to database
+      let syncedCount = 0;
+      const errors: string[] = [];
+
+      for (const fbAccount of fbAdAccounts) {
+        try {
+          // Check if account already exists
+          const existingAccounts = await storage.getAdAccounts();
+          const exists = existingAccounts.find(acc => 
+            acc.platform.toLowerCase() === 'facebook' && acc.accountId === fbAccount.account_id
+          );
+
+          if (!exists) {
+            await storage.createAdAccount({
+              platform: 'facebook',
+              accountName: fbAccount.name,
+              accountId: fbAccount.account_id,
+              clientId: defaultClientId,
+              spendLimit: '10000.00',
+              status: fbAccount.account_status === 1 ? 'active' : 'suspended',
+              notes: `Synced from Facebook on ${new Date().toISOString()}`
+            });
+            syncedCount++;
+          }
+        } catch (error: any) {
+          errors.push(`Failed to sync account ${fbAccount.name}: ${error.message}`);
+        }
+      }
+
+      res.json({ 
+        message: `Successfully synced ${syncedCount} ad account(s)`,
+        count: syncedCount,
+        total: fbAdAccounts.length,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error: any) {
+      console.error("Sync Facebook ad accounts error:", error);
+      res.status(500).json({ 
+        message: error.message || "Internal server error" 
+      });
+    }
+  });
+
   // Get Facebook ad accounts (from existing ad_accounts table filtered by platform)
   app.get("/api/facebook/ad-accounts", authenticate, async (req: Request, res: Response) => {
     try {
