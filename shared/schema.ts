@@ -613,6 +613,9 @@ export const facebookCampaignInsights = pgTable("facebook_campaign_insights", {
   adAccountId: varchar("ad_account_id").references(() => adAccounts.id, { onDelete: "cascade" }).notNull(),
   fbCampaignId: text("fb_campaign_id").notNull(), // Facebook's campaign ID
   campaignName: text("campaign_name").notNull(),
+  status: text("status").default("ACTIVE"), // Campaign status: ACTIVE, PAUSED, ARCHIVED, DELETED
+  objective: text("objective"), // Campaign objective: OUTCOME_ENGAGEMENT, OUTCOME_SALES, etc.
+  dailyBudget: decimal("daily_budget", { precision: 12, scale: 2 }), // Daily budget
   date: timestamp("date").notNull(),
   spend: decimal("spend", { precision: 12, scale: 2 }).default("0"),
   impressions: integer("impressions").default(0),
@@ -621,7 +624,10 @@ export const facebookCampaignInsights = pgTable("facebook_campaign_insights", {
   cpc: decimal("cpc", { precision: 10, scale: 4 }).default("0"),
   cpm: decimal("cpm", { precision: 10, scale: 4 }).default("0"),
   reach: integer("reach").default(0),
+  frequency: decimal("frequency", { precision: 10, scale: 2 }).default("0"),
   conversions: integer("conversions").default(0),
+  costPerConversion: decimal("cost_per_conversion", { precision: 10, scale: 4 }).default("0"),
+  conversionRate: decimal("conversion_rate", { precision: 10, scale: 4 }).default("0"),
   roas: decimal("roas", { precision: 10, scale: 4 }).default("0"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
