@@ -3483,6 +3483,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send Test Email
+  app.post("/api/email/test-send", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getEmailSettings();
+      const { recipientEmail } = req.body;
+
+      if (!settings || !settings.apiKey) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Email settings not configured. Please save your settings first." 
+        });
+      }
+
+      if (!recipientEmail) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Recipient email is required" 
+        });
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(recipientEmail)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Invalid email address" 
+        });
+      }
+
+      // Send test email based on provider
+      let response;
+      
+      if (settings.provider === 'resend') {
+        response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${settings.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: `${settings.senderName} <${settings.senderEmail}>`,
+            to: recipientEmail,
+            subject: 'Test Email from Advantix Admin',
+            html: `
+              <h2>Email Configuration Test</h2>
+              <p>This is a test email from your Advantix Admin dashboard.</p>
+              <p>If you received this email, your email service is configured correctly!</p>
+              <hr>
+              <p><small>Provider: ${settings.provider}</small></p>
+              <p><small>Sender: ${settings.senderEmail}</small></p>
+            `
+          })
+        });
+      } else if (settings.provider === 'sendgrid') {
+        response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${settings.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            personalizations: [{
+              to: [{ email: recipientEmail }]
+            }],
+            from: {
+              email: settings.senderEmail,
+              name: settings.senderName
+            },
+            subject: 'Test Email from Advantix Admin',
+            content: [{
+              type: 'text/html',
+              value: `
+                <h2>Email Configuration Test</h2>
+                <p>This is a test email from your Advantix Admin dashboard.</p>
+                <p>If you received this email, your email service is configured correctly!</p>
+                <hr>
+                <p><small>Provider: ${settings.provider}</small></p>
+                <p><small>Sender: ${settings.senderEmail}</small></p>
+              `
+            }]
+          })
+        });
+      } else if (settings.provider === 'mailgun') {
+        const domain = settings.senderEmail.split('@')[1];
+        response = await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`api:${settings.apiKey}`).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            from: `${settings.senderName} <${settings.senderEmail}>`,
+            to: recipientEmail,
+            subject: 'Test Email from Advantix Admin',
+            html: `
+              <h2>Email Configuration Test</h2>
+              <p>This is a test email from your Advantix Admin dashboard.</p>
+              <p>If you received this email, your email service is configured correctly!</p>
+              <hr>
+              <p><small>Provider: ${settings.provider}</small></p>
+              <p><small>Sender: ${settings.senderEmail}</small></p>
+            `
+          }).toString()
+        });
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Unsupported email provider: ${settings.provider}` 
+        });
+      }
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("Email send error:", errorData);
+        return res.status(400).json({ 
+          success: false, 
+          message: `Failed to send test email: ${errorData}` 
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Test email sent successfully to ${recipientEmail}` 
+      });
+    } catch (error: any) {
+      console.error("Send test email error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "Internal server error" 
+      });
+    }
+  });
+
   // Sync Facebook ad accounts
   app.post("/api/facebook/sync-accounts", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
     try {
