@@ -658,6 +658,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export clients to CSV
+  app.get("/api/clients/export/csv", authenticate, requirePagePermission('clients', 'view'), async (req: Request, res: Response) => {
+    try {
+      const clients = await storage.getClients();
+
+      // Create CSV header
+      const headers = [
+        'id', 'clientName', 'businessName', 'contactPerson', 'email', 
+        'phone', 'address', 'notes', 'status', 'createdAt', 'updatedAt'
+      ];
+
+      // Create CSV rows
+      const csvRows = [headers.join(',')];
+      
+      clients.forEach(client => {
+        const row = headers.map(header => {
+          let value = client[header as keyof typeof client] ?? '';
+          
+          // Handle special formatting
+          if (header === 'createdAt' || header === 'updatedAt') {
+            value = value ? new Date(value as string).toISOString() : '';
+          }
+          
+          // Escape commas and quotes in values
+          const stringValue = String(value);
+          if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          }
+          return stringValue;
+        });
+        csvRows.push(row.join(','));
+      });
+
+      const csvContent = csvRows.join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=clients-export.csv');
+      res.send(csvContent);
+    } catch (error) {
+      console.error("Export clients CSV error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Import clients from CSV
+  app.post("/api/clients/import/csv", authenticate, requirePagePermission('clients', 'edit'), upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const fileContent = req.file.buffer.toString('utf-8');
+      const records = parse(fileContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true
+      }) as Record<string, string>[];
+
+      // Validate CSV structure
+      const requiredHeaders = [
+        'id', 'clientName', 'businessName', 'contactPerson', 'email',
+        'phone', 'address', 'notes', 'status', 'createdAt', 'updatedAt'
+      ];
+
+      if (records.length === 0) {
+        return res.status(400).json({ message: "CSV file is empty" });
+      }
+
+      const firstRecord = records[0];
+      const missingHeaders = requiredHeaders.filter(header => !(header in firstRecord));
+      
+      if (missingHeaders.length > 0) {
+        return res.status(400).json({ 
+          message: `Invalid CSV format. Missing columns: ${missingHeaders.join(', ')}` 
+        });
+      }
+
+      let importedCount = 0;
+      const errors: string[] = [];
+
+      for (const record of records) {
+        try {
+          // Parse client data
+          const clientData = {
+            clientName: record.clientName,
+            businessName: record.businessName,
+            contactPerson: record.contactPerson,
+            email: record.email,
+            phone: record.phone,
+            address: record.address || '',
+            notes: record.notes || '',
+            status: record.status || 'active',
+          };
+
+          // Create client
+          await storage.createClient(clientData);
+          importedCount++;
+        } catch (error) {
+          errors.push(`Failed to import client "${record.clientName}": ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      res.json({
+        message: `Successfully imported ${importedCount} client(s)`,
+        imported: importedCount,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error) {
+      console.error("Import clients CSV error:", error);
+      res.status(500).json({ message: "Failed to import CSV file" });
+    }
+  });
+
   // User Management Routes (Super Admin only)
   // Get all users
   app.get("/api/users", authenticate, requirePagePermission('admin', 'view', { superAdminBypass: true }), async (req: Request, res: Response) => {
