@@ -711,11 +711,35 @@ export const insertFacebookAdInsightSchema = createInsertSchema(facebookAdInsigh
 export type InsertFacebookAdInsight = z.infer<typeof insertFacebookAdInsightSchema>;
 export type FacebookAdInsight = typeof facebookAdInsights.$inferSelect;
 
+export const facebookPages = pgTable("facebook_pages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  facebookPageId: text("facebook_page_id").notNull().unique(),
+  pageName: text("page_name").notNull(),
+  category: text("category"),
+  profilePictureUrl: text("profile_picture_url"),
+  accessToken: text("access_token"),
+  adAccountId: varchar("ad_account_id").references(() => adAccounts.id, { onDelete: "cascade" }),
+  isActive: boolean("is_active").default(true),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFacebookPageSchema = createInsertSchema(facebookPages).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFacebookPage = z.infer<typeof insertFacebookPageSchema>;
+export type FacebookPage = typeof facebookPages.$inferSelect;
+
 // Campaign Drafts - Store in-progress campaigns before publishing to Facebook
 export const campaignDrafts = pgTable("campaign_drafts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   draftName: text("draft_name").notNull(),
   adAccountId: varchar("ad_account_id").references(() => adAccounts.id, { onDelete: "cascade" }).notNull(),
+  pageId: varchar("page_id").references(() => facebookPages.id, { onDelete: "set null" }),
   
   // Campaign Configuration
   objective: text("objective"), // OUTCOME_ENGAGEMENT, OUTCOME_SALES, OUTCOME_LEADS, etc.
