@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign, Tag as TagIcon, Plus, Database, Download, Upload, FileText, AlertCircle, Send, MessageSquare, Bot } from "lucide-react";
+import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign, Tag as TagIcon, Plus, Database, Download, Upload, FileText, AlertCircle, Send, MessageSquare, Bot, Mail } from "lucide-react";
 import type { User, InsertUserWithRole, Page, RolePermission, Tag, InsertTag, UserMenuPermission, InsertUserMenuPermission, Employee, InsertEmployee, TelegramConfig, InsertTelegramConfig, TelegramChatId, InsertTelegramChatId } from "@shared/schema";
 
 interface UserFormData {
@@ -3546,6 +3546,343 @@ function FacebookSettings() {
   );
 }
 
+function EmailSettings() {
+  const { toast } = useToast();
+  const [provider, setProvider] = useState("resend");
+  const [senderEmail, setSenderEmail] = useState("");
+  const [senderName, setSenderName] = useState("");
+  const [enableNotifications, setEnableNotifications] = useState(false);
+  const [enableNewAdAlerts, setEnableNewAdAlerts] = useState(true);
+  const [enableDailySummary, setEnableDailySummary] = useState(true);
+  const [dailySummaryTime, setDailySummaryTime] = useState("07:00");
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [lastTestedAt, setLastTestedAt] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  // Fetch Email settings
+  const { data: settings, isLoading: settingsLoading } = useQuery<any>({
+    queryKey: ["/api/email/settings"],
+  });
+
+  // Save settings mutation
+  const saveSettingsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/email/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ 
+          provider, 
+          senderEmail, 
+          senderName, 
+          enableNotifications, 
+          enableNewAdAlerts, 
+          enableDailySummary, 
+          dailySummaryTime 
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to save settings");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Email settings saved successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/email/settings"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Test connection mutation
+  const testConnectionMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/email/test-connection", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Connection failed");
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      setIsConfigured(data.success);
+      if (data.success) {
+        toast({
+          title: "Connection Successful",
+          description: `Email service configured with ${data.provider}`,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/email/settings"] });
+    },
+    onError: (error: any) => {
+      setIsConfigured(false);
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Failed to connect to email service",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Load settings when available
+  useEffect(() => {
+    if (settings) {
+      setProvider(settings.provider || "resend");
+      setSenderEmail(settings.senderEmail || "");
+      setSenderName(settings.senderName || "");
+      setEnableNotifications(settings.enableNotifications || false);
+      setEnableNewAdAlerts(settings.enableNewAdAlerts ?? true);
+      setEnableDailySummary(settings.enableDailySummary ?? true);
+      setDailySummaryTime(settings.dailySummaryTime || "07:00");
+      setIsConfigured(settings.isConfigured || false);
+      setLastTestedAt(settings.lastTestedAt || null);
+      setConnectionError(settings.connectionError || null);
+    }
+  }, [settings]);
+
+  const handleSaveSettings = () => {
+    if (!provider || !senderEmail || !senderName) {
+      toast({
+        title: "Validation Error",
+        description: "Provider, sender email, and sender name are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    saveSettingsMutation.mutate();
+  };
+
+  const handleTestConnection = () => {
+    if (!settings) {
+      toast({
+        title: "Error",
+        description: "Please save settings first",
+        variant: "destructive",
+      });
+      return;
+    }
+    testConnectionMutation.mutate();
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Email Automation Settings
+          </CardTitle>
+          <CardDescription>
+            Configure email service for automated client notifications
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Connection Status */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className={`w-3 h-3 rounded-full ${isConfigured ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {isConfigured ? 'Configured' : 'Not Configured'}
+                </p>
+                {lastTestedAt && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Last tested: {new Date(lastTestedAt).toLocaleString()}
+                  </p>
+                )}
+                {connectionError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    Error: {connectionError}
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button
+              onClick={handleTestConnection}
+              disabled={testConnectionMutation.isPending || !settings}
+              variant="outline"
+              data-testid="button-test-email-connection"
+            >
+              {testConnectionMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Test Connection
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Settings Form */}
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="email-provider">Email Service Provider</Label>
+              <Select value={provider} onValueChange={setProvider}>
+                <SelectTrigger id="email-provider" data-testid="select-email-provider">
+                  <SelectValue placeholder="Select email provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="resend">Resend</SelectItem>
+                  <SelectItem value="sendgrid">SendGrid</SelectItem>
+                  <SelectItem value="mailgun">Mailgun</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Choose your email service provider
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sender-email">Sender Email Address</Label>
+              <Input
+                id="sender-email"
+                type="email"
+                placeholder="notifications@yourcompany.com"
+                value={senderEmail}
+                onChange={(e) => setSenderEmail(e.target.value)}
+                data-testid="input-sender-email"
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Email address that will appear as the sender
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sender-name">Sender Name</Label>
+              <Input
+                id="sender-name"
+                type="text"
+                placeholder="Advantix Notifications"
+                value={senderName}
+                onChange={(e) => setSenderName(e.target.value)}
+                data-testid="input-sender-name"
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Name that will appear as the sender
+              </p>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t">
+              <h4 className="font-medium">Notification Settings</h4>
+              
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Enable Notifications</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Master toggle for all email notifications
+                  </p>
+                </div>
+                <Switch
+                  checked={enableNotifications}
+                  onCheckedChange={setEnableNotifications}
+                  data-testid="switch-enable-notifications"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>New Ad Alerts</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Notify clients when new ads are created
+                  </p>
+                </div>
+                <Switch
+                  checked={enableNewAdAlerts}
+                  onCheckedChange={setEnableNewAdAlerts}
+                  disabled={!enableNotifications}
+                  data-testid="switch-enable-new-ad-alerts"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Daily Summary Emails</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Send daily performance summaries to clients
+                  </p>
+                </div>
+                <Switch
+                  checked={enableDailySummary}
+                  onCheckedChange={setEnableDailySummary}
+                  disabled={!enableNotifications}
+                  data-testid="switch-enable-daily-summary"
+                />
+              </div>
+
+              {enableDailySummary && (
+                <div className="space-y-2 pl-4">
+                  <Label htmlFor="summary-time">Daily Summary Time</Label>
+                  <Input
+                    id="summary-time"
+                    type="time"
+                    value={dailySummaryTime}
+                    onChange={(e) => setDailySummaryTime(e.target.value)}
+                    disabled={!enableNotifications}
+                    data-testid="input-daily-summary-time"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                onClick={handleSaveSettings}
+                disabled={saveSettingsMutation.isPending}
+                className="flex-1"
+                data-testid="button-save-email-settings"
+              >
+                {saveSettingsMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Save Settings
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* API Key Notice */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              API Key Required
+            </h4>
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              Your email service API key should be stored in Replit Secrets as <code className="bg-blue-100 dark:bg-blue-800 px-1 py-0.5 rounded">EMAIL_SERVICE_API_KEY</code>. 
+              This ensures your API key is stored securely and not exposed in your codebase.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   return (
     <Sidebar>
@@ -3564,7 +3901,7 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="users" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4 max-w-4xl">
+            <TabsList className="grid w-full grid-cols-5 max-w-5xl">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 User Management
@@ -3585,6 +3922,10 @@ export default function AdminPage() {
                 </svg>
                 FB Settings
               </TabsTrigger>
+              <TabsTrigger value="email" className="flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Email Settings
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="users">
@@ -3601,6 +3942,10 @@ export default function AdminPage() {
 
             <TabsContent value="facebook">
               <FacebookSettings />
+            </TabsContent>
+
+            <TabsContent value="email">
+              <EmailSettings />
             </TabsContent>
           </Tabs>
         </div>
