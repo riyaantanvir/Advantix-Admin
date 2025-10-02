@@ -3519,41 +3519,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Facebook ad account not found" });
       }
 
-      // Fetch insights from Facebook API
-      const today = new Date().toISOString().split('T')[0];
-      const apiUrl = `https://graph.facebook.com/v18.0/act_${adAccount.accountId}/insights?access_token=${settings.accessToken}&time_range={'since':'${today}','until':'${today}'}&fields=spend,impressions,clicks,ctr,cpc,cpm,reach,frequency,actions`;
+      // Calculate date range (last 30 days)
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
       
-      const response = await fetch(apiUrl);
+      const since = startDate.toISOString().split('T')[0];
+      const until = endDate.toISOString().split('T')[0];
+
+      // Fetch account-level insights with daily breakdown
+      const accountApiUrl = `https://graph.facebook.com/v18.0/act_${adAccount.accountId}/insights?access_token=${settings.accessToken}&time_range={'since':'${since}','until':'${until}'}&time_increment=1&level=account&fields=spend,impressions,clicks,ctr,cpc,cpm,reach,frequency,actions`;
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        return res.status(400).json({ message: errorData.error?.message || "Failed to fetch data from Facebook" });
+      const accountResponse = await fetch(accountApiUrl);
+      
+      if (!accountResponse.ok) {
+        const errorData = await accountResponse.json();
+        return res.status(400).json({ message: errorData.error?.message || "Failed to fetch account insights from Facebook" });
       }
 
-      const data = await response.json();
+      const accountData = await accountResponse.json();
+      let accountRecordsUpdated = 0;
       
-      // Store insights in database
-      if (data.data && data.data.length > 0) {
-        const insight = data.data[0];
-        await storage.upsertFacebookAccountInsight({
-          adAccountId: adAccount.id,
-          date: new Date(today),
-          spend: insight.spend || "0",
-          impressions: parseInt(insight.impressions) || 0,
-          clicks: parseInt(insight.clicks) || 0,
-          ctr: insight.ctr || "0",
-          cpc: insight.cpc || "0",
-          cpm: insight.cpm || "0",
-          reach: parseInt(insight.reach) || 0,
-          frequency: insight.frequency || "0",
-          conversions: 0,
-          costPerConversion: "0",
-          conversionRate: "0",
-          roas: "0"
-        });
+      // Store account insights in database
+      if (accountData.data && accountData.data.length > 0) {
+        for (const dailyInsight of accountData.data) {
+          const dateString = dailyInsight.date_start;
+          const conversionsAction = dailyInsight.actions?.find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase');
+          const conversions = conversionsAction ? parseInt(conversionsAction.value) : 0;
+          const spend = parseFloat(dailyInsight.spend || "0");
+          const conversionValue = conversionsAction ? parseFloat(conversionsAction.value || "0") : 0;
+          const roas = spend > 0 && conversionValue > 0 ? (conversionValue / spend).toFixed(2) : "0";
+          
+          await storage.upsertFacebookAccountInsight({
+            adAccountId: adAccount.id,
+            date: new Date(dateString),
+            spend: dailyInsight.spend || "0",
+            impressions: parseInt(dailyInsight.impressions) || 0,
+            clicks: parseInt(dailyInsight.clicks) || 0,
+            ctr: dailyInsight.ctr || "0",
+            cpc: dailyInsight.cpc || "0",
+            cpm: dailyInsight.cpm || "0",
+            reach: parseInt(dailyInsight.reach) || 0,
+            frequency: dailyInsight.frequency || "0",
+            conversions,
+            costPerConversion: conversions > 0 ? (spend / conversions).toFixed(2) : "0",
+            conversionRate: dailyInsight.clicks > 0 ? ((conversions / parseInt(dailyInsight.clicks)) * 100).toFixed(2) : "0",
+            roas
+          });
+          accountRecordsUpdated++;
+        }
       }
 
-      res.json({ message: "Data synced successfully", recordsUpdated: data.data?.length || 0 });
+      // Fetch campaign-level insights
+      const campaignApiUrl = `https://graph.facebook.com/v18.0/act_${adAccount.accountId}/insights?access_token=${settings.accessToken}&time_range={'since':'${since}','until':'${until}'}&time_increment=1&level=campaign&fields=campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,cpm,reach,frequency,actions`;
+      
+      const campaignResponse = await fetch(campaignApiUrl);
+      let campaignRecordsUpdated = 0;
+      
+      if (campaignResponse.ok) {
+        const campaignData = await campaignResponse.json();
+        
+        if (campaignData.data && campaignData.data.length > 0) {
+          for (const dailyCampaign of campaignData.data) {
+            const dateString = dailyCampaign.date_start;
+            const conversionsAction = dailyCampaign.actions?.find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase');
+            const conversions = conversionsAction ? parseInt(conversionsAction.value) : 0;
+            const spend = parseFloat(dailyCampaign.spend || "0");
+            const conversionValue = conversionsAction ? parseFloat(conversionsAction.value || "0") : 0;
+            const roas = spend > 0 && conversionValue > 0 ? (conversionValue / spend).toFixed(2) : "0";
+            
+            await storage.upsertFacebookCampaignInsight({
+              adAccountId: adAccount.id,
+              fbCampaignId: dailyCampaign.campaign_id,
+              campaignName: dailyCampaign.campaign_name || "Unnamed Campaign",
+              date: new Date(dateString),
+              spend: dailyCampaign.spend || "0",
+              impressions: parseInt(dailyCampaign.impressions) || 0,
+              clicks: parseInt(dailyCampaign.clicks) || 0,
+              ctr: dailyCampaign.ctr || "0",
+              cpc: dailyCampaign.cpc || "0",
+              cpm: dailyCampaign.cpm || "0",
+              reach: parseInt(dailyCampaign.reach) || 0,
+              frequency: dailyCampaign.frequency || "0",
+              conversions,
+              costPerConversion: conversions > 0 ? (spend / conversions).toFixed(2) : "0",
+              conversionRate: dailyCampaign.clicks > 0 ? ((conversions / parseInt(dailyCampaign.clicks)) * 100).toFixed(2) : "0",
+              roas
+            });
+            campaignRecordsUpdated++;
+          }
+        }
+      }
+
+      res.json({ 
+        message: "Data synced successfully", 
+        accountRecordsUpdated,
+        campaignRecordsUpdated,
+        totalRecords: accountRecordsUpdated + campaignRecordsUpdated
+      });
     } catch (error: any) {
       console.error("Sync Facebook data error:", error);
       res.status(500).json({ message: error.message || "Internal server error" });
