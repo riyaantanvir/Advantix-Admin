@@ -3686,6 +3686,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // ADVANTIX ADS MANAGER ROUTES - Campaign Creation & Management
+  // ============================================================================
+
+  // Get all campaign drafts
+  app.get("/api/campaign-drafts", authenticate, async (req: Request, res: Response) => {
+    try {
+      const drafts = await storage.getCampaignDrafts();
+      res.json(drafts);
+    } catch (error) {
+      console.error("Get campaign drafts error:", error);
+      res.status(500).json({ message: "Failed to fetch campaign drafts" });
+    }
+  });
+
+  // Get single campaign draft
+  app.get("/api/campaign-drafts/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const draft = await storage.getCampaignDraftById(id);
+      
+      if (!draft) {
+        return res.status(404).json({ message: "Draft not found" });
+      }
+      
+      res.json(draft);
+    } catch (error) {
+      console.error("Get campaign draft error:", error);
+      res.status(500).json({ message: "Failed to fetch campaign draft" });
+    }
+  });
+
+  // Create new campaign draft
+  app.post("/api/campaign-drafts", authenticate, async (req: Request, res: Response) => {
+    try {
+      const draftData = {
+        ...req.body,
+        createdBy: (req as any).user?.id,
+      };
+      
+      const draft = await storage.createCampaignDraft(draftData);
+      res.json(draft);
+    } catch (error) {
+      console.error("Create campaign draft error:", error);
+      res.status(500).json({ message: "Failed to create campaign draft" });
+    }
+  });
+
+  // Update campaign draft
+  app.put("/api/campaign-drafts/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const draft = await storage.updateCampaignDraft(id, req.body);
+      
+      if (!draft) {
+        return res.status(404).json({ message: "Draft not found" });
+      }
+      
+      res.json(draft);
+    } catch (error) {
+      console.error("Update campaign draft error:", error);
+      res.status(500).json({ message: "Failed to update campaign draft" });
+    }
+  });
+
+  // Delete campaign draft
+  app.delete("/api/campaign-drafts/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteCampaignDraft(id);
+      res.json({ message: "Draft deleted successfully" });
+    } catch (error) {
+      console.error("Delete campaign draft error:", error);
+      res.status(500).json({ message: "Failed to delete campaign draft" });
+    }
+  });
+
+  // Publish campaign draft to Facebook
+  app.post("/api/campaign-drafts/:id/publish", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const draft = await storage.getCampaignDraftById(id);
+      
+      if (!draft) {
+        return res.status(404).json({ message: "Draft not found" });
+      }
+
+      // Get Facebook settings
+      const settings = await storage.getFacebookSettings();
+      if (!settings || !settings.accessToken) {
+        return res.status(400).json({ message: "Facebook settings not configured" });
+      }
+
+      // Get ad account details
+      const adAccount = await storage.getAdAccountById(draft.adAccountId);
+      if (!adAccount) {
+        return res.status(404).json({ message: "Ad account not found" });
+      }
+
+      // Update draft status to publishing
+      await storage.updateCampaignDraft(id, { status: "publishing" });
+
+      // Create Campaign on Facebook
+      const campaignData = {
+        name: draft.campaignName,
+        objective: draft.objective,
+        status: "PAUSED", // Start paused for safety
+        special_ad_categories: [],
+      };
+
+      const campaignUrl = `https://graph.facebook.com/v18.0/act_${adAccount.accountId}/campaigns?access_token=${settings.accessToken}`;
+      const campaignResponse = await fetch(campaignUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(campaignData),
+      });
+
+      if (!campaignResponse.ok) {
+        const error = await campaignResponse.json();
+        await storage.updateCampaignDraft(id, { status: "failed", notes: error.error?.message || "Campaign creation failed" });
+        return res.status(400).json({ message: error.error?.message || "Failed to create campaign" });
+      }
+
+      const campaignResult = await campaignResponse.json();
+      const fbCampaignId = campaignResult.id;
+
+      // Update draft as published
+      await storage.updateCampaignDraft(id, {
+        status: "published",
+        publishedCampaignId: fbCampaignId,
+      });
+
+      res.json({
+        message: "Campaign published successfully",
+        campaignId: fbCampaignId,
+        draft: await storage.getCampaignDraftById(id),
+      });
+    } catch (error: any) {
+      console.error("Publish campaign error:", error);
+      const { id } = req.params;
+      await storage.updateCampaignDraft(id, { status: "failed", notes: error.message });
+      res.status(500).json({ message: error.message || "Failed to publish campaign" });
+    }
+  });
+
+  // Get campaign templates
+  app.get("/api/campaign-templates", authenticate, async (req: Request, res: Response) => {
+    try {
+      const templates = await storage.getCampaignTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Get campaign templates error:", error);
+      res.status(500).json({ message: "Failed to fetch campaign templates" });
+    }
+  });
+
+  // Get saved audiences
+  app.get("/api/saved-audiences", authenticate, async (req: Request, res: Response) => {
+    try {
+      const audiences = await storage.getSavedAudiences();
+      res.json(audiences);
+    } catch (error) {
+      console.error("Get saved audiences error:", error);
+      res.status(500).json({ message: "Failed to fetch saved audiences" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
