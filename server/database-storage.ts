@@ -40,6 +40,8 @@ import {
   type InsertTelegramChatId,
   type FacebookSetting,
   type InsertFacebookSetting,
+  type EmailSetting,
+  type InsertEmailSetting,
   type FacebookAccountInsight,
   type InsertFacebookAccountInsight,
   type FacebookCampaignInsight,
@@ -70,6 +72,7 @@ import {
   telegramConfig,
   telegramChatIds,
   facebookSettings,
+  emailSettings,
   facebookAccountInsights,
   facebookCampaignInsights,
   facebookAdSetInsights,
@@ -1820,6 +1823,72 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("[DB ERROR] Failed to update Facebook connection status:", error);
       throw new Error(`Failed to update Facebook connection status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Email Settings methods
+  async getEmailSettings(): Promise<EmailSetting | undefined> {
+    try {
+      const result = await db.select()
+        .from(emailSettings)
+        .limit(1);
+      
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get email settings:", error);
+      throw new Error(`Failed to get email settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async saveEmailSettings(data: InsertEmailSetting): Promise<EmailSetting> {
+    try {
+      const existing = await this.getEmailSettings();
+      
+      if (existing) {
+        const result = await db.update(emailSettings)
+          .set({
+            ...data,
+            updatedAt: new Date(),
+          })
+          .where(eq(emailSettings.id, existing.id))
+          .returning();
+        
+        console.log(`[DB] Updated email settings`);
+        return result[0];
+      } else {
+        const result = await db.insert(emailSettings).values({
+          ...data,
+          id: randomUUID(),
+        }).returning();
+        
+        console.log(`[DB] Created email settings`);
+        return result[0];
+      }
+    } catch (error) {
+      console.error("[DB ERROR] Failed to save email settings:", error);
+      throw new Error(`Failed to save email settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async updateEmailConnectionStatus(isConfigured: boolean, error?: string): Promise<void> {
+    try {
+      const existing = await this.getEmailSettings();
+      
+      if (existing) {
+        await db.update(emailSettings)
+          .set({
+            isConfigured,
+            lastTestedAt: new Date(),
+            connectionError: error || null,
+            updatedAt: new Date(),
+          })
+          .where(eq(emailSettings.id, existing.id));
+        
+        console.log(`[DB] Updated email connection status: ${isConfigured ? 'configured' : 'not configured'}`);
+      }
+    } catch (error) {
+      console.error("[DB ERROR] Failed to update email connection status:", error);
+      throw new Error(`Failed to update email connection status: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

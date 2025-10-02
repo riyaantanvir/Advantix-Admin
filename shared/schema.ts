@@ -574,6 +574,32 @@ export const insertFacebookSettingSchema = createInsertSchema(facebookSettings).
 export type InsertFacebookSetting = z.infer<typeof insertFacebookSettingSchema>;
 export type FacebookSetting = typeof facebookSettings.$inferSelect;
 
+// Email Settings (API key stored in Replit Secrets for security)
+export const emailSettings = pgTable("email_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull().default("resend"), // "resend", "sendgrid", "mailgun"
+  senderEmail: text("sender_email").notNull(),
+  senderName: text("sender_name").notNull(),
+  enableNotifications: boolean("enable_notifications").default(false),
+  enableNewAdAlerts: boolean("enable_new_ad_alerts").default(true),
+  enableDailySummary: boolean("enable_daily_summary").default(true),
+  dailySummaryTime: text("daily_summary_time").default("07:00"), // Time in HH:mm format
+  isConfigured: boolean("is_configured").default(false),
+  lastTestedAt: timestamp("last_tested_at"),
+  connectionError: text("connection_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEmailSettingSchema = createInsertSchema(emailSettings).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertEmailSetting = z.infer<typeof insertEmailSettingSchema>;
+export type EmailSetting = typeof emailSettings.$inferSelect;
+
 // Facebook Ad Account Insights
 export const facebookAccountInsights = pgTable("facebook_account_insights", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
