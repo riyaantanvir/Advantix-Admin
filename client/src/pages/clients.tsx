@@ -58,6 +58,7 @@ import {
   Users, 
   RefreshCw, 
   Download,
+  Upload,
   Eye,
   Pause,
   Play
@@ -81,6 +82,7 @@ export default function ClientsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isImporting, setIsImporting] = useState(false);
   
   const [formData, setFormData] = useState<ClientFormData>({
     clientName: "",
@@ -274,59 +276,91 @@ export default function ClientsPage() {
     toggleClientStatusMutation.mutate({ id: client.id, status: newStatus });
   };
 
-  const handleExportCSV = () => {
-    if (filteredClients.length === 0) {
+  const handleExportCSV = async () => {
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch("/api/clients/export/csv", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to export clients");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `clients-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
       toast({
-        title: "No Data",
-        description: "No clients to export",
+        title: "Success",
+        description: "Clients exported successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export clients",
         variant: "destructive",
       });
-      return;
     }
+  };
 
-    const headers = [
-      "Client ID",
-      "Client Name", 
-      "Business Name",
-      "Contact Person",
-      "Email", 
-      "Phone",
-      "Status",
-      "Created Date"
-    ];
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    const csvData = [
-      headers,
-      ...filteredClients.map(client => [
-        client.id,
-        client.clientName,
-        client.businessName,
-        client.contactPerson,
-        client.email,
-        client.phone,
-        client.status,
-        client.createdAt ? new Date(client.createdAt).toLocaleDateString() : ""
-      ])
-    ];
+    setIsImporting(true);
+    const formData = new FormData();
+    formData.append("file", file);
 
-    const csvContent = csvData.map(row => 
-      row.map(field => `"${field}"`).join(",")
-    ).join("\n");
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch("/api/clients/import/csv", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `clients-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const data = await response.json();
 
-    toast({
-      title: "Success",
-      description: "Client data exported successfully",
-    });
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to import clients");
+      }
+
+      toast({
+        title: "Success",
+        description: data.message,
+      });
+
+      if (data.errors && data.errors.length > 0) {
+        toast({
+          title: "Import Warnings",
+          description: `${data.errors.length} error(s) occurred during import`,
+          variant: "destructive",
+        });
+      }
+
+      refetchClients();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to import clients",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+      event.target.value = "";
+    }
   };
 
   return (
@@ -365,6 +399,24 @@ export default function ClientsPage() {
                     <Download className="h-4 w-4 mr-2" />
                     Export CSV
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('csv-import-input')?.click()}
+                    disabled={isImporting}
+                    data-testid="button-import-csv"
+                  >
+                    <Upload className={`h-4 w-4 mr-2 ${isImporting ? 'animate-pulse' : ''}`} />
+                    {isImporting ? "Importing..." : "Import CSV"}
+                  </Button>
+                  <input
+                    id="csv-import-input"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleImportCSV}
+                    className="hidden"
+                    data-testid="input-csv-file"
+                  />
                   <Button
                     variant="outline"
                     size="sm"
