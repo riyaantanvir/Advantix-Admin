@@ -461,6 +461,7 @@ function UserManagement() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="font-semibold">Username</TableHead>
+                  <TableHead className="font-semibold">Role</TableHead>
                   <TableHead className="text-center font-semibold">Dashboard</TableHead>
                   <TableHead className="text-center font-semibold">Campaign Mgmt</TableHead>
                   <TableHead className="text-center font-semibold">Client Mgmt</TableHead>
@@ -479,17 +480,39 @@ function UserManagement() {
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={15} className="text-center py-8 text-gray-500">
                       No users found
                     </TableCell>
                   </TableRow>
                 ) : (
                   users.map((user) => {
                     const permissions = getUserPermissions(user.id);
+                    const getRoleBadgeVariant = (role: string) => {
+                      switch (role) {
+                        case 'super_admin': return 'destructive';
+                        case 'admin': return 'default';
+                        case 'manager': return 'secondary';
+                        default: return 'outline';
+                      }
+                    };
+                    const getRoleLabel = (role: string) => {
+                      switch (role) {
+                        case 'super_admin': return 'Super Admin';
+                        case 'admin': return 'Admin';
+                        case 'manager': return 'Manager';
+                        case 'user': return 'User';
+                        default: return role;
+                      }
+                    };
                     return (
                       <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                         <TableCell className="font-medium" data-testid={`text-username-${user.id}`}>
                           {user.username}
+                        </TableCell>
+                        <TableCell data-testid={`text-role-${user.id}`}>
+                          <Badge variant={getRoleBadgeVariant(user.role)}>
+                            {getRoleLabel(user.role)}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="flex justify-center">
