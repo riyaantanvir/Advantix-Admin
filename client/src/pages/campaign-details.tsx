@@ -125,27 +125,41 @@ export default function CampaignDetailsPage() {
     enabled: !!campaignId,
   });
 
-  // Mock daily spend data (in real app, this would come from API)
+  // Fetch daily spends from the database
+  const { data: dailySpendsFromDB = [] } = useQuery<DailySpend[]>({
+    queryKey: ["/api/campaigns", campaignId, "daily-spends"],
+    enabled: !!campaignId,
+  });
+
+  // Generate calendar with all days, merged with database data
   const [dailySpends, setDailySpends] = useState<DailySpend[]>([]);
   
-  // Initialize daily spends when component mounts or campaign data changes
+  // Initialize daily spends when component mounts or data changes
   useEffect(() => {
     const days = [];
-    const today = new Date();
     
     // Show only today and previous 3 days (4 days total)
     for (let i = 3; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const isToday = date.toDateString() === today.toDateString();
+      // Normalize to UTC start of day to match backend
+      date.setUTCHours(0, 0, 0, 0);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      // Find existing spend from database for this date
+      const existingSpend = dailySpendsFromDB.find(spend => {
+        const spendDate = new Date(spend.date);
+        spendDate.setUTCHours(0, 0, 0, 0);
+        return spendDate.toISOString().split('T')[0] === dateStr;
+      });
       
       days.push({
-        date: date.toISOString().split('T')[0],
-        amount: isToday ? (campaign ? parseFloat(campaign.budget || '0') : 0) : 0, // Only today gets budget, others are 0
+        date: dateStr,
+        amount: existingSpend ? parseFloat(existingSpend.amount.toString()) : 0,
       });
     }
     setDailySpends(days);
-  }, [campaign]); // Re-run when campaign data is loaded
+  }, [dailySpendsFromDB]); // Re-run when database data changes
 
   // Mock campaign history (in real app, this would come from API)
   const [campaignHistory] = useState<CampaignHistory[]>([
@@ -206,57 +220,10 @@ export default function CampaignDetailsPage() {
     }).format(numAmount);
   };
 
-  // Calculate total spending from calendar data
+  // Calculate total spending from calendar data (for display only)
   const totalCalendarSpend = dailySpends.reduce((sum, day) => {
-    const dayDate = new Date(day.date);
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    
-    // For past days, add full amount to total
-    // For current day, add running total (in real app, this would be live)
-    if (dayDate < today || !isRunningDay(day.date)) {
-      return sum + day.amount;
-    } else {
-      // Current running day - in real app, this would be live spending
-      return sum + day.amount; // For now, treat the same
-    }
+    return sum + day.amount;
   }, 0);
-
-  // Mutation to sync calendar spend to campaign
-  const syncCampaignSpendMutation = useMutation({
-    mutationFn: async (newSpend: number) => {
-      const response = await apiRequest("PUT", `/api/campaigns/${campaignId}`, { spend: newSpend.toString() });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] }); // Refresh campaign list
-      toast({
-        title: "Success",
-        description: "Campaign spending synchronized successfully.",
-      });
-    },
-    onError: (error: any) => {
-      console.error("Failed to sync campaign spend:", error);
-      toast({
-        title: "Error",
-        description: "Failed to sync campaign spending.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Auto-sync campaign spend when calendar changes
-  useEffect(() => {
-    if (campaign && totalCalendarSpend !== parseFloat(campaign.spend || '0')) {
-      // Debounce the sync to avoid too many API calls
-      const timeoutId = setTimeout(() => {
-        syncCampaignSpendMutation.mutate(totalCalendarSpend);
-      }, 1000); // 1 second debounce
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [totalCalendarSpend, campaign]);
 
   // Ad Copy Set form setup
   const createAdCopyForm = useForm<InsertAdCopySet>({
@@ -422,32 +389,34 @@ export default function CampaignDetailsPage() {
     },
   });
 
-  // Update daily spend mutation (mock)
+  // Update daily spend mutation - saves to database
   const updateDailySpendMutation = useMutation({
     mutationFn: async ({ date, amount }: { date: string; amount: number }) => {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return { date, amount };
+      const response = await apiRequest("POST", `/api/campaigns/${campaignId}/daily-spends`, {
+        date: new Date(date).toISOString(),
+        amount: amount,
+      });
+      return response.json();
     },
     onSuccess: (data) => {
       setIsLoading(false);
-      setDailySpends(prev => 
-        prev.map(day => 
-          day.date === data.date ? { ...day, amount: data.amount } : day
-        )
-      );
+      // Invalidate queries to trigger re-fetch and sync across all pages
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "daily-spends"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] }); // Refresh main campaigns list
       setEditingDay(null);
       setEditingSpend("");
       toast({
         title: "Success!",
-        description: "Daily spend updated successfully.",
+        description: "Daily spend updated and synced across all pages.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       setIsLoading(false);
       toast({
         title: "Error",
-        description: "Failed to update daily spend.",
+        description: error.message || "Failed to update daily spend.",
         variant: "destructive",
       });
     },

@@ -11,6 +11,8 @@ import {
   type InsertAdAccount,
   type AdCopySet,
   type InsertAdCopySet,
+  type CampaignDailySpend,
+  type InsertCampaignDailySpend,
   type WorkReport,
   type InsertWorkReport,
   type Page,
@@ -62,6 +64,12 @@ export interface IStorage {
   createCampaign(campaign: InsertCampaign): Promise<Campaign>;
   updateCampaign(id: string, campaign: Partial<InsertCampaign>): Promise<Campaign | undefined>;
   deleteCampaign(id: string): Promise<boolean>;
+  
+  // Campaign Daily Spend methods
+  getCampaignDailySpends(campaignId: string): Promise<CampaignDailySpend[]>;
+  getCampaignDailySpend(campaignId: string, date: string): Promise<CampaignDailySpend | undefined>;
+  upsertCampaignDailySpend(spend: InsertCampaignDailySpend): Promise<CampaignDailySpend>;
+  getCampaignTotalSpend(campaignId: string): Promise<number>;
   
   // Client methods
   getClients(): Promise<Client[]>;

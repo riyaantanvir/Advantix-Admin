@@ -10,6 +10,8 @@ import {
   type InsertAdAccount,
   type AdCopySet,
   type InsertAdCopySet,
+  type CampaignDailySpend,
+  type InsertCampaignDailySpend,
   type WorkReport,
   type InsertWorkReport,
   type Page,
@@ -43,6 +45,7 @@ import {
   clients,
   adAccounts,
   adCopySets,
+  campaignDailySpends,
   workReports,
   pages,
   rolePermissions,
@@ -432,6 +435,91 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`[DB ERROR] Failed to delete campaign with ID ${id}:`, error);
       throw new Error(`Failed to delete campaign: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Campaign Daily Spend methods
+  async getCampaignDailySpends(campaignId: string): Promise<CampaignDailySpend[]> {
+    try {
+      return db.select()
+        .from(campaignDailySpends)
+        .where(eq(campaignDailySpends.campaignId, campaignId))
+        .orderBy(desc(campaignDailySpends.date));
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get daily spends for campaign ${campaignId}:`, error);
+      throw new Error(`Failed to get campaign daily spends: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getCampaignDailySpend(campaignId: string, date: string): Promise<CampaignDailySpend | undefined> {
+    try {
+      // Normalize date to start of day in UTC to prevent timezone shifts
+      const normalizedDate = new Date(date);
+      normalizedDate.setUTCHours(0, 0, 0, 0);
+      
+      const result = await db.select()
+        .from(campaignDailySpends)
+        .where(and(
+          eq(campaignDailySpends.campaignId, campaignId),
+          eq(campaignDailySpends.date, normalizedDate)
+        ))
+        .limit(1);
+      return result[0];
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get daily spend for campaign ${campaignId} on ${date}:`, error);
+      throw new Error(`Failed to get campaign daily spend: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async upsertCampaignDailySpend(spend: InsertCampaignDailySpend): Promise<CampaignDailySpend> {
+    try {
+      const id = randomUUID();
+      // Normalize date to start of day in UTC to ensure uniqueness works correctly across timezones
+      const normalizedDate = new Date(spend.date);
+      normalizedDate.setUTCHours(0, 0, 0, 0);
+      
+      const spendData = {
+        ...spend,
+        id,
+        date: normalizedDate,
+        amount: spend.amount.toString(),
+      };
+      
+      // Use PostgreSQL's ON CONFLICT to update if exists
+      const result = await db.insert(campaignDailySpends)
+        .values(spendData)
+        .onConflictDoUpdate({
+          target: [campaignDailySpends.campaignId, campaignDailySpends.date],
+          set: {
+            amount: spend.amount.toString(),
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      
+      console.log(`[DB] Upserted daily spend for campaign ${spend.campaignId} on ${normalizedDate.toISOString().split('T')[0]}: $${spend.amount}`);
+      
+      // Update the campaign's total spend field
+      const totalSpend = await this.getCampaignTotalSpend(spend.campaignId);
+      await this.updateCampaign(spend.campaignId, { spend: totalSpend.toString() });
+      
+      return result[0];
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to upsert daily spend:`, error);
+      throw new Error(`Failed to upsert campaign daily spend: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getCampaignTotalSpend(campaignId: string): Promise<number> {
+    try {
+      const spends = await this.getCampaignDailySpends(campaignId);
+      const total = spends.reduce((sum, spend) => {
+        return sum + parseFloat(spend.amount || "0");
+      }, 0);
+      return total;
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get total spend for campaign ${campaignId}:`, error);
+      throw new Error(`Failed to get campaign total spend: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

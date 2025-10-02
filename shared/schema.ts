@@ -124,6 +124,21 @@ export const salaries = pgTable("salaries", {
   }
 });
 
+// Daily Campaign Spend Tracking
+export const campaignDailySpends = pgTable("campaign_daily_spends", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: "cascade" }).notNull(),
+  date: timestamp("date").notNull(), // Store as date normalized to start of day
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => {
+  return {
+    // Unique constraint: one entry per campaign per day (date must be normalized to start of day)
+    uniqueCampaignDate: sql`UNIQUE(${table.campaignId}, ${table.date})`
+  }
+});
+
 // Ad Copy Sets for Campaign Management
 export const adCopySets = pgTable("ad_copy_sets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -260,6 +275,15 @@ export const insertAdCopySetSchema = createInsertSchema(adCopySets).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertCampaignDailySpendSchema = createInsertSchema(campaignDailySpends).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  date: z.coerce.date(),
+  amount: z.coerce.number().min(0, "Amount must be a positive number"),
 });
 
 export const insertPageSchema = createInsertSchema(pages).omit({
@@ -491,6 +515,9 @@ export type WorkReport = typeof workReports.$inferSelect;
 
 export type InsertAdCopySet = z.infer<typeof insertAdCopySetSchema>;
 export type AdCopySet = typeof adCopySets.$inferSelect;
+
+export type InsertCampaignDailySpend = z.infer<typeof insertCampaignDailySpendSchema>;
+export type CampaignDailySpend = typeof campaignDailySpends.$inferSelect;
 
 export type InsertPage = z.infer<typeof insertPageSchema>;
 export type Page = typeof pages.$inferSelect;

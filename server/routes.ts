@@ -6,6 +6,7 @@ import { parse } from "csv-parse/sync";
 import { 
   loginSchema, 
   insertCampaignSchema, 
+  insertCampaignDailySpendSchema,
   insertClientSchema,
   insertUserWithRoleSchema,
   insertAdAccountSchema,
@@ -387,6 +388,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Campaign deleted successfully" });
     } catch (error) {
       console.error("Delete campaign error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Campaign Daily Spend Routes
+  // Get all daily spends for a campaign
+  app.get("/api/campaigns/:id/daily-spends", authenticate, requirePagePermission('campaigns', 'view'), async (req: Request, res: Response) => {
+    try {
+      const spends = await storage.getCampaignDailySpends(req.params.id);
+      res.json(spends);
+    } catch (error) {
+      console.error("Get campaign daily spends error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Upsert (create or update) daily spend for a campaign
+  app.post("/api/campaigns/:id/daily-spends", authenticate, requirePagePermission('campaigns', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertCampaignDailySpendSchema.parse({
+        ...req.body,
+        campaignId: req.params.id,
+      });
+      
+      const spend = await storage.upsertCampaignDailySpend(validatedData);
+      res.json(spend);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Upsert campaign daily spend error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get total spend for a campaign
+  app.get("/api/campaigns/:id/total-spend", authenticate, requirePagePermission('campaigns', 'view'), async (req: Request, res: Response) => {
+    try {
+      const totalSpend = await storage.getCampaignTotalSpend(req.params.id);
+      res.json({ totalSpend });
+    } catch (error) {
+      console.error("Get campaign total spend error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
