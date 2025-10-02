@@ -2,6 +2,18 @@
 
 This is a full-stack web application built with React and Express.js, featuring a modern authentication system and admin dashboard. The application is named "Advantix Admin" and provides comprehensive campaign management, client tracking, financial management, and work reporting capabilities. It uses a PostgreSQL database with Drizzle ORM for data persistence and includes a comprehensive UI component library built with shadcn/ui and Tailwind CSS.
 
+## Recent Updates (October 2, 2025)
+
+**Advantix Ads Manager** - New advanced campaign creation system with:
+- **3-Step Campaign Wizard**: Guided workflow for creating Facebook ad campaigns
+  - Step 1: Campaign Setup (objective, budget, ad account selection)
+  - Step 2: Audience Targeting (age range slider, gender selection, location targeting, interests)
+  - Step 3: Creative Assets (ad copy, headlines, image/video upload with preview)
+- **Campaign Drafts**: Save and manage campaign drafts before publishing
+- **Template System**: Foundation for campaign templates and saved audiences
+- **Media Upload**: Image and video upload functionality with real-time preview
+- **Database Schema**: New tables for campaign_drafts, campaign_templates, saved_audiences, saved_creatives
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
