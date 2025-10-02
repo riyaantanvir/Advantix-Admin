@@ -12,6 +12,7 @@ import { Rocket, Plus, Trash2, Play, CheckCircle, XCircle, Clock, Upload, Image 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import Sidebar from "@/components/layout/Sidebar";
 
 export default function AdvantixAdsManager() {
   const { toast } = useToast();
@@ -226,22 +227,24 @@ export default function AdvantixAdsManager() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Rocket className="w-8 h-8 text-primary" />
-            Advantix Ads Manager
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Create and manage Facebook ad campaigns with ease
-          </p>
-        </div>
-        <Button onClick={() => setShowWizard(!showWizard)} size="lg" data-testid="button-new-campaign">
-          <Plus className="w-4 h-4 mr-2" />
-          New Campaign
-        </Button>
-      </div>
+    <Sidebar>
+      <div className="flex-1 overflow-auto">
+        <div className="p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Rocket className="w-8 h-8 text-primary" />
+                Advantix Ads Manager
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Create and manage Facebook ad campaigns with ease
+              </p>
+            </div>
+            <Button onClick={() => setShowWizard(!showWizard)} size="lg" data-testid="button-new-campaign">
+              <Plus className="w-4 h-4 mr-2" />
+              New Campaign
+            </Button>
+          </div>
 
       {showWizard && (
         <Card>
@@ -712,6 +715,8 @@ export default function AdvantixAdsManager() {
           )}
         </CardContent>
       </Card>
-    </div>
+        </div>
+      </div>
+    </Sidebar>
   );
 }
