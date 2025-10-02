@@ -3655,8 +3655,20 @@ function EmailSettings() {
         body: JSON.stringify({ recipientEmail: testEmailRecipient }),
       });
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to send test email");
+        let errorMessage = "Failed to send test email";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const error = await response.json();
+            errorMessage = error.message || errorMessage;
+          } else {
+            const text = await response.text();
+            errorMessage = text.substring(0, 200) || errorMessage;
+          }
+        } catch (e) {
+          console.error("Error parsing response:", e);
+        }
+        throw new Error(errorMessage);
       }
       return response.json();
     },

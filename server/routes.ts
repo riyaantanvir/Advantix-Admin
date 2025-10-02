@@ -3595,14 +3595,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error("Email send error:", errorData);
+        let errorMessage = 'Failed to send test email';
+        try {
+          const errorData = await response.text();
+          console.error("Email send error:", errorData);
+          errorMessage = errorData.substring(0, 200);
+        } catch (e) {
+          console.error("Error parsing email provider response:", e);
+        }
         return res.status(400).json({ 
           success: false, 
-          message: `Failed to send test email: ${errorData}` 
+          message: errorMessage
         });
       }
 
+      const responseData = await response.json();
+      console.log("Email sent successfully:", responseData);
+      
       res.json({ 
         success: true, 
         message: `Test email sent successfully to ${recipientEmail}` 
