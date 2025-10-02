@@ -14,6 +14,10 @@ This is a full-stack web application built with React and Express.js, featuring 
   - Dynamic page selection based on selected ad account
   - API endpoint GET /api/facebook/pages/:adAccountId for fetching pages
   - Optional page selection in campaign wizard with helpful empty state messages
+  - **Sync with FB Button**: One-click sync for ad accounts and pages from Facebook Graph API
+    - POST /api/facebook/sync-accounts endpoint fetches and stores both ad accounts and pages
+    - Real-time feedback with spinning icon during sync and success/error toasts
+    - Automatic cache invalidation to refresh data after sync
 - **Campaign Drafts Management**: 
   - **Create**: Save drafts at any wizard step before publishing
   - **Edit**: Click Edit button to load draft into wizard and modify any field
