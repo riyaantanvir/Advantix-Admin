@@ -3362,6 +3362,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Disconnect Facebook
+  app.post("/api/facebook/disconnect", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getFacebookSettings();
+      
+      if (!settings) {
+        return res.status(400).json({ message: "No Facebook settings to disconnect" });
+      }
+
+      // Clear settings by setting empty values and marking as disconnected
+      await storage.saveFacebookSettings({
+        appId: "",
+        appSecret: "",
+        accessToken: "",
+        isConnected: false
+      });
+
+      res.json({ message: "Facebook disconnected successfully" });
+    } catch (error) {
+      console.error("Disconnect Facebook error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Sync Facebook ad accounts
   app.post("/api/facebook/sync-accounts", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
     try {

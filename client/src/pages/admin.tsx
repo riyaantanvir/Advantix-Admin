@@ -3259,6 +3259,43 @@ function FacebookSettings() {
     },
   });
 
+  // Disconnect Facebook mutation
+  const disconnectFacebookMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/facebook/disconnect", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Disconnect failed");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Disconnected",
+        description: "Facebook account has been disconnected",
+      });
+      setAppId("");
+      setAppSecret("");
+      setAccessToken("");
+      setIsConnected(false);
+      setLastTestedAt(null);
+      setConnectionError(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/facebook/settings"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Disconnect Failed",
+        description: error.message || "Failed to disconnect",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Load settings when available
   useEffect(() => {
     if (settings) {
@@ -3305,6 +3342,18 @@ function FacebookSettings() {
       return;
     }
     syncAdAccountsMutation.mutate();
+  };
+
+  const handleDisconnect = () => {
+    if (!settings) {
+      toast({
+        title: "Error",
+        description: "No settings to disconnect",
+        variant: "destructive",
+      });
+      return;
+    }
+    disconnectFacebookMutation.mutate();
   };
 
   return (
@@ -3379,6 +3428,23 @@ function FacebookSettings() {
                   </>
                 )}
               </Button>
+              {settings && (
+                <Button
+                  onClick={handleDisconnect}
+                  disabled={disconnectFacebookMutation.isPending}
+                  variant="destructive"
+                  data-testid="button-disconnect-fb"
+                >
+                  {disconnectFacebookMutation.isPending ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Disconnecting...
+                    </>
+                  ) : (
+                    "Disconnect"
+                  )}
+                </Button>
+              )}
             </div>
           </div>
 
