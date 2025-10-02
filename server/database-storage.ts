@@ -76,7 +76,7 @@ import {
   facebookAdInsights
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gte, lte } from "drizzle-orm";
 import { db } from "./db";
 import type { IStorage } from "./storage";
 
@@ -1827,7 +1827,8 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             eq(facebookAccountInsights.adAccountId, adAccountId),
-            // Date filtering would go here
+            gte(facebookAccountInsights.date, startDate),
+            lte(facebookAccountInsights.date, endDate)
           )
         )
         .orderBy(desc(facebookAccountInsights.date));
@@ -1867,7 +1868,13 @@ export class DatabaseStorage implements IStorage {
     try {
       const result = await db.select()
         .from(facebookCampaignInsights)
-        .where(eq(facebookCampaignInsights.adAccountId, adAccountId))
+        .where(
+          and(
+            eq(facebookCampaignInsights.adAccountId, adAccountId),
+            gte(facebookCampaignInsights.date, startDate),
+            lte(facebookCampaignInsights.date, endDate)
+          )
+        )
         .orderBy(desc(facebookCampaignInsights.date));
       
       return result;
