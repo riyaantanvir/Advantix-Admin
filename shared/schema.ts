@@ -549,3 +549,156 @@ export type TelegramConfig = typeof telegramConfig.$inferSelect;
 
 export type InsertTelegramChatId = z.infer<typeof insertTelegramChatIdSchema>;
 export type TelegramChatId = typeof telegramChatIds.$inferSelect;
+
+// Facebook App Settings
+export const facebookSettings = pgTable("facebook_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appId: text("app_id").notNull(),
+  appSecret: text("app_secret").notNull(),
+  accessToken: text("access_token").notNull(),
+  isConnected: boolean("is_connected").default(false),
+  lastTestedAt: timestamp("last_tested_at"),
+  connectionError: text("connection_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFacebookSettingSchema = createInsertSchema(facebookSettings).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFacebookSetting = z.infer<typeof insertFacebookSettingSchema>;
+export type FacebookSetting = typeof facebookSettings.$inferSelect;
+
+// Facebook Ad Account Insights
+export const facebookAccountInsights = pgTable("facebook_account_insights", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adAccountId: varchar("ad_account_id").references(() => adAccounts.id, { onDelete: "cascade" }).notNull(),
+  date: timestamp("date").notNull(),
+  spend: decimal("spend", { precision: 12, scale: 2 }).default("0"),
+  impressions: integer("impressions").default(0),
+  clicks: integer("clicks").default(0),
+  ctr: decimal("ctr", { precision: 10, scale: 4 }).default("0"), // Click-through rate
+  cpc: decimal("cpc", { precision: 10, scale: 4 }).default("0"), // Cost per click
+  cpm: decimal("cpm", { precision: 10, scale: 4 }).default("0"), // Cost per mille
+  reach: integer("reach").default(0),
+  frequency: decimal("frequency", { precision: 10, scale: 2 }).default("0"),
+  conversions: integer("conversions").default(0),
+  costPerConversion: decimal("cost_per_conversion", { precision: 10, scale: 4 }).default("0"),
+  conversionRate: decimal("conversion_rate", { precision: 10, scale: 4 }).default("0"),
+  roas: decimal("roas", { precision: 10, scale: 4 }).default("0"), // Return on ad spend
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => {
+  return {
+    uniqueAccountDate: unique().on(table.adAccountId, table.date)
+  }
+});
+
+export const insertFacebookAccountInsightSchema = createInsertSchema(facebookAccountInsights).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFacebookAccountInsight = z.infer<typeof insertFacebookAccountInsightSchema>;
+export type FacebookAccountInsight = typeof facebookAccountInsights.$inferSelect;
+
+// Facebook Campaign Insights
+export const facebookCampaignInsights = pgTable("facebook_campaign_insights", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adAccountId: varchar("ad_account_id").references(() => adAccounts.id, { onDelete: "cascade" }).notNull(),
+  fbCampaignId: text("fb_campaign_id").notNull(), // Facebook's campaign ID
+  campaignName: text("campaign_name").notNull(),
+  date: timestamp("date").notNull(),
+  spend: decimal("spend", { precision: 12, scale: 2 }).default("0"),
+  impressions: integer("impressions").default(0),
+  clicks: integer("clicks").default(0),
+  ctr: decimal("ctr", { precision: 10, scale: 4 }).default("0"),
+  cpc: decimal("cpc", { precision: 10, scale: 4 }).default("0"),
+  cpm: decimal("cpm", { precision: 10, scale: 4 }).default("0"),
+  reach: integer("reach").default(0),
+  conversions: integer("conversions").default(0),
+  roas: decimal("roas", { precision: 10, scale: 4 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => {
+  return {
+    uniqueCampaignDate: unique().on(table.fbCampaignId, table.date)
+  }
+});
+
+export const insertFacebookCampaignInsightSchema = createInsertSchema(facebookCampaignInsights).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFacebookCampaignInsight = z.infer<typeof insertFacebookCampaignInsightSchema>;
+export type FacebookCampaignInsight = typeof facebookCampaignInsights.$inferSelect;
+
+// Facebook Ad Set Insights
+export const facebookAdSetInsights = pgTable("facebook_adset_insights", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fbCampaignId: text("fb_campaign_id").notNull(),
+  fbAdSetId: text("fb_adset_id").notNull(), // Facebook's ad set ID
+  adSetName: text("adset_name").notNull(),
+  date: timestamp("date").notNull(),
+  spend: decimal("spend", { precision: 12, scale: 2 }).default("0"),
+  impressions: integer("impressions").default(0),
+  clicks: integer("clicks").default(0),
+  ctr: decimal("ctr", { precision: 10, scale: 4 }).default("0"),
+  cpc: decimal("cpc", { precision: 10, scale: 4 }).default("0"),
+  cpm: decimal("cpm", { precision: 10, scale: 4 }).default("0"),
+  conversions: integer("conversions").default(0),
+  roas: decimal("roas", { precision: 10, scale: 4 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => {
+  return {
+    uniqueAdSetDate: unique().on(table.fbAdSetId, table.date)
+  }
+});
+
+export const insertFacebookAdSetInsightSchema = createInsertSchema(facebookAdSetInsights).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFacebookAdSetInsight = z.infer<typeof insertFacebookAdSetInsightSchema>;
+export type FacebookAdSetInsight = typeof facebookAdSetInsights.$inferSelect;
+
+// Facebook Ad Insights
+export const facebookAdInsights = pgTable("facebook_ad_insights", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fbAdSetId: text("fb_adset_id").notNull(),
+  fbAdId: text("fb_ad_id").notNull(), // Facebook's ad ID
+  adName: text("ad_name").notNull(),
+  date: timestamp("date").notNull(),
+  spend: decimal("spend", { precision: 12, scale: 2 }).default("0"),
+  impressions: integer("impressions").default(0),
+  clicks: integer("clicks").default(0),
+  ctr: decimal("ctr", { precision: 10, scale: 4 }).default("0"),
+  cpc: decimal("cpc", { precision: 10, scale: 4 }).default("0"),
+  cpm: decimal("cpm", { precision: 10, scale: 4 }).default("0"),
+  conversions: integer("conversions").default(0),
+  roas: decimal("roas", { precision: 10, scale: 4 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => {
+  return {
+    uniqueAdDate: unique().on(table.fbAdId, table.date)
+  }
+});
+
+export const insertFacebookAdInsightSchema = createInsertSchema(facebookAdInsights).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFacebookAdInsight = z.infer<typeof insertFacebookAdInsightSchema>;
+export type FacebookAdInsight = typeof facebookAdInsights.$inferSelect;
