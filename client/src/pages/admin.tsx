@@ -298,6 +298,7 @@ function UserManagement() {
         projects: false,
         payments: false,
         expensesSalaries: false,
+        salaryManagement: false,
         reports: false,
         adminPanel: false,
       }
