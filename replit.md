@@ -14,7 +14,14 @@ This is a full-stack web application built with React and Express.js, featuring 
   - Dynamic page selection based on selected ad account
   - API endpoint GET /api/facebook/pages/:adAccountId for fetching pages
   - Optional page selection in campaign wizard with helpful empty state messages
-- **Campaign Drafts**: Save and manage campaign drafts before publishing (includes pageId)
+- **Campaign Drafts Management**: 
+  - **Create**: Save drafts at any wizard step before publishing
+  - **Edit**: Click Edit button to load draft into wizard and modify any field
+  - **Update**: Changes save with PUT /api/campaign-drafts/:id endpoint
+  - **Publish**: Launch campaigns directly to Facebook from drafts
+  - **Delete**: Remove unwanted drafts
+  - Smart targeting state management with fallback defaults
+- **Collapsible Sidebar**: Main navigation sidebar available throughout wizard for easy access to other sections
 - **Template System**: Foundation for campaign templates and saved audiences
 - **Media Upload**: Image and video upload functionality with real-time preview
 - **Database Schema**: New tables for campaign_drafts, campaign_templates, saved_audiences, saved_creatives, facebook_pages
