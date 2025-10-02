@@ -550,28 +550,58 @@ export default function FBAdManagementPage() {
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Campaign</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Objective</TableHead>
+                                <TableHead className="text-right">Budget</TableHead>
                                 <TableHead>Date</TableHead>
                                 <TableHead className="text-right">Spend</TableHead>
                                 <TableHead className="text-right">Impressions</TableHead>
                                 <TableHead className="text-right">Clicks</TableHead>
-                                <TableHead className="text-right">CTR</TableHead>
-                                <TableHead className="text-right">CPC</TableHead>
+                                <TableHead className="text-right">Conversions</TableHead>
                                 <TableHead className="text-right">ROAS</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {campaignInsights.map((campaign) => (
-                                <TableRow key={campaign.id} data-testid={`campaign-row-${campaign.id}`}>
-                                  <TableCell className="font-medium">{campaign.campaignName}</TableCell>
-                                  <TableCell>{new Date(campaign.date).toLocaleDateString()}</TableCell>
-                                  <TableCell className="text-right">${parseFloat(campaign.spend).toFixed(2)}</TableCell>
-                                  <TableCell className="text-right">{campaign.impressions.toLocaleString()}</TableCell>
-                                  <TableCell className="text-right">{campaign.clicks.toLocaleString()}</TableCell>
-                                  <TableCell className="text-right">{parseFloat(campaign.ctr).toFixed(2)}%</TableCell>
-                                  <TableCell className="text-right">${parseFloat(campaign.cpc).toFixed(2)}</TableCell>
-                                  <TableCell className="text-right">{campaign.roas ? `${parseFloat(campaign.roas).toFixed(2)}x` : '-'}</TableCell>
-                                </TableRow>
-                              ))}
+                              {campaignInsights.map((campaign) => {
+                                const status = campaign.status || 'ACTIVE';
+                                const statusColors = {
+                                  'ACTIVE': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                                  'PAUSED': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+                                  'ARCHIVED': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+                                  'DELETED': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+                                };
+                                const objectiveLabels: Record<string, string> = {
+                                  'OUTCOME_ENGAGEMENT': 'Engagement',
+                                  'OUTCOME_LEADS': 'Leads',
+                                  'OUTCOME_SALES': 'Sales',
+                                  'OUTCOME_TRAFFIC': 'Traffic',
+                                  'OUTCOME_AWARENESS': 'Awareness',
+                                  'OUTCOME_APP_PROMOTION': 'App Promotion',
+                                };
+                                
+                                return (
+                                  <TableRow key={campaign.id} data-testid={`campaign-row-${campaign.id}`}>
+                                    <TableCell className="font-medium">{campaign.campaignName}</TableCell>
+                                    <TableCell>
+                                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusColors[status as keyof typeof statusColors] || statusColors['ACTIVE']}`}>
+                                        {status}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-sm text-gray-600 dark:text-gray-400">
+                                      {campaign.objective ? (objectiveLabels[campaign.objective] || campaign.objective) : '-'}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {campaign.dailyBudget ? `$${parseFloat(campaign.dailyBudget).toFixed(2)}` : '-'}
+                                    </TableCell>
+                                    <TableCell>{new Date(campaign.date).toLocaleDateString()}</TableCell>
+                                    <TableCell className="text-right">${parseFloat(campaign.spend).toFixed(2)}</TableCell>
+                                    <TableCell className="text-right">{campaign.impressions.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{campaign.clicks.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{campaign.conversions ? campaign.conversions.toLocaleString() : '0'}</TableCell>
+                                    <TableCell className="text-right">{campaign.roas ? `${parseFloat(campaign.roas).toFixed(2)}x` : '-'}</TableCell>
+                                  </TableRow>
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         </div>
