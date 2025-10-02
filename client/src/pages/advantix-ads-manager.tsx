@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Rocket, Plus, Trash2, Play, CheckCircle, XCircle, Clock, Upload, Image as ImageIcon, Video, X } from "lucide-react";
+import { Rocket, Plus, Trash2, Play, CheckCircle, XCircle, Clock, Upload, Image as ImageIcon, Video, X, Edit } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
@@ -18,6 +18,7 @@ export default function AdvantixAdsManager() {
   const { toast } = useToast();
   const [showWizard, setShowWizard] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
 
   // Form state - Campaign Setup
   const [draftName, setDraftName] = useState("");
@@ -64,16 +65,20 @@ export default function AdvantixAdsManager() {
     queryKey: ["/api/campaign-drafts"],
   });
 
-  // Create draft mutation
-  const createDraftMutation = useMutation({
+  // Create/Update draft mutation
+  const saveDraftMutation = useMutation({
     mutationFn: async (draftData: any) => {
+      if (editingDraftId) {
+        return await apiRequest("PUT", `/api/campaign-drafts/${editingDraftId}`, draftData);
+      }
       return await apiRequest("POST", "/api/campaign-drafts", draftData);
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Campaign draft saved successfully" });
+      toast({ title: "Success", description: editingDraftId ? "Draft updated successfully" : "Draft saved successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/campaign-drafts"] });
       resetForm();
       setShowWizard(false);
+      setEditingDraftId(null);
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to save draft", variant: "destructive" });
@@ -133,6 +138,60 @@ export default function AdvantixAdsManager() {
     setImagePreview("");
     setVideoPreview("");
     setCurrentStep(1);
+    setEditingDraftId(null);
+  };
+
+  const loadDraft = (draft: any) => {
+    setEditingDraftId(draft.id);
+    setDraftName(draft.draftName || "");
+    setAdAccountId(draft.adAccountId || "");
+    setPageId(draft.pageId || "");
+    setObjective(draft.objective || "");
+    setCampaignName(draft.campaignName || "");
+    setBudgetType(draft.budgetType || "daily");
+    setDailyBudget(draft.dailyBudget ? draft.dailyBudget.toString() : "");
+    
+    // Parse targeting JSON with fallback to defaults
+    if (draft.targeting) {
+      try {
+        const targeting = typeof draft.targeting === 'string' ? JSON.parse(draft.targeting) : draft.targeting;
+        setAgeMin(targeting.age_min || 18);
+        setAgeMax(targeting.age_max || 65);
+        setGenders(targeting.genders || ["all"]);
+        setCountries(targeting.geo_locations?.countries?.join(', ') || "");
+        setInterests(targeting.interests?.join(', ') || "");
+      } catch (e) {
+        console.error("Error parsing targeting data:", e);
+        // Reset to defaults on parse error
+        setAgeMin(18);
+        setAgeMax(65);
+        setGenders(["all"]);
+        setCountries("");
+        setInterests("");
+      }
+    } else {
+      // No targeting data, use defaults
+      setAgeMin(18);
+      setAgeMax(65);
+      setGenders(["all"]);
+      setCountries("");
+      setInterests("");
+    }
+    
+    setAdSetName(draft.adSetName || "");
+    setAdName(draft.adName || "");
+    setAdCopy(draft.adCopy || "");
+    setHeadline(draft.headline || "");
+    setDescription(draft.description || "");
+    setWebsiteUrl(draft.websiteUrl || "");
+    setCallToAction(draft.callToAction || "LEARN_MORE");
+    setImageUrl(draft.imageUrl || "");
+    setVideoUrl(draft.videoUrl || "");
+    setImagePreview(draft.imageUrl || "");
+    setVideoPreview(draft.videoUrl || "");
+    
+    setShowWizard(true);
+    setCurrentStep(1);
   };
 
   const handleSaveDraft = () => {
@@ -170,7 +229,7 @@ export default function AdvantixAdsManager() {
       status: "draft",
     };
 
-    createDraftMutation.mutate(draftData);
+    saveDraftMutation.mutate(draftData);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -642,8 +701,8 @@ export default function AdvantixAdsManager() {
                     Next
                   </Button>
                 ) : (
-                  <Button onClick={handleSaveDraft} disabled={createDraftMutation.isPending} data-testid="button-save-draft">
-                    {createDraftMutation.isPending ? "Saving..." : "Save Draft"}
+                  <Button onClick={handleSaveDraft} disabled={saveDraftMutation.isPending} data-testid="button-save-draft">
+                    {saveDraftMutation.isPending ? "Saving..." : editingDraftId ? "Update Draft" : "Save Draft"}
                   </Button>
                 )}
               </div>
@@ -686,6 +745,15 @@ export default function AdvantixAdsManager() {
                     <TableCell>{getStatusBadge(draft.status)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => loadDraft(draft)}
+                          data-testid={`button-edit-${draft.id}`}
+                        >
+                          <Edit className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
                         {draft.status === "draft" && (
                           <Button
                             size="sm"
