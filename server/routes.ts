@@ -3399,10 +3399,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (clients.length === 0) {
         // Create a default client for Facebook ads
         const newClient = await storage.createClient({
-          name: "Facebook Ads Client",
+          clientName: "Facebook Ads Client",
+          businessName: "Facebook Advertising",
+          contactPerson: "Facebook Admin",
           email: "facebook@default.com",
           phone: "",
-          company: "Facebook Advertising",
           address: "",
           notes: "Auto-created for Facebook ad accounts"
         });

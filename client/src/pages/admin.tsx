@@ -3228,6 +3228,37 @@ function FacebookSettings() {
     },
   });
 
+  // Sync ad accounts mutation
+  const syncAdAccountsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/facebook/sync-accounts", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Sync failed");
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Sync Successful",
+        description: data.message || `Synced ${data.count} ad account(s)`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/facebook/ad-accounts"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync ad accounts",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Load settings when available
   useEffect(() => {
     if (settings) {
@@ -3262,6 +3293,18 @@ function FacebookSettings() {
       return;
     }
     testConnectionMutation.mutate();
+  };
+
+  const handleSyncAdAccounts = () => {
+    if (!isConnected) {
+      toast({
+        title: "Error",
+        description: "Please test connection first",
+        variant: "destructive",
+      });
+      return;
+    }
+    syncAdAccountsMutation.mutate();
   };
 
   return (
@@ -3299,24 +3342,44 @@ function FacebookSettings() {
                 )}
               </div>
             </div>
-            <Button
-              onClick={handleTestConnection}
-              disabled={testConnectionMutation.isPending || !settings}
-              variant="outline"
-              data-testid="button-test-fb-connection"
-            >
-              {testConnectionMutation.isPending ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Test Connection
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleTestConnection}
+                disabled={testConnectionMutation.isPending || !settings}
+                variant="outline"
+                data-testid="button-test-fb-connection"
+              >
+                {testConnectionMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Test Connection
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={handleSyncAdAccounts}
+                disabled={syncAdAccountsMutation.isPending || !isConnected}
+                variant={isConnected ? "default" : "outline"}
+                data-testid="button-sync-fb-accounts"
+              >
+                {syncAdAccountsMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Sync Ad Accounts
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
 
           {/* Settings Form */}
@@ -3398,6 +3461,7 @@ function FacebookSettings() {
               <li>Generate a long-lived access token with required permissions</li>
               <li>Paste the credentials here and click "Save Settings"</li>
               <li>Click "Test Connection" to verify everything works</li>
+              <li>Click "Sync Ad Accounts" to import your Facebook ad accounts</li>
             </ol>
           </div>
         </CardContent>
