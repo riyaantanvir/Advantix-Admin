@@ -3303,7 +3303,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { appId, appSecret, accessToken } = req.body;
       
+      console.log("[FB Settings] Save request received from:", req.headers.origin || req.headers.referer);
+      console.log("[FB Settings] Auth token present:", !!req.headers.authorization);
+      console.log("[FB Settings] User:", (req as any).user?.username);
+      
       if (!appId || !appSecret || !accessToken) {
+        console.log("[FB Settings] Missing fields - appId:", !!appId, "appSecret:", !!appSecret, "accessToken:", !!accessToken);
         return res.status(400).json({ message: "App ID, App Secret, and Access Token are required" });
       }
 
@@ -3315,9 +3320,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isConnected: false
       });
 
+      console.log("[FB Settings] Settings saved successfully");
       res.json({ message: "Facebook settings saved successfully" });
     } catch (error) {
-      console.error("Save Facebook settings error:", error);
+      console.error("[FB Settings] Save error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

@@ -3174,7 +3174,16 @@ function FacebookSettings() {
         },
         body: JSON.stringify({ appId, appSecret, accessToken }),
       });
-      if (!response.ok) throw new Error("Failed to save settings");
+      if (!response.ok) {
+        let errorMessage = "Failed to save settings";
+        try {
+          const error = await response.json();
+          errorMessage = error.message || errorMessage;
+        } catch (e) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -3185,6 +3194,7 @@ function FacebookSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/facebook/settings"] });
     },
     onError: (error: any) => {
+      console.error("Save settings error details:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to save settings",
