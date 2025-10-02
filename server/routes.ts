@@ -1046,6 +1046,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export ad accounts to CSV
+  app.get("/api/ad-accounts/export/csv", authenticate, requirePagePermission('ad_accounts', 'view'), async (req: Request, res: Response) => {
+    try {
+      const adAccounts = await storage.getAdAccounts();
+
+      // Create CSV header - include ALL fields for lossless export/import
+      const headers = [
+        'id', 'platform', 'accountName', 'accountId', 'clientId', 
+        'spendLimit', 'totalSpend', 'status', 'notes',
+        'createdAt', 'updatedAt'
+      ];
+
+      // Create CSV rows
+      const csvRows = [headers.join(',')];
+      
+      adAccounts.forEach(account => {
+        const row = headers.map(header => {
+          let value = account[header as keyof typeof account] ?? '';
+          
+          // Handle special formatting
+          if (header === 'createdAt' || header === 'updatedAt') {
+            value = value ? new Date(value as string).toISOString() : '';
+          }
+          
+          // Escape commas and quotes in values
+          const stringValue = String(value);
+          if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          }
+          return stringValue;
+        });
+        csvRows.push(row.join(','));
+      });
+
+      const csvContent = csvRows.join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=ad-accounts-export.csv');
+      res.send(csvContent);
+    } catch (error) {
+      console.error("Export ad accounts CSV error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Import ad accounts from CSV
+  app.post("/api/ad-accounts/import/csv", authenticate, requirePagePermission('ad_accounts', 'edit'), upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const csvData = req.file.buffer.toString('utf-8');
+      const records = parse(csvData, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true
+      }) as Record<string, string>[];
+
+      // Validate CSV structure
+      const requiredHeaders = [
+        'id', 'platform', 'accountName', 'accountId', 'clientId',
+        'spendLimit', 'totalSpend', 'status', 'notes',
+        'createdAt', 'updatedAt'
+      ];
+
+      if (records.length === 0) {
+        return res.status(400).json({ message: "CSV file is empty" });
+      }
+
+      const fileHeaders = Object.keys(records[0]);
+      const missingHeaders = requiredHeaders.filter(h => !fileHeaders.includes(h));
+      if (missingHeaders.length > 0) {
+        return res.status(400).json({ 
+          message: `Missing required columns: ${missingHeaders.join(', ')}` 
+        });
+      }
+
+      // Process and insert/update ad accounts
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
+      for (const record of records) {
+        try {
+          // Prepare ad account data with preserved ID and timestamps
+          const adAccountData = {
+            id: record.id,
+            platform: record.platform,
+            accountName: record.accountName,
+            accountId: record.accountId,
+            clientId: record.clientId,
+            spendLimit: record.spendLimit,
+            totalSpend: record.totalSpend || '0',
+            status: record.status || 'active',
+            notes: record.notes || null,
+            createdAt: record.createdAt ? new Date(record.createdAt) : new Date(),
+            updatedAt: record.updatedAt ? new Date(record.updatedAt) : new Date(),
+          };
+
+          // Use upsert to preserve IDs and update existing records
+          await db.insert(adAccounts)
+            .values(adAccountData)
+            .onConflictDoUpdate({
+              target: adAccounts.id,
+              set: {
+                platform: adAccountData.platform,
+                accountName: adAccountData.accountName,
+                accountId: adAccountData.accountId,
+                clientId: adAccountData.clientId,
+                spendLimit: adAccountData.spendLimit,
+                totalSpend: adAccountData.totalSpend,
+                status: adAccountData.status,
+                notes: adAccountData.notes,
+                createdAt: adAccountData.createdAt,
+                updatedAt: adAccountData.updatedAt,
+              }
+            });
+
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          errors.push(`Row ${successCount + errorCount}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      if (errorCount > 0) {
+        return res.status(207).json({ 
+          message: `Imported ${successCount} ad accounts with ${errorCount} errors`,
+          successCount,
+          errorCount,
+          errors: errors.slice(0, 10)
+        });
+      }
+
+      res.json({ 
+        message: `Successfully imported ${successCount} ad accounts`,
+        successCount 
+      });
+    } catch (error) {
+      console.error("Import ad accounts CSV error:", error);
+      res.status(500).json({ message: "Failed to import CSV" });
+    }
+  });
+
   // ====== AD COPY SETS ROUTES ======
   
   // Get ad copy sets for a campaign
