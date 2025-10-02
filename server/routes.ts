@@ -3482,11 +3482,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Also sync Facebook Pages for each ad account
+      let pagesSynced = 0;
+      const pageErrors: string[] = [];
+      
+      for (const fbAccount of fbAdAccounts) {
+        try {
+          // Find the synced ad account ID
+          const syncedAccounts = await storage.getAdAccounts();
+          const syncedAccount = syncedAccounts.find(acc => 
+            acc.platform.toLowerCase() === 'facebook' && acc.accountId === fbAccount.account_id
+          );
+
+          if (syncedAccount) {
+            // Fetch pages for this ad account from Facebook
+            // Note: Pages API requires page-level access token or user access token with pages_manage_metadata permission
+            const pagesUrl = `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,category,picture&access_token=${settings.accessToken}`;
+            const pagesResponse = await fetch(pagesUrl);
+            
+            if (pagesResponse.ok) {
+              const pagesData = await pagesResponse.json();
+              const fbPages = pagesData.data || [];
+
+              // Save pages to database (associate with this ad account)
+              for (const fbPage of fbPages) {
+                try {
+                  // Check if page already exists for this ad account
+                  const existingPages = await db.select()
+                    .from(facebookPages)
+                    .where(eq(facebookPages.facebookPageId, fbPage.id));
+
+                  if (existingPages.length === 0) {
+                    await db.insert(facebookPages).values({
+                      facebookPageId: fbPage.id,
+                      pageName: fbPage.name,
+                      category: fbPage.category || 'Not specified',
+                      profilePictureUrl: fbPage.picture?.data?.url || null,
+                      accessToken: null, // We'd need page-specific token for posting
+                      adAccountId: syncedAccount.id,
+                      isActive: true
+                    });
+                    pagesSynced++;
+                  }
+                } catch (pageError: any) {
+                  pageErrors.push(`Failed to sync page ${fbPage.name}: ${pageError.message}`);
+                }
+              }
+            }
+          }
+        } catch (error: any) {
+          pageErrors.push(`Failed to sync pages for account ${fbAccount.name}: ${error.message}`);
+        }
+      }
+
       res.json({ 
-        message: `Successfully synced ${syncedCount} ad account(s)`,
-        count: syncedCount,
+        message: `Successfully synced ${syncedCount} ad account(s) and ${pagesSynced} page(s)`,
+        accountsSynced: syncedCount,
+        pagesSynced,
         total: fbAdAccounts.length,
-        errors: errors.length > 0 ? errors : undefined
+        errors: [...errors, ...pageErrors].length > 0 ? [...errors, ...pageErrors] : undefined
       });
     } catch (error: any) {
       console.error("Sync Facebook ad accounts error:", error);

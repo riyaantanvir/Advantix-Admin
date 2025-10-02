@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Rocket, Plus, Trash2, Play, CheckCircle, XCircle, Clock, Upload, Image as ImageIcon, Video, X, Edit } from "lucide-react";
+import { Rocket, Plus, Trash2, Play, CheckCircle, XCircle, Clock, Upload, Image as ImageIcon, Video, X, Edit, RefreshCw } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
@@ -110,6 +110,25 @@ export default function AdvantixAdsManager() {
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to delete draft", variant: "destructive" });
+    },
+  });
+
+  // Sync Facebook data mutation
+  const syncFacebookMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/facebook/sync-accounts");
+    },
+    onSuccess: (data: any) => {
+      const message = data.message || "Facebook data synced successfully";
+      toast({ 
+        title: "Synced!", 
+        description: message
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/facebook/ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/facebook/pages"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Sync Failed", description: error.message || "Failed to sync with Facebook", variant: "destructive" });
     },
   });
 
@@ -299,10 +318,22 @@ export default function AdvantixAdsManager() {
                 Create and manage Facebook ad campaigns with ease
               </p>
             </div>
-            <Button onClick={() => setShowWizard(!showWizard)} size="lg" data-testid="button-new-campaign">
-              <Plus className="w-4 h-4 mr-2" />
-              New Campaign
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => syncFacebookMutation.mutate()} 
+                variant="outline" 
+                size="lg" 
+                disabled={syncFacebookMutation.isPending}
+                data-testid="button-sync-facebook"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${syncFacebookMutation.isPending ? 'animate-spin' : ''}`} />
+                {syncFacebookMutation.isPending ? 'Syncing...' : 'Sync with FB'}
+              </Button>
+              <Button onClick={() => setShowWizard(!showWizard)} size="lg" data-testid="button-new-campaign">
+                <Plus className="w-4 h-4 mr-2" />
+                New Campaign
+              </Button>
+            </div>
           </div>
 
       {showWizard && (
