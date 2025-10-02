@@ -3489,6 +3489,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getEmailSettings();
       const { recipientEmail } = req.body;
 
+      console.log("Send test email request:", { recipientEmail, provider: settings?.provider });
+
       if (!settings || !settings.apiKey) {
         return res.status(400).json({ 
           success: false, 
@@ -3513,6 +3515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Send test email based on provider
+      console.log(`Sending test email via ${settings.provider} to ${recipientEmail}`);
       let response;
       
       if (settings.provider === 'resend') {
@@ -3593,6 +3596,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: `Unsupported email provider: ${settings.provider}` 
         });
       }
+
+      if (!response) {
+        console.error("No response from email provider - provider may not be configured correctly");
+        return res.status(500).json({ 
+          success: false, 
+          message: `Email provider ${settings.provider} is not properly configured` 
+        });
+      }
+
+      console.log(`Email provider response status: ${response.status}`);
 
       if (!response.ok) {
         let errorMessage = 'Failed to send test email';
