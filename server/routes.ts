@@ -506,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         columns: true,
         skip_empty_lines: true,
         trim: true
-      });
+      }) as Record<string, string>[];
 
       // Validate CSV structure
       const requiredHeaders = [
@@ -537,12 +537,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const campaignData = {
             name: record.name,
             clientId: record.clientId || null,
-            adAccountId: record.adAccountId || null,
-            startDate: record.startDate ? new Date(record.startDate) : null,
+            adAccountId: record.adAccountId || '',
+            startDate: record.startDate ? new Date(record.startDate) : new Date(),
             endDate: record.endDate ? new Date(record.endDate) : null,
-            status: record.status,
+            status: record.status || 'active',
             spend: record.spend || '0',
-            budget: record.budget || null,
+            budget: record.budget || '0',
+            objective: '',
             tags: record.tags || null,
             notes: record.notes || null,
             isActive: record.isActive === 'true',
@@ -552,7 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const campaign = await storage.createCampaign(campaignData);
           
           // Import daily spends if present
-          if (record.dailySpends) {
+          if (record.dailySpends && record.dailySpends !== '') {
             try {
               const dailySpends = JSON.parse(record.dailySpends);
               for (const spend of dailySpends) {

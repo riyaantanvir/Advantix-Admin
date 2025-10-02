@@ -60,7 +60,9 @@ import {
   Edit, 
   Trash2, 
   ExternalLink,
-  Calendar
+  Calendar,
+  Download,
+  Upload
 } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -93,6 +95,7 @@ export default function CampaignsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const { toast } = useToast();
 
   // Form setup
@@ -318,6 +321,97 @@ export default function CampaignsPage() {
     }
   };
 
+  // Handle Export
+  const handleExport = async () => {
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch("/api/campaigns/export/csv", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to export campaigns");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `campaigns-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Success",
+        description: "Campaigns exported successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export campaigns",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle Import
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch("/api/campaigns/import/csv", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to import campaigns");
+      }
+
+      toast({
+        title: "Success",
+        description: data.message,
+      });
+
+      if (data.errors && data.errors.length > 0) {
+        toast({
+          title: "Import Warnings",
+          description: `${data.errors.length} error(s) occurred during import`,
+          variant: "destructive",
+        });
+      }
+
+      // Refresh campaigns list
+      refetchCampaigns();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to import campaigns",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+      // Reset file input
+      event.target.value = "";
+    }
+  };
+
   return (
     <Sidebar>
       <div className="flex-1 overflow-auto">
@@ -357,6 +451,31 @@ export default function CampaignsPage() {
                   <RefreshCw className={cn("h-4 w-4 mr-2", campaignsLoading && "animate-spin")} />
                   Refresh
                 </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleExport}
+                  data-testid="button-export-campaigns"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => document.getElementById('csv-import-input')?.click()}
+                  disabled={isImporting}
+                  data-testid="button-import-campaigns"
+                >
+                  <Upload className={cn("h-4 w-4 mr-2", isImporting && "animate-pulse")} />
+                  {isImporting ? "Importing..." : "Import CSV"}
+                </Button>
+                <input
+                  id="csv-import-input"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImport}
+                  className="hidden"
+                  data-testid="input-csv-file"
+                />
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-new-campaign">
