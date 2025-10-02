@@ -21,6 +21,7 @@ export default function AdvantixAdsManager() {
   // Form state - Campaign Setup
   const [draftName, setDraftName] = useState("");
   const [adAccountId, setAdAccountId] = useState("");
+  const [pageId, setPageId] = useState("");
   const [objective, setObjective] = useState("");
   const [campaignName, setCampaignName] = useState("");
   const [budgetType, setBudgetType] = useState("daily");
@@ -49,6 +50,12 @@ export default function AdvantixAdsManager() {
   // Fetch ad accounts
   const { data: adAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/facebook/ad-accounts"],
+  });
+
+  // Fetch Facebook pages for selected ad account
+  const { data: facebookPages = [] } = useQuery<any[]>({
+    queryKey: ["/api/facebook/pages", adAccountId],
+    enabled: !!adAccountId,
   });
 
   // Fetch campaign drafts
@@ -103,6 +110,7 @@ export default function AdvantixAdsManager() {
   const resetForm = () => {
     setDraftName("");
     setAdAccountId("");
+    setPageId("");
     setObjective("");
     setCampaignName("");
     setBudgetType("daily");
@@ -143,6 +151,7 @@ export default function AdvantixAdsManager() {
     const draftData = {
       draftName,
       adAccountId,
+      pageId: pageId || null,
       objective,
       campaignName,
       budgetType,
@@ -256,18 +265,40 @@ export default function AdvantixAdsManager() {
 
                 <div className="space-y-2">
                   <Label htmlFor="ad-account">Ad Account *</Label>
-                  <Select value={adAccountId} onValueChange={setAdAccountId}>
+                  <Select value={adAccountId} onValueChange={(value) => {
+                    setAdAccountId(value);
+                    setPageId("");
+                  }}>
                     <SelectTrigger id="ad-account" data-testid="select-ad-account">
                       <SelectValue placeholder="Select ad account" />
                     </SelectTrigger>
                     <SelectContent>
                       {adAccounts.map((account: any) => (
                         <SelectItem key={account.id} value={account.id}>
-                          {account.accountName} ({account.platform})
+                          {account.name} ({account.platform})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="page">Facebook Page</Label>
+                  <Select value={pageId} onValueChange={setPageId} disabled={!adAccountId || facebookPages.length === 0}>
+                    <SelectTrigger id="page" data-testid="select-page">
+                      <SelectValue placeholder={!adAccountId ? "Select ad account first" : facebookPages.length === 0 ? "No pages found - connect Facebook" : "Select a page"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {facebookPages.map((page: any) => (
+                        <SelectItem key={page.id} value={page.id}>
+                          {page.pageName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    {facebookPages.length === 0 && adAccountId ? "No pages found. Make sure your Facebook account is connected." : "Select the page where your ad will be published"}
+                  </p>
                 </div>
 
                 <div className="space-y-2">

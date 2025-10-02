@@ -74,10 +74,10 @@ import {
   facebookCampaignInsights,
   facebookAdSetInsights,
   facebookAdInsights,
+  facebookPages,
   campaignDrafts,
   campaignTemplates,
-  savedAudiences,
-  savedCreatives
+  savedAudiences
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, and, desc, gte, lte } from "drizzle-orm";

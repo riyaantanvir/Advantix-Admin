@@ -46,9 +46,11 @@ import {
   clients,
   campaigns,
   campaignDailySpends,
-  adAccounts
+  adAccounts,
+  facebookPages
 } from "@shared/schema";
 import { z } from "zod";
+import { eq, desc, sql } from "drizzle-orm";
 
 // Extend Express Request to include user
 declare global {
@@ -3509,6 +3511,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(facebookAccounts);
     } catch (error) {
       console.error("Get Facebook ad accounts error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get Facebook Pages for an ad account
+  app.get("/api/facebook/pages/:adAccountId?", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { adAccountId } = req.params;
+      const pages = await db.select()
+        .from(facebookPages)
+        .where(adAccountId ? eq(facebookPages.adAccountId, adAccountId) : sql`true`)
+        .orderBy(desc(facebookPages.createdAt));
+      res.json(pages);
+    } catch (error) {
+      console.error("Get Facebook pages error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
