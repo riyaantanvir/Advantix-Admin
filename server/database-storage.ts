@@ -73,7 +73,11 @@ import {
   facebookAccountInsights,
   facebookCampaignInsights,
   facebookAdSetInsights,
-  facebookAdInsights
+  facebookAdInsights,
+  campaignDrafts,
+  campaignTemplates,
+  savedAudiences,
+  savedCreatives
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, and, desc, gte, lte } from "drizzle-orm";
