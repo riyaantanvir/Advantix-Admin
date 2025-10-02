@@ -3366,7 +3366,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/facebook/ad-accounts", authenticate, async (req: Request, res: Response) => {
     try {
       const allAdAccounts = await storage.getAdAccounts();
-      const facebookAccounts = allAdAccounts.filter(acc => acc.platform.toLowerCase() === 'facebook');
+      const facebookAccounts = allAdAccounts
+        .filter(acc => acc.platform.toLowerCase() === 'facebook')
+        .map(acc => ({
+          id: acc.id,
+          name: acc.accountName,
+          accountId: acc.accountId,
+          platform: acc.platform
+        }));
       res.json(facebookAccounts);
     } catch (error) {
       console.error("Get Facebook ad accounts error:", error);
