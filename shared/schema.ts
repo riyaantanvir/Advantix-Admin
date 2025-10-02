@@ -474,6 +474,7 @@ export const userMenuPermissions = pgTable("user_menu_permissions", {
   salaryManagement: boolean("salary_management").default(false),
   reports: boolean("reports").default(false),
   fbAdManagement: boolean("fb_ad_management").default(false),
+  advantixAdsManager: boolean("advantix_ads_manager").default(false),
   adminPanel: boolean("admin_panel").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -709,3 +710,117 @@ export const insertFacebookAdInsightSchema = createInsertSchema(facebookAdInsigh
 
 export type InsertFacebookAdInsight = z.infer<typeof insertFacebookAdInsightSchema>;
 export type FacebookAdInsight = typeof facebookAdInsights.$inferSelect;
+
+// Campaign Drafts - Store in-progress campaigns before publishing to Facebook
+export const campaignDrafts = pgTable("campaign_drafts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  draftName: text("draft_name").notNull(),
+  adAccountId: varchar("ad_account_id").references(() => adAccounts.id, { onDelete: "cascade" }).notNull(),
+  
+  // Campaign Configuration
+  objective: text("objective"), // OUTCOME_ENGAGEMENT, OUTCOME_SALES, OUTCOME_LEADS, etc.
+  campaignName: text("campaign_name"),
+  
+  // Budget & Schedule
+  budgetType: text("budget_type"), // "daily" or "lifetime"
+  dailyBudget: decimal("daily_budget", { precision: 12, scale: 2 }),
+  lifetimeBudget: decimal("lifetime_budget", { precision: 12, scale: 2 }),
+  startTime: timestamp("start_time"),
+  endTime: timestamp("end_time"),
+  
+  // Targeting (stored as JSON)
+  targeting: text("targeting"), // JSON string with audience targeting
+  
+  // Creative Assets
+  adSetName: text("adset_name"),
+  adName: text("ad_name"),
+  adCopy: text("ad_copy"),
+  headline: text("headline"),
+  description: text("description"),
+  callToAction: text("call_to_action"),
+  websiteUrl: text("website_url"),
+  imageUrl: text("image_url"),
+  videoUrl: text("video_url"),
+  
+  // Metadata
+  status: text("status").default("draft"), // "draft", "ready", "publishing", "published", "failed"
+  createdBy: varchar("created_by").references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  publishedCampaignId: text("published_campaign_id"), // Facebook campaign ID after publishing
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCampaignDraftSchema = createInsertSchema(campaignDrafts).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCampaignDraft = z.infer<typeof insertCampaignDraftSchema>;
+export type CampaignDraft = typeof campaignDrafts.$inferSelect;
+
+// Campaign Templates - Reusable campaign configurations
+export const campaignTemplates = pgTable("campaign_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateName: text("template_name").notNull(),
+  description: text("description"),
+  
+  // Template Configuration (same structure as drafts)
+  objective: text("objective"),
+  budgetType: text("budget_type"),
+  defaultDailyBudget: decimal("default_daily_budget", { precision: 12, scale: 2 }),
+  defaultLifetimeBudget: decimal("default_lifetime_budget", { precision: 12, scale: 2 }),
+  targeting: text("targeting"), // JSON string
+  adCopy: text("ad_copy"),
+  headline: text("headline"),
+  adDescription: text("ad_description"),
+  callToAction: text("call_to_action"),
+  
+  // Metadata
+  createdBy: varchar("created_by").references(() => users.id),
+  usageCount: integer("usage_count").default(0),
+  isShared: boolean("is_shared").default(false), // Can other team members use it?
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCampaignTemplateSchema = createInsertSchema(campaignTemplates).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCampaignTemplate = z.infer<typeof insertCampaignTemplateSchema>;
+export type CampaignTemplate = typeof campaignTemplates.$inferSelect;
+
+// Saved Audiences - Reusable targeting configurations
+export const savedAudiences = pgTable("saved_audiences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  audienceName: text("audience_name").notNull(),
+  description: text("description"),
+  
+  // Targeting Configuration (stored as JSON for flexibility)
+  targetingConfig: text("targeting_config").notNull(), // JSON with age, gender, locations, interests, behaviors
+  
+  // Metadata
+  estimatedSize: integer("estimated_size"), // Estimated reach
+  createdBy: varchar("created_by").references(() => users.id),
+  usageCount: integer("usage_count").default(0),
+  isShared: boolean("is_shared").default(false),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSavedAudienceSchema = createInsertSchema(savedAudiences).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSavedAudience = z.infer<typeof insertSavedAudienceSchema>;
+export type SavedAudience = typeof savedAudiences.$inferSelect;
