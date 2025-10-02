@@ -3559,6 +3559,7 @@ function EmailSettings() {
   const [isConfigured, setIsConfigured] = useState(false);
   const [lastTestedAt, setLastTestedAt] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [testEmailRecipient, setTestEmailRecipient] = useState("");
 
   // Fetch Email settings
   const { data: settings, isLoading: settingsLoading } = useQuery<any>({
@@ -3637,6 +3638,39 @@ function EmailSettings() {
       toast({
         title: "Connection Failed",
         description: error.message || "Failed to connect to email service",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Send test email mutation
+  const sendTestEmailMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/email/test-send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ recipientEmail: testEmailRecipient }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to send test email");
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Email Sent",
+        description: data.message || "Test email sent successfully",
+      });
+      setTestEmailRecipient("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Send",
+        description: error.message || "Failed to send test email",
         variant: "destructive",
       });
     },
@@ -3899,6 +3933,47 @@ function EmailSettings() {
               <li>Click "Save Settings" and then "Test Connection" to verify</li>
             </ol>
           </div>
+
+          {/* Send Test Email Section */}
+          {isConfigured && (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <h4 className="font-medium text-green-900 dark:text-green-100 mb-3 flex items-center gap-2">
+                <Send className="w-4 h-4" />
+                Send Test Email
+              </h4>
+              <p className="text-sm text-green-800 dark:text-green-200 mb-3">
+                Send a test email to verify your email service is working correctly.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="recipient@example.com"
+                  value={testEmailRecipient}
+                  onChange={(e) => setTestEmailRecipient(e.target.value)}
+                  disabled={sendTestEmailMutation.isPending}
+                  data-testid="input-test-email-recipient"
+                  className="flex-1"
+                />
+                <Button
+                  onClick={() => sendTestEmailMutation.mutate()}
+                  disabled={!testEmailRecipient || sendTestEmailMutation.isPending}
+                  data-testid="button-send-test-email"
+                >
+                  {sendTestEmailMutation.isPending ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Send Test
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
