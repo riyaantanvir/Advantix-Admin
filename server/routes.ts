@@ -45,7 +45,8 @@ import {
   UserRole,
   clients,
   campaigns,
-  campaignDailySpends
+  campaignDailySpends,
+  adAccounts
 } from "@shared/schema";
 import { z } from "zod";
 

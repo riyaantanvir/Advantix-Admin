@@ -61,7 +61,8 @@ import {
   Eye,
   Pause,
   Play,
-  DollarSign
+  DollarSign,
+  Upload
 } from "lucide-react";
 import type { AdAccount, InsertAdAccount, Client } from "@shared/schema";
 
@@ -352,7 +353,7 @@ export default function AdAccountsPage() {
     }).format(numAmount);
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (filteredAdAccounts.length === 0) {
       toast({
         title: "No Data",
@@ -362,53 +363,77 @@ export default function AdAccountsPage() {
       return;
     }
 
-    const headers = [
-      "Account ID",
-      "Platform", 
-      "Account Name",
-      "External Account ID",
-      "Linked Client",
-      "Status",
-      "Spend Limit",
-      "Total Spend",
-      "Available Balance",
-      "Created Date"
-    ];
+    try {
+      const response = await fetch("/api/ad-accounts/export/csv", {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-    const csvData = [
-      headers,
-      ...filteredAdAccounts.map(adAccount => [
-        adAccount.id,
-        getPlatformIcon(adAccount.platform),
-        adAccount.accountName,
-        adAccount.accountId,
-        getClientName(adAccount.clientId),
-        adAccount.status,
-        formatCurrency(adAccount.spendLimit),
-        formatCurrency(adAccount.totalSpend || "0"),
-        formatCurrency(calculateAvailableBalance(adAccount)),
-        adAccount.createdAt ? new Date(adAccount.createdAt).toLocaleDateString() : ""
-      ])
-    ];
+      if (!response.ok) {
+        throw new Error("Failed to export CSV");
+      }
 
-    const csvContent = csvData.map(row => 
-      row.map(field => `"${field}"`).join(",")
-    ).join("\n");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `ad-accounts-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `ad-accounts-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      toast({
+        title: "Success",
+        description: "Ad accounts exported successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export ad accounts",
+        variant: "destructive",
+      });
+    }
+  };
 
-    toast({
-      title: "Success",
-      description: "Ad accounts data exported successfully",
-    });
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("/api/ad-accounts/import/csv", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to import CSV");
+      }
+
+      toast({
+        title: "Success",
+        description: data.message,
+      });
+
+      refetchAdAccounts();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to import CSV",
+        variant: "destructive",
+      });
+    }
+
+    event.target.value = "";
   };
 
   const handleExportPDF = () => {
@@ -544,6 +569,23 @@ export default function AdAccountsPage() {
                     <Download className="h-4 w-4 mr-2" />
                     Export CSV
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('import-csv-ad-accounts')?.click()}
+                    data-testid="button-import-csv"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import CSV
+                  </Button>
+                  <input
+                    id="import-csv-ad-accounts"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleImportCSV}
+                    style={{ display: 'none' }}
+                    data-testid="input-import-csv"
+                  />
                   <Button
                     variant="outline"
                     size="sm"
