@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, TrendingUp, MousePointer, Eye, DollarSign, Target, BarChart3 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { RefreshCw, TrendingUp, MousePointer, Eye, DollarSign, Target, BarChart3, CalendarIcon, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { format } from "date-fns";
 
 interface AdAccount {
   id: string;
@@ -50,22 +53,49 @@ interface CampaignInsight {
 export default function FBAdManagementPage() {
   const { toast } = useToast();
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
-  const [dateRange] = useState({ start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), end: new Date() });
+  const [startDate, setStartDate] = useState<Date>(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const [endDate, setEndDate] = useState<Date>(new Date());
 
   // Fetch Facebook ad accounts
   const { data: adAccounts = [], isLoading: accountsLoading } = useQuery<AdAccount[]>({
     queryKey: ["/api/facebook/ad-accounts"],
   });
 
-  // Fetch account insights
+  // Fetch account insights with date filtering
   const { data: accountInsights = [], isLoading: insightsLoading } = useQuery<AccountInsight[]>({
-    queryKey: ["/api/facebook/insights", selectedAccountId],
+    queryKey: ["/api/facebook/insights", selectedAccountId, startDate.toISOString(), endDate.toISOString()],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      });
+      const response = await fetch(`/api/facebook/insights/${selectedAccountId}?${params}`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+      });
+      if (!response.ok) throw new Error("Failed to fetch insights");
+      return response.json();
+    },
     enabled: !!selectedAccountId,
   });
 
-  // Fetch campaign insights
+  // Fetch campaign insights with date filtering
   const { data: campaignInsights = [], isLoading: campaignsLoading } = useQuery<CampaignInsight[]>({
-    queryKey: ["/api/facebook/campaigns", selectedAccountId],
+    queryKey: ["/api/facebook/campaigns", selectedAccountId, startDate.toISOString(), endDate.toISOString()],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      });
+      const response = await fetch(`/api/facebook/campaigns/${selectedAccountId}?${params}`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+      });
+      if (!response.ok) throw new Error("Failed to fetch campaigns");
+      return response.json();
+    },
     enabled: !!selectedAccountId,
   });
 
@@ -137,54 +167,172 @@ export default function FBAdManagementPage() {
 
   const kpis = calculateKPIs();
 
+  // Quick date range presets
+  const setDatePreset = (preset: 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'lastMonth') => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (preset) {
+      case 'today':
+        setStartDate(today);
+        setEndDate(new Date());
+        break;
+      case 'yesterday':
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        setStartDate(yesterday);
+        setEndDate(yesterday);
+        break;
+      case 'last7days':
+        const last7 = new Date(today);
+        last7.setDate(last7.getDate() - 7);
+        setStartDate(last7);
+        setEndDate(new Date());
+        break;
+      case 'last30days':
+        const last30 = new Date(today);
+        last30.setDate(last30.getDate() - 30);
+        setStartDate(last30);
+        setEndDate(new Date());
+        break;
+      case 'thisMonth':
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        setStartDate(monthStart);
+        setEndDate(new Date());
+        break;
+      case 'lastMonth':
+        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+        setStartDate(lastMonthStart);
+        setEndDate(lastMonthEnd);
+        break;
+    }
+  };
+
   return (
     <Sidebar>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-                FB Ad Management
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400">
-                Monitor and analyze Facebook advertising performance
-              </p>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                  FB Ad Management
+                </h1>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Monitor and analyze Facebook advertising performance
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                  <SelectTrigger className="w-64" data-testid="select-fb-account">
+                    <SelectValue placeholder="Select ad account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {adAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={() => syncMutation.mutate()}
+                  disabled={!selectedAccountId || syncMutation.isPending}
+                  data-testid="button-sync-fb-data"
+                >
+                  {syncMutation.isPending ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Sync Data
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-3">
-              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                <SelectTrigger className="w-64" data-testid="select-fb-account">
-                  <SelectValue placeholder="Select ad account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {adAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                onClick={() => syncMutation.mutate()}
-                disabled={!selectedAccountId || syncMutation.isPending}
-                data-testid="button-sync-fb-data"
-              >
-                {syncMutation.isPending ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Syncing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Sync Data
-                  </>
-                )}
-              </Button>
-            </div>
+
+            {/* Date Range Filter */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Date:</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="justify-start text-left font-normal" data-testid="button-start-date">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {format(startDate, "MMM dd, yyyy")}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={startDate}
+                            onSelect={(date) => date && setStartDate(date)}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <span className="text-gray-600 dark:text-gray-400">to</span>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="justify-start text-left font-normal" data-testid="button-end-date">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {format(endDate, "MMM dd, yyyy")}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={endDate}
+                            onSelect={(date) => date && setEndDate(date)}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="flex-1" />
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Showing data from <span className="font-semibold">{format(startDate, "MMM dd, yyyy")}</span> to <span className="font-semibold">{format(endDate, "MMM dd, yyyy")}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Quick Select:</span>
+                    <Button variant="outline" size="sm" onClick={() => setDatePreset('today')} data-testid="preset-today">
+                      Today
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDatePreset('yesterday')} data-testid="preset-yesterday">
+                      Yesterday
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDatePreset('last7days')} data-testid="preset-last7days">
+                      Last 7 Days
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDatePreset('last30days')} data-testid="preset-last30days">
+                      Last 30 Days
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDatePreset('thisMonth')} data-testid="preset-this-month">
+                      This Month
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDatePreset('lastMonth')} data-testid="preset-last-month">
+                      Last Month
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {!selectedAccountId ? (
