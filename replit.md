@@ -30,6 +30,22 @@ This is a full-stack web application built with React and Express.js, featuring 
 - **Media Upload**: Image and video upload functionality with real-time preview
 - **Database Schema**: New tables for campaign_drafts, campaign_templates, saved_audiences, saved_creatives, facebook_pages
 
+**Email Automation** - Email notification system for client communication:
+- **Email Settings Configuration**: New Admin panel tab for centralized email setup
+  - Provider selection: Resend, SendGrid, or Mailgun support
+  - **API Key Storage**: Stored directly in database (email_settings table) per user request, not in Replit Secrets
+  - Sender configuration: Email address and display name
+  - Notification toggles: Enable/disable email notifications
+  - Test connection: Validates API key and provider settings before activation
+- **Notification Types**:
+  - New Ad Alerts: Automatic emails when new ads are created
+  - Daily Performance Summaries: Scheduled reports at configurable times
+- **Database Schema**: New email_settings table with provider, apiKey, senderEmail, senderName, and notification preferences
+- **API Endpoints**: 
+  - GET /api/email/settings - Retrieve current email configuration
+  - POST /api/email/settings - Save email settings with validation
+  - POST /api/email/test-connection - Verify API key and connection
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
