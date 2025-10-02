@@ -77,6 +77,7 @@ function AuthenticatedRoute({ component: Component }: { component: React.Compone
 function ProtectedRoute({ component: Component, pageKey }: { component: React.ComponentType, pageKey: string }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [user, setUser] = useState<any>(null);
+  const [, setLocation] = useState(window.location.pathname);
 
   useEffect(() => {
     const checkAuth = () => {
@@ -116,6 +117,59 @@ function ProtectedRoute({ component: Component, pageKey }: { component: React.Co
     select: (data: any) => data?.hasPermission ?? false,
   });
 
+  // Check alternative pages if current page is denied and it's the dashboard
+  const { data: campaignsPermission } = useQuery({
+    queryKey: [`/api/permissions/check/campaigns`],
+    enabled: !!isAuthenticated && !!user && pageKey === 'dashboard' && !permissionLoading && !hasPermission,
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+  });
+
+  const { data: clientsPermission } = useQuery({
+    queryKey: [`/api/permissions/check/clients`],
+    enabled: !!isAuthenticated && !!user && pageKey === 'dashboard' && !permissionLoading && !hasPermission,
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+  });
+
+  const { data: adAccountsPermission } = useQuery({
+    queryKey: [`/api/permissions/check/ad_accounts`],
+    enabled: !!isAuthenticated && !!user && pageKey === 'dashboard' && !permissionLoading && !hasPermission,
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+  });
+
+  const { data: workReportsPermission } = useQuery({
+    queryKey: [`/api/permissions/check/work_reports`],
+    enabled: !!isAuthenticated && !!user && pageKey === 'dashboard' && !permissionLoading && !hasPermission,
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+  });
+
+  const { data: financePermission } = useQuery({
+    queryKey: [`/api/permissions/check/finance`],
+    enabled: !!isAuthenticated && !!user && pageKey === 'dashboard' && !permissionLoading && !hasPermission,
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+  });
+
+  // Redirect to first accessible page if dashboard is denied
+  useEffect(() => {
+    if (pageKey === 'dashboard' && !permissionLoading && !hasPermission && isAuthenticated) {
+      if (campaignsPermission) {
+        window.location.href = '/campaigns';
+      } else if (clientsPermission) {
+        window.location.href = '/clients';
+      } else if (adAccountsPermission) {
+        window.location.href = '/ad-accounts';
+      } else if (workReportsPermission) {
+        window.location.href = '/work-reports';
+      } else if (financePermission) {
+        window.location.href = '/finance/dashboard';
+      }
+    }
+  }, [pageKey, permissionLoading, hasPermission, isAuthenticated, campaignsPermission, clientsPermission, adAccountsPermission, workReportsPermission, financePermission]);
+
   if (isAuthenticated === null || (isAuthenticated && permissionLoading)) {
     // Loading state
     return (
@@ -139,6 +193,18 @@ function ProtectedRoute({ component: Component, pageKey }: { component: React.Co
 
   // Check if user has permission for this page
   if (isError || !hasPermission) {
+    // For dashboard, show loading while checking alternative pages
+    if (pageKey === 'dashboard' && (campaignsPermission === undefined || clientsPermission === undefined)) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-8">
