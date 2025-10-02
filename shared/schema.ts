@@ -574,10 +574,11 @@ export const insertFacebookSettingSchema = createInsertSchema(facebookSettings).
 export type InsertFacebookSetting = z.infer<typeof insertFacebookSettingSchema>;
 export type FacebookSetting = typeof facebookSettings.$inferSelect;
 
-// Email Settings (API key stored in Replit Secrets for security)
+// Email Settings
 export const emailSettings = pgTable("email_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   provider: text("provider").notNull().default("resend"), // "resend", "sendgrid", "mailgun"
+  apiKey: text("api_key").notNull(),
   senderEmail: text("sender_email").notNull(),
   senderName: text("sender_name").notNull(),
   enableNotifications: boolean("enable_notifications").default(false),

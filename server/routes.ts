@@ -3418,19 +3418,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Save Email settings (API key stored in Replit Secrets)
+  // Save Email settings
   app.post("/api/email/settings", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
     try {
-      const { provider, senderEmail, senderName, enableNotifications, enableNewAdAlerts, enableDailySummary, dailySummaryTime } = req.body;
+      const { provider, apiKey, senderEmail, senderName, enableNotifications, enableNewAdAlerts, enableDailySummary, dailySummaryTime } = req.body;
       
       // Validate required fields
-      if (!provider || !senderEmail || !senderName) {
-        return res.status(400).json({ message: "Provider, sender email, and sender name are required" });
+      if (!provider || !apiKey || !senderEmail || !senderName) {
+        return res.status(400).json({ message: "Provider, API key, sender email, and sender name are required" });
       }
 
-      // Save settings (API key is handled separately via Replit Secrets)
+      // Save settings
       await storage.saveEmailSettings({
         provider,
+        apiKey,
         senderEmail,
         senderName,
         enableNotifications: enableNotifications ?? false,
@@ -3456,13 +3457,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email settings not configured" });
       }
 
-      // Check if API key exists in environment
-      const apiKey = process.env.EMAIL_SERVICE_API_KEY;
-      if (!apiKey) {
-        await storage.updateEmailConnectionStatus(false, "API key not found in environment");
+      if (!settings.apiKey) {
+        await storage.updateEmailConnectionStatus(false, "API key not configured");
         return res.status(400).json({ 
           success: false, 
-          message: "Email service API key not configured. Please add EMAIL_SERVICE_API_KEY to Replit Secrets." 
+          message: "Email service API key not configured. Please save your settings with an API key." 
         });
       }
 

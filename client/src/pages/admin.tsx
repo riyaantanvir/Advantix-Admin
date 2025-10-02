@@ -3549,6 +3549,7 @@ function FacebookSettings() {
 function EmailSettings() {
   const { toast } = useToast();
   const [provider, setProvider] = useState("resend");
+  const [apiKey, setApiKey] = useState("");
   const [senderEmail, setSenderEmail] = useState("");
   const [senderName, setSenderName] = useState("");
   const [enableNotifications, setEnableNotifications] = useState(false);
@@ -3574,7 +3575,8 @@ function EmailSettings() {
           "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
         },
         body: JSON.stringify({ 
-          provider, 
+          provider,
+          apiKey, 
           senderEmail, 
           senderName, 
           enableNotifications, 
@@ -3644,6 +3646,7 @@ function EmailSettings() {
   useEffect(() => {
     if (settings) {
       setProvider(settings.provider || "resend");
+      setApiKey(settings.apiKey || "");
       setSenderEmail(settings.senderEmail || "");
       setSenderName(settings.senderName || "");
       setEnableNotifications(settings.enableNotifications || false);
@@ -3657,10 +3660,10 @@ function EmailSettings() {
   }, [settings]);
 
   const handleSaveSettings = () => {
-    if (!provider || !senderEmail || !senderName) {
+    if (!provider || !apiKey || !senderEmail || !senderName) {
       toast({
         title: "Validation Error",
-        description: "Provider, sender email, and sender name are required",
+        description: "Provider, API key, sender email, and sender name are required",
         variant: "destructive",
       });
       return;
@@ -3749,6 +3752,21 @@ function EmailSettings() {
               </Select>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Choose your email service provider
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email-api-key">API Key</Label>
+              <Input
+                id="email-api-key"
+                type="password"
+                placeholder="Enter your email service API key"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                data-testid="input-email-api-key"
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Your email service API key for sending notifications
               </p>
             </div>
 
@@ -3866,16 +3884,20 @@ function EmailSettings() {
             </div>
           </div>
 
-          {/* API Key Notice */}
+          {/* Setup Instructions */}
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
-              API Key Required
+              How to Get Your API Key
             </h4>
-            <p className="text-sm text-blue-800 dark:text-blue-200">
-              Your email service API key should be stored in Replit Secrets as <code className="bg-blue-100 dark:bg-blue-800 px-1 py-0.5 rounded">EMAIL_SERVICE_API_KEY</code>. 
-              This ensures your API key is stored securely and not exposed in your codebase.
-            </p>
+            <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800 dark:text-blue-200">
+              <li>Sign up for an email service provider (we recommend <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="underline">Resend</a>)</li>
+              <li>Go to your account dashboard and find the API Keys section</li>
+              <li>Create a new API key and copy it</li>
+              <li>Paste the API key in the field above</li>
+              <li>Fill in your sender email and name</li>
+              <li>Click "Save Settings" and then "Test Connection" to verify</li>
+            </ol>
           </div>
         </CardContent>
       </Card>
