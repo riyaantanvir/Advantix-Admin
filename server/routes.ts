@@ -3570,6 +3570,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // First fetch campaign details (status, objective, budget)
+      const campaignsUrl = `https://graph.facebook.com/v18.0/act_${adAccount.accountId}/campaigns?access_token=${settings.accessToken}&fields=id,name,status,objective,daily_budget&limit=100`;
+      const campaignsResponse = await fetch(campaignsUrl);
+      const campaignDetailsMap = new Map();
+      
+      if (campaignsResponse.ok) {
+        const campaignsData = await campaignsResponse.json();
+        if (campaignsData.data) {
+          for (const camp of campaignsData.data) {
+            campaignDetailsMap.set(camp.id, {
+              status: camp.status || 'ACTIVE',
+              objective: camp.objective || null,
+              dailyBudget: camp.daily_budget ? (parseFloat(camp.daily_budget) / 100).toFixed(2) : null // Facebook returns cents
+            });
+          }
+        }
+      }
+
       // Fetch campaign-level insights
       const campaignApiUrl = `https://graph.facebook.com/v18.0/act_${adAccount.accountId}/insights?access_token=${settings.accessToken}&time_range={'since':'${since}','until':'${until}'}&time_increment=1&level=campaign&fields=campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,cpm,reach,frequency,actions`;
       
@@ -3588,10 +3606,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const conversionValue = conversionsAction ? parseFloat(conversionsAction.value || "0") : 0;
             const roas = spend > 0 && conversionValue > 0 ? (conversionValue / spend).toFixed(2) : "0";
             
+            // Get campaign details from map
+            const campaignDetails = campaignDetailsMap.get(dailyCampaign.campaign_id) || {};
+            
             await storage.upsertFacebookCampaignInsight({
               adAccountId: adAccount.id,
               fbCampaignId: dailyCampaign.campaign_id,
               campaignName: dailyCampaign.campaign_name || "Unnamed Campaign",
+              status: campaignDetails.status || "ACTIVE",
+              objective: campaignDetails.objective,
+              dailyBudget: campaignDetails.dailyBudget,
               date: new Date(dateString),
               spend: dailyCampaign.spend || "0",
               impressions: parseInt(dailyCampaign.impressions) || 0,
