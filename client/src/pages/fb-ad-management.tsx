@@ -349,6 +349,41 @@ export default function FBAdManagementPage() {
             </Card>
           ) : (
             <>
+              {/* Period Summary */}
+              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
+                    <CalendarIcon className="w-5 h-5" />
+                    Period Summary
+                  </CardTitle>
+                  <CardDescription className="text-blue-700 dark:text-blue-300">
+                    Results for {format(startDate, "MMM dd, yyyy")} - {format(endDate, "MMM dd, yyyy")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mb-1">Total Spend</p>
+                      <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">
+                        ${kpis.totalSpend}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mb-1">Total Conversions</p>
+                      <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">
+                        {accountInsights.reduce((sum, insight) => sum + (insight.conversions || 0), 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mb-1">ROAS (Return on Ad Spend)</p>
+                      <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">
+                        {kpis.avgROAS}x
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* KPI Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                 <Card data-testid="kpi-total-spend">
