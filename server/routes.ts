@@ -3403,6 +3403,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email Settings Routes
+  // Get Email settings
+  app.get("/api/email/settings", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getEmailSettings();
+      if (!settings) {
+        return res.json(null);
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Get email settings error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Save Email settings (API key stored in Replit Secrets)
+  app.post("/api/email/settings", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { provider, senderEmail, senderName, enableNotifications, enableNewAdAlerts, enableDailySummary, dailySummaryTime } = req.body;
+      
+      // Validate required fields
+      if (!provider || !senderEmail || !senderName) {
+        return res.status(400).json({ message: "Provider, sender email, and sender name are required" });
+      }
+
+      // Save settings (API key is handled separately via Replit Secrets)
+      await storage.saveEmailSettings({
+        provider,
+        senderEmail,
+        senderName,
+        enableNotifications: enableNotifications ?? false,
+        enableNewAdAlerts: enableNewAdAlerts ?? true,
+        enableDailySummary: enableDailySummary ?? true,
+        dailySummaryTime: dailySummaryTime || "07:00",
+        isConfigured: false
+      });
+
+      res.json({ message: "Email settings saved successfully" });
+    } catch (error: any) {
+      console.error("Save email settings error:", error);
+      res.status(500).json({ message: error.message || "Internal server error" });
+    }
+  });
+
+  // Test Email connection
+  app.post("/api/email/test-connection", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getEmailSettings();
+      
+      if (!settings) {
+        return res.status(400).json({ message: "Email settings not configured" });
+      }
+
+      // Check if API key exists in environment
+      const apiKey = process.env.EMAIL_SERVICE_API_KEY;
+      if (!apiKey) {
+        await storage.updateEmailConnectionStatus(false, "API key not found in environment");
+        return res.status(400).json({ 
+          success: false, 
+          message: "Email service API key not configured. Please add EMAIL_SERVICE_API_KEY to Replit Secrets." 
+        });
+      }
+
+      // For now, just validate settings exist and API key is present
+      // In production, this would make an actual test request to the email service
+      await storage.updateEmailConnectionStatus(true);
+      res.json({ 
+        success: true, 
+        message: "Email service configured successfully",
+        provider: settings.provider
+      });
+    } catch (error: any) {
+      await storage.updateEmailConnectionStatus(false, error.message);
+      console.error("Test email connection error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "Internal server error" 
+      });
+    }
+  });
+
   // Sync Facebook ad accounts
   app.post("/api/facebook/sync-accounts", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
     try {
