@@ -6,13 +6,18 @@ This is a full-stack web application built with React and Express.js, featuring 
 
 **Advantix Ads Manager** - New advanced campaign creation system with:
 - **3-Step Campaign Wizard**: Guided workflow for creating Facebook ad campaigns
-  - Step 1: Campaign Setup (objective, budget, ad account selection)
+  - Step 1: Campaign Setup (objective, budget, ad account selection, **Facebook Page selection**)
   - Step 2: Audience Targeting (age range slider, gender selection, location targeting, interests)
   - Step 3: Creative Assets (ad copy, headlines, image/video upload with preview)
-- **Campaign Drafts**: Save and manage campaign drafts before publishing
+- **Facebook Pages Integration**: 
+  - New facebook_pages table to store Facebook Pages linked to ad accounts
+  - Dynamic page selection based on selected ad account
+  - API endpoint GET /api/facebook/pages/:adAccountId for fetching pages
+  - Optional page selection in campaign wizard with helpful empty state messages
+- **Campaign Drafts**: Save and manage campaign drafts before publishing (includes pageId)
 - **Template System**: Foundation for campaign templates and saved audiences
 - **Media Upload**: Image and video upload functionality with real-time preview
-- **Database Schema**: New tables for campaign_drafts, campaign_templates, saved_audiences, saved_creatives
+- **Database Schema**: New tables for campaign_drafts, campaign_templates, saved_audiences, saved_creatives, facebook_pages
 
 # User Preferences
 
