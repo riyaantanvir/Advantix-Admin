@@ -965,6 +965,33 @@ export class DatabaseStorage implements IStorage {
     // Super Admin has access to everything
     if (user.role === UserRole.SUPER_ADMIN) return true;
 
+    // First check user-specific menu permissions
+    const userMenuPermission = await this.getUserMenuPermission(userId);
+    
+    // Map pageKey to menu permission field
+    const pageKeyToMenuField: Record<string, string> = {
+      'dashboard': 'dashboard',
+      'campaigns': 'campaignManagement',
+      'clients': 'clientManagement',
+      'ad_accounts': 'adAccounts',
+      'work_reports': 'workReports',
+      'finance': 'advantixDashboard', // Finance uses multiple fields, checking main one
+      'admin': 'adminPanel'
+    };
+
+    // If user has specific menu permissions set, use those for view action
+    if (userMenuPermission && action === 'view') {
+      const menuField = pageKeyToMenuField[pageKey];
+      if (menuField && menuField in userMenuPermission) {
+        const permissionValue = (userMenuPermission as any)[menuField];
+        // Return the user's specific menu permission if it's boolean
+        if (typeof permissionValue === 'boolean') {
+          return permissionValue;
+        }
+      }
+    }
+
+    // Fall back to role-based permissions for edit/delete actions or if no user menu permissions
     // Get page
     const page = await this.getPageByKey(pageKey);
     if (!page || !page.isActive) return false;
