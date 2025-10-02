@@ -40,6 +40,9 @@ interface CampaignInsight {
   adAccountId: string;
   campaignId: string;
   campaignName: string;
+  status?: string;
+  objective?: string;
+  dailyBudget?: string;
   date: Date;
   spend: string;
   impressions: number;
