@@ -198,6 +198,22 @@ export interface IStorage {
   // Facebook Campaign Insights methods
   getFacebookCampaignInsights(adAccountId: string, startDate: Date, endDate: Date): Promise<any[]>;
   upsertFacebookCampaignInsight(data: any): Promise<any>;
+
+  // Campaign Draft methods
+  getCampaignDrafts(): Promise<any[]>;
+  getCampaignDraftById(id: string): Promise<any>;
+  createCampaignDraft(draft: any): Promise<any>;
+  updateCampaignDraft(id: string, draft: any): Promise<any>;
+  deleteCampaignDraft(id: string): Promise<void>;
+
+  // Campaign Template methods
+  getCampaignTemplates(): Promise<any[]>;
+
+  // Saved Audience methods
+  getSavedAudiences(): Promise<any[]>;
+
+  // Ad Account by ID
+  getAdAccountById(id: string): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -1437,6 +1453,39 @@ export class MemStorage implements IStorage {
 
   async upsertFacebookCampaignInsight(data: any): Promise<any> {
     return data;
+  }
+
+  // Campaign Draft methods (stub implementations)
+  async getCampaignDrafts(): Promise<any[]> {
+    return [];
+  }
+
+  async getCampaignDraftById(id: string): Promise<any> {
+    return null;
+  }
+
+  async createCampaignDraft(draft: any): Promise<any> {
+    return draft;
+  }
+
+  async updateCampaignDraft(id: string, draft: any): Promise<any> {
+    return draft;
+  }
+
+  async deleteCampaignDraft(id: string): Promise<void> {
+    // Stub
+  }
+
+  async getCampaignTemplates(): Promise<any[]> {
+    return [];
+  }
+
+  async getSavedAudiences(): Promise<any[]> {
+    return [];
+  }
+
+  async getAdAccountById(id: string): Promise<any> {
+    return Array.from(this.adAccounts.values()).find(acc => acc.id === id);
   }
 
 }

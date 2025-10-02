@@ -1906,4 +1906,108 @@ export class DatabaseStorage implements IStorage {
       throw new Error(`Failed to upsert Facebook campaign insight: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+
+  // Campaign Draft methods
+  async getCampaignDrafts(): Promise<any[]> {
+    try {
+      const result = await db.select()
+        .from(campaignDrafts)
+        .orderBy(desc(campaignDrafts.createdAt));
+      return result;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get campaign drafts:", error);
+      return [];
+    }
+  }
+
+  async getCampaignDraftById(id: string): Promise<any> {
+    try {
+      const result = await db.select()
+        .from(campaignDrafts)
+        .where(eq(campaignDrafts.id, id))
+        .limit(1);
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get campaign draft:", error);
+      return null;
+    }
+  }
+
+  async createCampaignDraft(draft: any): Promise<any> {
+    try {
+      const result = await db.insert(campaignDrafts)
+        .values({
+          ...draft,
+          id: randomUUID(),
+        })
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to create campaign draft:", error);
+      throw error;
+    }
+  }
+
+  async updateCampaignDraft(id: string, draft: any): Promise<any> {
+    try {
+      const result = await db.update(campaignDrafts)
+        .set({
+          ...draft,
+          updatedAt: new Date(),
+        })
+        .where(eq(campaignDrafts.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to update campaign draft:", error);
+      throw error;
+    }
+  }
+
+  async deleteCampaignDraft(id: string): Promise<void> {
+    try {
+      await db.delete(campaignDrafts)
+        .where(eq(campaignDrafts.id, id));
+    } catch (error) {
+      console.error("[DB ERROR] Failed to delete campaign draft:", error);
+      throw error;
+    }
+  }
+
+  async getCampaignTemplates(): Promise<any[]> {
+    try {
+      const result = await db.select()
+        .from(campaignTemplates)
+        .orderBy(desc(campaignTemplates.createdAt));
+      return result;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get campaign templates:", error);
+      return [];
+    }
+  }
+
+  async getSavedAudiences(): Promise<any[]> {
+    try {
+      const result = await db.select()
+        .from(savedAudiences)
+        .orderBy(desc(savedAudiences.createdAt));
+      return result;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get saved audiences:", error);
+      return [];
+    }
+  }
+
+  async getAdAccountById(id: string): Promise<any> {
+    try {
+      const result = await db.select()
+        .from(adAccounts)
+        .where(eq(adAccounts.id, id))
+        .limit(1);
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get ad account:", error);
+      return null;
+    }
+  }
 }

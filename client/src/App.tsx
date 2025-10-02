@@ -20,6 +20,7 @@ import FinanceExpenses from "@/pages/finance-expenses";
 import FinanceSalaryManagement from "@/pages/finance-salary-management";
 import FinanceReports from "@/pages/finance-reports";
 import FBAdManagementPage from "@/pages/fb-ad-management";
+import AdvantixAdsManager from "@/pages/advantix-ads-manager";
 import NotFound from "@/pages/not-found";
 
 function AuthenticatedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -244,6 +245,7 @@ function Router() {
       <Route path="/finance/salary-management" component={() => <ProtectedRoute component={FinanceSalaryManagement} pageKey="salary_management" />} />
       <Route path="/finance/reports" component={() => <ProtectedRoute component={FinanceReports} pageKey="finance" />} />
       <Route path="/fb-ad-management" component={() => <ProtectedRoute component={FBAdManagementPage} pageKey="fb_ad_management" />} />
+      <Route path="/advantix-ads" component={() => <ProtectedRoute component={AdvantixAdsManager} pageKey="advantix_ads_manager" />} />
       <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} pageKey="admin" />} />
       <Route path="/" component={() => <ProtectedRoute component={Home} pageKey="dashboard" />} />
       <Route component={NotFound} />
