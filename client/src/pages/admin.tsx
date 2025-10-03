@@ -4028,15 +4028,28 @@ function SmsSettings() {
         }),
       });
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to save settings");
+        let errorMessage = "Failed to save settings";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const error = await response.json();
+            errorMessage = error.message || errorMessage;
+          } else {
+            const text = await response.text();
+            console.error("Non-JSON response:", text.substring(0, 200));
+            errorMessage = "Server returned an unexpected response";
+          }
+        } catch (e) {
+          console.error("Error parsing response:", e);
+        }
+        throw new Error(errorMessage);
       }
       return response.json();
     },
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "SMS settings saved successfully",
+        description: "SMS settings saved successfully. Click 'Send Test SMS' to verify and activate.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/sms/settings"] });
     },
@@ -4288,7 +4301,7 @@ function SmsSettings() {
           </div>
 
           {/* Send Test SMS Section */}
-          {isConfigured && (
+          {settings && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
               <h4 className="font-medium text-green-900 dark:text-green-100 mb-3 flex items-center gap-2">
                 <Send className="w-4 h-4" />
