@@ -4003,6 +4003,7 @@ function SmsSettings() {
   const [lastTestedAt, setLastTestedAt] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [testPhoneNumber, setTestPhoneNumber] = useState("");
+  const [testMessage, setTestMessage] = useState("Test SMS from Advantix Admin. Your SMS service is configured correctly!");
 
   // Fetch SMS settings
   const { data: settings, isLoading: settingsLoading } = useQuery<any>({
@@ -4057,7 +4058,10 @@ function SmsSettings() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
         },
-        body: JSON.stringify({ phoneNumber: testPhoneNumber }),
+        body: JSON.stringify({ 
+          phoneNumber: testPhoneNumber,
+          message: testMessage 
+        }),
       });
       if (!response.ok) {
         let errorMessage = "Failed to send test SMS";
@@ -4293,7 +4297,7 @@ function SmsSettings() {
               <p className="text-sm text-green-800 dark:text-green-200 mb-3">
                 Send a test SMS to verify your SMS service is working correctly. Use Bangladesh format: +8801XXXXXXXXX or 01XXXXXXXXX
               </p>
-              <div className="flex gap-2">
+              <div className="space-y-3">
                 <Input
                   type="tel"
                   placeholder="+8801XXXXXXXXX or 01XXXXXXXXX"
@@ -4301,12 +4305,20 @@ function SmsSettings() {
                   onChange={(e) => setTestPhoneNumber(e.target.value)}
                   disabled={sendTestSmsMutation.isPending}
                   data-testid="input-test-sms-recipient"
-                  className="flex-1"
+                />
+                <Input
+                  type="text"
+                  placeholder="Custom test message (optional)"
+                  value={testMessage}
+                  onChange={(e) => setTestMessage(e.target.value)}
+                  disabled={sendTestSmsMutation.isPending}
+                  data-testid="input-test-sms-message"
                 />
                 <Button
                   onClick={() => sendTestSmsMutation.mutate()}
                   disabled={!testPhoneNumber || sendTestSmsMutation.isPending}
                   data-testid="button-send-test-sms"
+                  className="w-full"
                 >
                   {sendTestSmsMutation.isPending ? (
                     <>
@@ -4316,7 +4328,7 @@ function SmsSettings() {
                   ) : (
                     <>
                       <Send className="w-4 h-4 mr-2" />
-                      Send Test
+                      Send Test SMS
                     </>
                   )}
                 </Button>

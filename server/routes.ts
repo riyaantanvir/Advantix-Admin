@@ -3684,7 +3684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/sms/test-send", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
     try {
       const settings = await storage.getSmsSettings();
-      const { phoneNumber } = req.body;
+      const { phoneNumber, message } = req.body;
 
       console.log("Send test SMS request:", { phoneNumber, provider: settings?.provider });
 
@@ -3719,6 +3719,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         normalizedPhone = normalizedPhone.substring(1);
       }
 
+      // Use custom message if provided, otherwise use default
+      const smsMessage = message || 'Test SMS from Advantix Admin. Your SMS service is configured correctly!';
+
       // Send test SMS based on provider
       console.log(`Sending test SMS via ${settings.provider} to ${normalizedPhone}`);
       let response;
@@ -3734,7 +3737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             api_key: settings.apiKey,
             senderid: settings.phoneNumber,
             number: normalizedPhone,
-            message: 'Test SMS from Advantix Admin. Your SMS service is configured correctly!'
+            message: smsMessage
           })
         });
       } else if (settings.provider === 'bd_bulk_sms') {
@@ -3748,7 +3751,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             api_key: settings.apiKey,
             sender_id: settings.phoneNumber,
             to: normalizedPhone,
-            message: 'Test SMS from Advantix Admin. Your SMS service is configured correctly!'
+            message: smsMessage
           })
         });
       } else {
