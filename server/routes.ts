@@ -3727,18 +3727,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let response;
       
       if (settings.provider === 'sms_in_bd') {
-        // SMS in BD API
+        // SMS in BD API - uses 'msg' and 'to' parameters (no senderid needed - it's in dashboard)
+        const requestBody = {
+          api_key: settings.apiKey,
+          msg: smsMessage,
+          to: normalizedPhone
+        };
+        console.log('SMS in BD request body:', JSON.stringify(requestBody, null, 2));
+        
         response = await fetch('https://api.sms.net.bd/sendsms', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            api_key: settings.apiKey,
-            senderid: settings.senderId,
-            number: normalizedPhone,
-            message: smsMessage
-          })
+          body: JSON.stringify(requestBody)
         });
       } else if (settings.provider === 'bd_bulk_sms') {
         // BD Bulk SMS API

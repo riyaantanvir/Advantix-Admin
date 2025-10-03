@@ -4243,17 +4243,17 @@ function SmsSettings() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="sender-phone">Sender Phone Number / Sender ID</Label>
+              <Label htmlFor="sender-phone">Sender ID / Brand Name</Label>
               <Input
                 id="sender-phone"
                 type="text"
-                placeholder="YourBrand or +8801XXXXXXXXX"
+                placeholder="Your registered sender ID or brand name"
                 value={senderId}
                 onChange={(e) => setSenderId(e.target.value)}
                 data-testid="input-sender-id"
               />
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Sender ID or phone number that will appear as the sender
+                Note: For SMS in BD, sender ID is configured in your dashboard (enter anything here for testing)
               </p>
             </div>
 
