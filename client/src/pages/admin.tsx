@@ -4065,17 +4065,24 @@ function SmsSettings() {
   // Send test SMS mutation
   const sendTestSmsMutation = useMutation({
     mutationFn: async () => {
+      console.log("Sending test SMS to:", testPhoneNumber);
+      const authToken = localStorage.getItem("authToken");
+      console.log("Auth token exists:", !!authToken);
+      
       const response = await fetch("/api/sms/test-send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+          "Authorization": `Bearer ${authToken}`,
         },
         body: JSON.stringify({ 
           phoneNumber: testPhoneNumber,
           message: testMessage 
         }),
       });
+      
+      console.log("Response status:", response.status);
+      console.log("Response headers:", response.headers.get("content-type"));
       if (!response.ok) {
         let errorMessage = "Failed to send test SMS";
         try {
@@ -4085,14 +4092,29 @@ function SmsSettings() {
             errorMessage = error.message || errorMessage;
           } else {
             const text = await response.text();
-            errorMessage = text.substring(0, 200) || errorMessage;
+            console.error("Non-JSON response:", text.substring(0, 200));
+            errorMessage = "Server returned an unexpected response. Please check your session.";
           }
         } catch (e) {
           console.error("Error parsing response:", e);
         }
         throw new Error(errorMessage);
       }
-      return response.json();
+      
+      // Parse JSON response safely
+      try {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          return response.json();
+        } else {
+          const text = await response.text();
+          console.error("Non-JSON success response:", text.substring(0, 200));
+          throw new Error("Server returned an unexpected response format. Please refresh and try again.");
+        }
+      } catch (e) {
+        console.error("Error parsing success response:", e);
+        throw new Error("Failed to parse server response. Please refresh the page and try again.");
+      }
     },
     onSuccess: (data: any) => {
       toast({
@@ -4103,11 +4125,26 @@ function SmsSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/sms/settings"] });
     },
     onError: (error: any) => {
-      toast({
-        title: "Failed to Send",
-        description: error.message || "Failed to send test SMS",
-        variant: "destructive",
-      });
+      const errorMessage = error.message || "Failed to send test SMS";
+      
+      // Check if it's a session expiration error
+      if (errorMessage.includes("unexpected response") || errorMessage.includes("session")) {
+        toast({
+          title: "Session Expired",
+          description: "Your session has expired. Please log in again.",
+          variant: "destructive",
+        });
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 2000);
+      } else {
+        toast({
+          title: "Failed to Send",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     },
   });
 
