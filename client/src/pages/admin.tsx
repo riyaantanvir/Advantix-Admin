@@ -3996,7 +3996,7 @@ function SmsSettings() {
   const { toast } = useToast();
   const [provider, setProvider] = useState("sms_in_bd");
   const [apiKey, setApiKey] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [senderId, setSenderId] = useState("");
   const [enableNotifications, setEnableNotifications] = useState(false);
   const [enableAdActiveAlerts, setEnableAdActiveAlerts] = useState(true);
   const [isConfigured, setIsConfigured] = useState(false);
@@ -4022,7 +4022,7 @@ function SmsSettings() {
         body: JSON.stringify({ 
           provider,
           apiKey, 
-          phoneNumber, 
+          senderId, 
           enableNotifications, 
           enableAdActiveAlerts
         }),
@@ -4153,7 +4153,7 @@ function SmsSettings() {
     if (settings) {
       setProvider(settings.provider || "sms_in_bd");
       setApiKey(settings.apiKey || "");
-      setPhoneNumber(settings.phoneNumber || "");
+      setSenderId(settings.senderId || "");
       setEnableNotifications(settings.enableNotifications || false);
       setEnableAdActiveAlerts(settings.enableAdActiveAlerts ?? true);
       setIsConfigured(settings.isConfigured || false);
@@ -4163,10 +4163,10 @@ function SmsSettings() {
   }, [settings]);
 
   const handleSaveSettings = () => {
-    if (!provider || !apiKey || !phoneNumber) {
+    if (!provider || !apiKey || !senderId) {
       toast({
         title: "Validation Error",
-        description: "Provider, API key, and phone number are required",
+        description: "Provider, API key, and sender ID are required",
         variant: "destructive",
       });
       return;
@@ -4248,9 +4248,9 @@ function SmsSettings() {
                 id="sender-phone"
                 type="text"
                 placeholder="YourBrand or +8801XXXXXXXXX"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                data-testid="input-sender-phone"
+                value={senderId}
+                onChange={(e) => setSenderId(e.target.value)}
+                data-testid="input-sender-id"
               />
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Sender ID or phone number that will appear as the sender
