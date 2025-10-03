@@ -3992,6 +3992,343 @@ function EmailSettings() {
   );
 }
 
+function SmsSettings() {
+  const { toast } = useToast();
+  const [provider, setProvider] = useState("sms_in_bd");
+  const [apiKey, setApiKey] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [enableNotifications, setEnableNotifications] = useState(false);
+  const [enableAdActiveAlerts, setEnableAdActiveAlerts] = useState(true);
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [lastTestedAt, setLastTestedAt] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [testPhoneNumber, setTestPhoneNumber] = useState("");
+
+  // Fetch SMS settings
+  const { data: settings, isLoading: settingsLoading } = useQuery<any>({
+    queryKey: ["/api/sms/settings"],
+  });
+
+  // Save settings mutation
+  const saveSettingsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/sms/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ 
+          provider,
+          apiKey, 
+          phoneNumber, 
+          enableNotifications, 
+          enableAdActiveAlerts
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to save settings");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "SMS settings saved successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/sms/settings"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Send test SMS mutation
+  const sendTestSmsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/sms/test-send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ phoneNumber: testPhoneNumber }),
+      });
+      if (!response.ok) {
+        let errorMessage = "Failed to send test SMS";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const error = await response.json();
+            errorMessage = error.message || errorMessage;
+          } else {
+            const text = await response.text();
+            errorMessage = text.substring(0, 200) || errorMessage;
+          }
+        } catch (e) {
+          console.error("Error parsing response:", e);
+        }
+        throw new Error(errorMessage);
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "SMS Sent",
+        description: data.message || "Test SMS sent successfully",
+      });
+      setTestPhoneNumber("");
+      queryClient.invalidateQueries({ queryKey: ["/api/sms/settings"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Send",
+        description: error.message || "Failed to send test SMS",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Load settings when available
+  useEffect(() => {
+    if (settings) {
+      setProvider(settings.provider || "sms_in_bd");
+      setApiKey(settings.apiKey || "");
+      setPhoneNumber(settings.phoneNumber || "");
+      setEnableNotifications(settings.enableNotifications || false);
+      setEnableAdActiveAlerts(settings.enableAdActiveAlerts ?? true);
+      setIsConfigured(settings.isConfigured || false);
+      setLastTestedAt(settings.lastTestedAt || null);
+      setConnectionError(settings.connectionError || null);
+    }
+  }, [settings]);
+
+  const handleSaveSettings = () => {
+    if (!provider || !apiKey || !phoneNumber) {
+      toast({
+        title: "Validation Error",
+        description: "Provider, API key, and phone number are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    saveSettingsMutation.mutate();
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5" />
+            SMS Notifications Settings
+          </CardTitle>
+          <CardDescription>
+            Configure SMS service for automated text alerts to Bangladesh clients
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Connection Status */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className={`w-3 h-3 rounded-full ${isConfigured ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {isConfigured ? 'Configured' : 'Not Configured'}
+                </p>
+                {lastTestedAt && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Last tested: {new Date(lastTestedAt).toLocaleString()}
+                  </p>
+                )}
+                {connectionError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    Error: {connectionError}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Settings Form */}
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="sms-provider">SMS Service Provider</Label>
+              <Select value={provider} onValueChange={setProvider}>
+                <SelectTrigger id="sms-provider" data-testid="select-sms-provider">
+                  <SelectValue placeholder="Select SMS provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sms_in_bd">SMS in BD (0.16-0.17 BDT/SMS)</SelectItem>
+                  <SelectItem value="bd_bulk_sms">BD Bulk SMS (0.16-0.17 BDT/SMS)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Choose your Bangladesh SMS service provider
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sms-api-key">API Key</Label>
+              <Input
+                id="sms-api-key"
+                type="password"
+                placeholder="Enter your SMS service API key"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                data-testid="input-sms-api-key"
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Your SMS service API key for sending notifications
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sender-phone">Sender Phone Number / Sender ID</Label>
+              <Input
+                id="sender-phone"
+                type="text"
+                placeholder="YourBrand or +8801XXXXXXXXX"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                data-testid="input-sender-phone"
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Sender ID or phone number that will appear as the sender
+              </p>
+            </div>
+
+            {/* Notification Options */}
+            <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Label className="text-base font-semibold">Notification Settings</Label>
+              
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div>
+                  <Label htmlFor="enable-sms-notifications" className="font-medium">
+                    Enable SMS Notifications
+                  </Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Master toggle for all SMS notifications
+                  </p>
+                </div>
+                <Switch
+                  id="enable-sms-notifications"
+                  checked={enableNotifications}
+                  onCheckedChange={setEnableNotifications}
+                  data-testid="switch-enable-sms-notifications"
+                />
+              </div>
+
+              {enableNotifications && (
+                <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div>
+                    <Label htmlFor="enable-ad-active-alerts" className="font-medium text-blue-900 dark:text-blue-100">
+                      Ad Active Alerts
+                    </Label>
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      Send SMS when ads become active in Bangladesh
+                    </p>
+                  </div>
+                  <Switch
+                    id="enable-ad-active-alerts"
+                    checked={enableAdActiveAlerts}
+                    onCheckedChange={setEnableAdActiveAlerts}
+                    disabled={!enableNotifications}
+                    data-testid="switch-enable-ad-active-alerts"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                onClick={handleSaveSettings}
+                disabled={saveSettingsMutation.isPending}
+                className="flex-1"
+                data-testid="button-save-sms-settings"
+              >
+                {saveSettingsMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Save Settings
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Setup Instructions */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              How to Get Your API Key
+            </h4>
+            <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800 dark:text-blue-200">
+              <li>Sign up for an SMS provider (<a href="https://sms.net.bd" target="_blank" rel="noopener noreferrer" className="underline">SMS in BD</a> or <a href="https://bdbulksms.com" target="_blank" rel="noopener noreferrer" className="underline">BD Bulk SMS</a>)</li>
+              <li>Go to your account dashboard and find the API Keys section</li>
+              <li>Create a new API key and copy it</li>
+              <li>Register your Sender ID (brand name) if required</li>
+              <li>Paste the API key and Sender ID above</li>
+              <li>Click "Save Settings" and then "Send Test SMS" to verify</li>
+            </ol>
+          </div>
+
+          {/* Send Test SMS Section */}
+          {isConfigured && (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <h4 className="font-medium text-green-900 dark:text-green-100 mb-3 flex items-center gap-2">
+                <Send className="w-4 h-4" />
+                Send Test SMS
+              </h4>
+              <p className="text-sm text-green-800 dark:text-green-200 mb-3">
+                Send a test SMS to verify your SMS service is working correctly. Use Bangladesh format: +8801XXXXXXXXX or 01XXXXXXXXX
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  type="tel"
+                  placeholder="+8801XXXXXXXXX or 01XXXXXXXXX"
+                  value={testPhoneNumber}
+                  onChange={(e) => setTestPhoneNumber(e.target.value)}
+                  disabled={sendTestSmsMutation.isPending}
+                  data-testid="input-test-sms-recipient"
+                  className="flex-1"
+                />
+                <Button
+                  onClick={() => sendTestSmsMutation.mutate()}
+                  disabled={!testPhoneNumber || sendTestSmsMutation.isPending}
+                  data-testid="button-send-test-sms"
+                >
+                  {sendTestSmsMutation.isPending ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Send Test
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   return (
     <Sidebar>
@@ -4010,7 +4347,7 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="users" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5 max-w-5xl">
+            <TabsList className="grid w-full grid-cols-6 max-w-6xl">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 User Management
@@ -4035,6 +4372,10 @@ export default function AdminPage() {
                 <Mail className="w-4 h-4" />
                 Email Settings
               </TabsTrigger>
+              <TabsTrigger value="sms" className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                SMS Settings
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="users">
@@ -4055,6 +4396,10 @@ export default function AdminPage() {
 
             <TabsContent value="email">
               <EmailSettings />
+            </TabsContent>
+
+            <TabsContent value="sms">
+              <SmsSettings />
             </TabsContent>
           </Tabs>
         </div>
