@@ -46,6 +46,29 @@ This is a full-stack web application built with React and Express.js, featuring 
   - POST /api/email/settings - Save email settings with validation
   - POST /api/email/test-connection - Verify API key and connection
 
+**SMS Notifications** (October 3, 2025) - Text message alerts for Bangladesh clients:
+- **SMS Settings Configuration**: New Admin panel tab for Bangladesh SMS provider setup
+  - Provider selection: SMS in BD or BD Bulk SMS (both ~0.16-0.17 BDT per SMS)
+  - **API Key Storage**: Stored directly in database (sms_settings table), not in Replit Secrets
+  - Sender ID configuration: Phone number or branded sender ID
+  - Notification toggles: Master switch and ad-active alerts
+  - Test send: Validates API key and sends test SMS to Bangladesh numbers
+- **Bangladesh Phone Validation**: 
+  - Supports formats: +8801XXXXXXXXX, 8801XXXXXXXXX, or 01XXXXXXXXX
+  - Automatic normalization to international format (880...)
+  - Regex validation: /^(\+?880|0)?1[3-9]\d{8}$/
+- **Notification Types**:
+  - Ad Active Alerts: Automatic SMS when ads become active in Bangladesh
+- **Database Schema**: New sms_settings table with provider, apiKey, phoneNumber, enableNotifications, enableAdActiveAlerts, isConfigured, lastTestedAt, connectionError
+- **API Endpoints**: 
+  - GET /api/sms/settings - Retrieve current SMS configuration
+  - POST /api/sms/settings - Save SMS settings with validation
+  - POST /api/sms/test-send - Send test SMS to verify connection
+- **Provider Integration**:
+  - SMS in BD: API endpoint https://api.sms.net.bd/sendsms
+  - BD Bulk SMS: API endpoint https://api.bdbulksms.com/api/send
+  - Cost-effective: 0.16-0.17 BDT per SMS (vs Twilio $0.05-0.10 USD)
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
