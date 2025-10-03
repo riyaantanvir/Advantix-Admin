@@ -42,6 +42,8 @@ import {
   type InsertFacebookSetting,
   type EmailSetting,
   type InsertEmailSetting,
+  type SmsSetting,
+  type InsertSmsSetting,
   type FacebookAccountInsight,
   type InsertFacebookAccountInsight,
   type FacebookCampaignInsight,
@@ -73,6 +75,7 @@ import {
   telegramChatIds,
   facebookSettings,
   emailSettings,
+  smsSettings,
   facebookAccountInsights,
   facebookCampaignInsights,
   facebookAdSetInsights,
@@ -1889,6 +1892,72 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("[DB ERROR] Failed to update email connection status:", error);
       throw new Error(`Failed to update email connection status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // SMS Settings methods
+  async getSmsSettings(): Promise<SmsSetting | undefined> {
+    try {
+      const result = await db.select()
+        .from(smsSettings)
+        .limit(1);
+      
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get SMS settings:", error);
+      throw new Error(`Failed to get SMS settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async saveSmsSettings(data: InsertSmsSetting): Promise<SmsSetting> {
+    try {
+      const existing = await this.getSmsSettings();
+      
+      if (existing) {
+        const result = await db.update(smsSettings)
+          .set({
+            ...data,
+            updatedAt: new Date(),
+          })
+          .where(eq(smsSettings.id, existing.id))
+          .returning();
+        
+        console.log(`[DB] Updated SMS settings`);
+        return result[0];
+      } else {
+        const result = await db.insert(smsSettings).values({
+          ...data,
+          id: randomUUID(),
+        }).returning();
+        
+        console.log(`[DB] Created SMS settings`);
+        return result[0];
+      }
+    } catch (error) {
+      console.error("[DB ERROR] Failed to save SMS settings:", error);
+      throw new Error(`Failed to save SMS settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async updateSmsConnectionStatus(isConfigured: boolean, error?: string): Promise<void> {
+    try {
+      const existing = await this.getSmsSettings();
+      
+      if (existing) {
+        await db.update(smsSettings)
+          .set({
+            isConfigured,
+            lastTestedAt: new Date(),
+            connectionError: error || null,
+            updatedAt: new Date(),
+          })
+          .where(eq(smsSettings.id, existing.id));
+        
+        console.log(`[DB] Updated SMS connection status: ${isConfigured ? 'configured' : 'not configured'}`);
+      }
+    } catch (error) {
+      console.error("[DB ERROR] Failed to update SMS connection status:", error);
+      throw new Error(`Failed to update SMS connection status: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

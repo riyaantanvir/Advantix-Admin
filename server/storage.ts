@@ -196,6 +196,11 @@ export interface IStorage {
   saveEmailSettings(data: any): Promise<any>;
   updateEmailConnectionStatus(isConfigured: boolean, error?: string): Promise<void>;
 
+  // SMS Settings methods
+  getSmsSettings(): Promise<any>;
+  saveSmsSettings(data: any): Promise<any>;
+  updateSmsConnectionStatus(isConfigured: boolean, error?: string): Promise<void>;
+
   // Facebook Account Insights methods
   getFacebookAccountInsights(adAccountId: string, startDate: Date, endDate: Date): Promise<any[]>;
   upsertFacebookAccountInsight(data: any): Promise<any>;
@@ -1452,6 +1457,19 @@ export class MemStorage implements IStorage {
   }
 
   async updateEmailConnectionStatus(isConfigured: boolean, error?: string): Promise<void> {
+    // Stub implementation
+  }
+
+  // SMS Settings methods (stub implementations - use DatabaseStorage in production)
+  async getSmsSettings(): Promise<any> {
+    return undefined;
+  }
+
+  async saveSmsSettings(data: any): Promise<any> {
+    return data;
+  }
+
+  async updateSmsConnectionStatus(isConfigured: boolean, error?: string): Promise<void> {
     // Stub implementation
   }
 
