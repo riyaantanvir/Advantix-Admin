@@ -3735,7 +3735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           body: JSON.stringify({
             api_key: settings.apiKey,
-            senderid: settings.phoneNumber,
+            senderid: settings.senderId,
             number: normalizedPhone,
             message: smsMessage
           })
@@ -3749,7 +3749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           body: JSON.stringify({
             api_key: settings.apiKey,
-            sender_id: settings.phoneNumber,
+            sender_id: settings.senderId,
             to: normalizedPhone,
             message: smsMessage
           })
@@ -3789,7 +3789,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const responseData = await response.json();
-      console.log("SMS sent successfully:", responseData);
+      console.log("SMS provider response:", responseData);
+      
+      // Check if the response contains an error (some providers return 200 with error object)
+      if (responseData.error || responseData.msg?.toLowerCase().includes('error') || responseData.msg?.toLowerCase().includes('required')) {
+        const errorMsg = responseData.msg || responseData.message || 'SMS provider returned an error';
+        console.error("SMS send failed:", errorMsg);
+        await storage.updateSmsConnectionStatus(false, errorMsg);
+        return res.status(400).json({ 
+          success: false, 
+          message: errorMsg
+        });
+      }
       
       await storage.updateSmsConnectionStatus(true);
       res.json({ 
