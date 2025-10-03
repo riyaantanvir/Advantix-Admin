@@ -601,6 +601,32 @@ export const insertEmailSettingSchema = createInsertSchema(emailSettings).omit({
 export type InsertEmailSetting = z.infer<typeof insertEmailSettingSchema>;
 export type EmailSetting = typeof emailSettings.$inferSelect;
 
+// SMS Settings
+export const smsSettings = pgTable("sms_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull().default("bdbulksms"), // "bdbulksms", "smsinbd", "smsnetbd", "twilio"
+  apiKey: text("api_key").notNull(),
+  senderId: text("sender_id").notNull(), // Sender ID or masking name
+  enableNotifications: boolean("enable_notifications").default(false),
+  enableAdActiveAlerts: boolean("enable_ad_active_alerts").default(true),
+  enableDailySummary: boolean("enable_daily_summary").default(true),
+  dailySummaryTime: text("daily_summary_time").default("07:00"), // Time in HH:mm format
+  isConfigured: boolean("is_configured").default(false),
+  lastTestedAt: timestamp("last_tested_at"),
+  connectionError: text("connection_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSmsSettingSchema = createInsertSchema(smsSettings).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSmsSetting = z.infer<typeof insertSmsSettingSchema>;
+export type SmsSetting = typeof smsSettings.$inferSelect;
+
 // Facebook Ad Account Insights
 export const facebookAccountInsights = pgTable("facebook_account_insights", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
