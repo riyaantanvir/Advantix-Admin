@@ -3656,18 +3656,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Save SMS settings
   app.post("/api/sms/settings", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
     try {
-      const { provider, apiKey, phoneNumber, enableNotifications, enableAdActiveAlerts } = req.body;
+      const { provider, apiKey, senderId, enableNotifications, enableAdActiveAlerts } = req.body;
       
       // Validate required fields
-      if (!provider || !apiKey || !phoneNumber) {
-        return res.status(400).json({ message: "Provider, API key, and phone number are required" });
+      if (!provider || !apiKey || !senderId) {
+        return res.status(400).json({ message: "Provider, API key, and sender ID are required" });
       }
 
       // Save settings
       await storage.saveSmsSettings({
         provider,
         apiKey,
-        phoneNumber,
+        senderId,
         enableNotifications: enableNotifications ?? false,
         enableAdActiveAlerts: enableAdActiveAlerts ?? true,
         isConfigured: false
