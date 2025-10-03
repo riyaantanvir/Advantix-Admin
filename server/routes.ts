@@ -3638,6 +3638,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SMS Settings Routes
+  // Get SMS settings
+  app.get("/api/sms/settings", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getSmsSettings();
+      if (!settings) {
+        return res.json(null);
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Get SMS settings error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Save SMS settings
+  app.post("/api/sms/settings", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { provider, apiKey, phoneNumber, enableNotifications, enableAdActiveAlerts } = req.body;
+      
+      // Validate required fields
+      if (!provider || !apiKey || !phoneNumber) {
+        return res.status(400).json({ message: "Provider, API key, and phone number are required" });
+      }
+
+      // Save settings
+      await storage.saveSmsSettings({
+        provider,
+        apiKey,
+        phoneNumber,
+        enableNotifications: enableNotifications ?? false,
+        enableAdActiveAlerts: enableAdActiveAlerts ?? true,
+        isConfigured: false
+      });
+
+      res.json({ message: "SMS settings saved successfully" });
+    } catch (error: any) {
+      console.error("Save SMS settings error:", error);
+      res.status(500).json({ message: error.message || "Internal server error" });
+    }
+  });
+
+  // Send Test SMS
+  app.post("/api/sms/test-send", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getSmsSettings();
+      const { phoneNumber } = req.body;
+
+      console.log("Send test SMS request:", { phoneNumber, provider: settings?.provider });
+
+      if (!settings || !settings.apiKey) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "SMS settings not configured. Please save your settings first." 
+        });
+      }
+
+      if (!phoneNumber) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Phone number is required" 
+        });
+      }
+
+      // Validate Bangladesh phone number format (starts with +880 or 880 or 01)
+      const phoneRegex = /^(\+?880|0)?1[3-9]\d{8}$/;
+      if (!phoneRegex.test(phoneNumber.replace(/\s/g, ''))) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Invalid Bangladesh phone number format. Use format: +8801XXXXXXXXX or 01XXXXXXXXX" 
+        });
+      }
+
+      // Normalize phone number to international format
+      let normalizedPhone = phoneNumber.replace(/\s/g, '');
+      if (normalizedPhone.startsWith('0')) {
+        normalizedPhone = '880' + normalizedPhone.substring(1);
+      } else if (normalizedPhone.startsWith('+')) {
+        normalizedPhone = normalizedPhone.substring(1);
+      }
+
+      // Send test SMS based on provider
+      console.log(`Sending test SMS via ${settings.provider} to ${normalizedPhone}`);
+      let response;
+      
+      if (settings.provider === 'sms_in_bd') {
+        // SMS in BD API
+        response = await fetch('https://api.sms.net.bd/sendsms', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            api_key: settings.apiKey,
+            senderid: settings.phoneNumber,
+            number: normalizedPhone,
+            message: 'Test SMS from Advantix Admin. Your SMS service is configured correctly!'
+          })
+        });
+      } else if (settings.provider === 'bd_bulk_sms') {
+        // BD Bulk SMS API
+        response = await fetch('https://api.bdbulksms.com/api/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            api_key: settings.apiKey,
+            sender_id: settings.phoneNumber,
+            to: normalizedPhone,
+            message: 'Test SMS from Advantix Admin. Your SMS service is configured correctly!'
+          })
+        });
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Unsupported SMS provider: ${settings.provider}` 
+        });
+      }
+
+      if (!response) {
+        console.error("No response from SMS provider - provider may not be configured correctly");
+        return res.status(500).json({ 
+          success: false, 
+          message: `SMS provider ${settings.provider} is not properly configured` 
+        });
+      }
+
+      console.log(`SMS provider response status: ${response.status}`);
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to send test SMS';
+        try {
+          const errorData = await response.text();
+          console.error("SMS send error:", errorData);
+          errorMessage = errorData.substring(0, 200);
+        } catch (e) {
+          console.error("Error parsing SMS provider response:", e);
+        }
+        
+        await storage.updateSmsConnectionStatus(false, errorMessage);
+        return res.status(400).json({ 
+          success: false, 
+          message: errorMessage
+        });
+      }
+
+      const responseData = await response.json();
+      console.log("SMS sent successfully:", responseData);
+      
+      await storage.updateSmsConnectionStatus(true);
+      res.json({ 
+        success: true, 
+        message: `Test SMS sent successfully to ${phoneNumber}` 
+      });
+    } catch (error: any) {
+      console.error("Send test SMS error:", error);
+      await storage.updateSmsConnectionStatus(false, error.message);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "Internal server error" 
+      });
+    }
+  });
+
   // Sync Facebook ad accounts
   app.post("/api/facebook/sync-accounts", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
     try {
