@@ -158,6 +158,7 @@ export class DatabaseStorage implements IStorage {
         { pageKey: "ad_accounts", displayName: "Ad Accounts", path: "/ad-accounts", description: "Manage advertising account connections" },
         { pageKey: "salaries", displayName: "Salary Management", path: "/salaries", description: "Manage employee salaries and payments" },
         { pageKey: "work_reports", displayName: "Work Reports", path: "/work-reports", description: "Track and submit work hours and tasks" },
+        { pageKey: "client_mailbox", displayName: "Client Mailbox", path: "/client-mailbox", description: "Send manual emails to clients with custom reports" },
         { pageKey: "admin", displayName: "Admin Panel", path: "/admin", description: "Administrative settings and user management" },
       ];
 
@@ -193,6 +194,7 @@ export class DatabaseStorage implements IStorage {
           ad_accounts: { view: false, edit: false, delete: false },
           salaries: { view: false, edit: false, delete: false },
           work_reports: { view: true, edit: true, delete: false },
+          client_mailbox: { view: false, edit: false, delete: false },
           admin: { view: false, edit: false, delete: false },
         },
         [UserRole.MANAGER]: {
@@ -203,6 +205,7 @@ export class DatabaseStorage implements IStorage {
           ad_accounts: { view: true, edit: false, delete: false },
           salaries: { view: false, edit: false, delete: false },
           work_reports: { view: true, edit: true, delete: false },
+          client_mailbox: { view: true, edit: true, delete: false },
           admin: { view: false, edit: false, delete: false },
         },
         [UserRole.ADMIN]: {
@@ -213,6 +216,7 @@ export class DatabaseStorage implements IStorage {
           ad_accounts: { view: true, edit: true, delete: true },
           salaries: { view: true, edit: true, delete: false },
           work_reports: { view: true, edit: true, delete: true },
+          client_mailbox: { view: true, edit: true, delete: false },
           admin: { view: false, edit: false, delete: false },
         },
         [UserRole.SUPER_ADMIN]: {
@@ -223,6 +227,7 @@ export class DatabaseStorage implements IStorage {
           ad_accounts: { view: true, edit: true, delete: true },
           salaries: { view: true, edit: true, delete: true },
           work_reports: { view: true, edit: true, delete: true },
+          client_mailbox: { view: true, edit: true, delete: true },
           admin: { view: true, edit: true, delete: true },
         },
       };
