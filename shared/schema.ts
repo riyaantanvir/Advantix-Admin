@@ -577,7 +577,17 @@ export type FacebookSetting = typeof facebookSettings.$inferSelect;
 // Client Mailbox Schemas
 export const clientMailboxEmailSchema = z.object({
   clientId: z.string().min(1, "Client is required"),
-  emailType: z.enum(["custom", "activation", "suspension"], {
+  emailType: z.enum([
+    "custom",
+    "activation", 
+    "suspension",
+    "welcome",
+    "monthly_report",
+    "payment_reminder",
+    "campaign_launch",
+    "budget_alert",
+    "thank_you"
+  ], {
     required_error: "Email type is required",
   }),
   subject: z.string().optional(),

@@ -57,11 +57,14 @@ export default function ClientMailboxPage() {
     queryKey: ["/api/clients"],
   });
 
-  // Fetch ad accounts for selected client
-  const { data: adAccounts = [], isLoading: adAccountsLoading } = useQuery<AdAccount[]>({
-    queryKey: ["/api/ad-accounts", watchedClientId],
-    enabled: !!watchedClientId && watchedEmailType !== "custom",
+  // Fetch all ad accounts
+  const { data: allAdAccounts = [], isLoading: adAccountsLoading } = useQuery<AdAccount[]>({
+    queryKey: ["/api/ad-accounts"],
+    enabled: watchedEmailType !== "custom",
   });
+
+  // Filter ad accounts for selected client
+  const adAccounts = allAdAccounts.filter(account => account.clientId === watchedClientId);
 
   // Fetch email settings
   const { data: emailSettings } = useQuery({
@@ -77,14 +80,201 @@ export default function ClientMailboxPage() {
       return "<p>Please select a client first.</p>";
     }
 
+    const baseStyle = `font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;`;
+    const cardStyle = `background-color: white; padding: 30px; border-radius: 8px;`;
+    const footerStyle = `color: #6b7280; font-size: 14px; margin-top: 30px;`;
+
     if (watchedEmailType === "custom") {
       return `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-          <div style="background-color: white; padding: 30px; border-radius: 8px;">
+        <div style="${baseStyle}">
+          <div style="${cardStyle}">
             <h2 style="color: #1a73e8; margin-bottom: 20px;">Message from Advantix Admin</h2>
             <p style="color: #333; font-size: 16px; line-height: 1.6; white-space: pre-wrap;">${watchedCustomMessage || "Your custom message will appear here..."}</p>
-            <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+            <p style="${footerStyle}">
               Best regards,<br/>
+              <strong>Advantix Admin Team</strong>
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    if (watchedEmailType === "welcome") {
+      return `
+        <div style="${baseStyle}">
+          <div style="${cardStyle}">
+            <h2 style="color: #10b981; margin-bottom: 20px;">🎉 Welcome to Advantix!</h2>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 15px;">
+              Hello <strong>${selectedClient.name}</strong>,
+            </p>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+              We're thrilled to have you on board! Welcome to Advantix, your trusted partner in digital advertising success.
+            </p>
+            <div style="background-color: #f0fdf4; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+              <h3 style="color: #15803d; margin-top: 0;">What's Next?</h3>
+              <ul style="color: #166534; margin: 0; padding-left: 20px;">
+                <li>Your account is set up and ready to go</li>
+                <li>We'll be managing your ad campaigns with care</li>
+                <li>You'll receive regular updates on performance</li>
+                <li>Our team is here to support you every step of the way</li>
+              </ul>
+            </div>
+            <p style="color: #333; font-size: 16px; line-height: 1.6;">
+              If you have any questions, please don't hesitate to reach out. We're here to help!
+            </p>
+            <p style="${footerStyle}">
+              Best regards,<br/>
+              <strong>Advantix Admin Team</strong>
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    if (watchedEmailType === "monthly_report") {
+      return `
+        <div style="${baseStyle}">
+          <div style="${cardStyle}">
+            <h2 style="color: #1a73e8; margin-bottom: 20px;">📊 Your Monthly Performance Report</h2>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 15px;">
+              Hello <strong>${selectedClient.name}</strong>,
+            </p>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+              Here's a summary of your advertising performance this month.
+            </p>
+            <div style="background-color: #f3f4f6; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+              <h3 style="color: #1f2937; margin-top: 0;">Key Metrics:</h3>
+              <p style="margin: 8px 0; color: #4b5563;"><strong>Total Ad Spend:</strong> $X,XXX.XX</p>
+              <p style="margin: 8px 0; color: #4b5563;"><strong>Impressions:</strong> XXX,XXX</p>
+              <p style="margin: 8px 0; color: #4b5563;"><strong>Clicks:</strong> XX,XXX</p>
+              <p style="margin: 8px 0; color: #4b5563;"><strong>Conversions:</strong> XXX</p>
+              <p style="margin: 8px 0; color: #4b5563;"><strong>ROI:</strong> XX%</p>
+            </div>
+            <p style="color: #333; font-size: 16px; line-height: 1.6;">
+              Your campaigns are performing well! Let's schedule a call to discuss optimization opportunities.
+            </p>
+            <p style="${footerStyle}">
+              Best regards,<br/>
+              <strong>Advantix Admin Team</strong>
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    if (watchedEmailType === "payment_reminder") {
+      return `
+        <div style="${baseStyle}">
+          <div style="${cardStyle}">
+            <h2 style="color: #f59e0b; margin-bottom: 20px;">💳 Payment Reminder</h2>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 15px;">
+              Hello <strong>${selectedClient.name}</strong>,
+            </p>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+              This is a friendly reminder about your upcoming payment.
+            </p>
+            <div style="background-color: #fef3c7; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+              <h3 style="color: #92400e; margin-top: 0;">Payment Details:</h3>
+              <p style="margin: 8px 0; color: #78350f;"><strong>Amount Due:</strong> $X,XXX.XX</p>
+              <p style="margin: 8px 0; color: #78350f;"><strong>Due Date:</strong> [Date]</p>
+              <p style="margin: 8px 0; color: #78350f;"><strong>Invoice Number:</strong> INV-XXXXX</p>
+            </div>
+            <p style="color: #333; font-size: 16px; line-height: 1.6;">
+              Please process this payment at your earliest convenience to avoid any service interruptions.
+            </p>
+            <p style="${footerStyle}">
+              Best regards,<br/>
+              <strong>Advantix Admin Team</strong>
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    if (watchedEmailType === "campaign_launch") {
+      return `
+        <div style="${baseStyle}">
+          <div style="${cardStyle}">
+            <h2 style="color: #8b5cf6; margin-bottom: 20px;">🚀 Your New Campaign is Live!</h2>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 15px;">
+              Hello <strong>${selectedClient.name}</strong>,
+            </p>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+              Great news! Your new advertising campaign has just been launched and is now live.
+            </p>
+            <div style="background-color: #f5f3ff; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+              <h3 style="color: #6b21a8; margin-top: 0;">Campaign Details:</h3>
+              <p style="margin: 8px 0; color: #5b21b6;"><strong>Campaign Name:</strong> [Campaign Name]</p>
+              <p style="margin: 8px 0; color: #5b21b6;"><strong>Platform:</strong> [Platform]</p>
+              <p style="margin: 8px 0; color: #5b21b6;"><strong>Budget:</strong> $X,XXX.XX</p>
+              <p style="margin: 8px 0; color: #5b21b6;"><strong>Duration:</strong> [Start Date] - [End Date]</p>
+            </div>
+            <p style="color: #333; font-size: 16px; line-height: 1.6;">
+              We'll be monitoring performance closely and will keep you updated with regular reports.
+            </p>
+            <p style="${footerStyle}">
+              Best regards,<br/>
+              <strong>Advantix Admin Team</strong>
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    if (watchedEmailType === "budget_alert") {
+      return `
+        <div style="${baseStyle}">
+          <div style="${cardStyle}">
+            <h2 style="color: #dc2626; margin-bottom: 20px;">⚠️ Budget Alert</h2>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 15px;">
+              Hello <strong>${selectedClient.name}</strong>,
+            </p>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+              This is an important notification about your campaign budget.
+            </p>
+            <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 20px; margin-bottom: 20px;">
+              <h3 style="color: #991b1b; margin-top: 0;">Budget Status:</h3>
+              <p style="margin: 8px 0; color: #7f1d1d;"><strong>Campaign:</strong> [Campaign Name]</p>
+              <p style="margin: 8px 0; color: #7f1d1d;"><strong>Budget Used:</strong> 85% ($X,XXX.XX of $X,XXX.XX)</p>
+              <p style="margin: 8px 0; color: #7f1d1d;"><strong>Remaining:</strong> $XXX.XX</p>
+              <p style="margin: 8px 0; color: #7f1d1d;"><strong>Estimated Days Left:</strong> X days</p>
+            </div>
+            <p style="color: #333; font-size: 16px; line-height: 1.6;">
+              Please let us know if you'd like to increase the budget to maintain campaign momentum.
+            </p>
+            <p style="${footerStyle}">
+              Best regards,<br/>
+              <strong>Advantix Admin Team</strong>
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    if (watchedEmailType === "thank_you") {
+      return `
+        <div style="${baseStyle}">
+          <div style="${cardStyle}">
+            <h2 style="color: #ec4899; margin-bottom: 20px;">💝 Thank You!</h2>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 15px;">
+              Hello <strong>${selectedClient.name}</strong>,
+            </p>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+              We wanted to take a moment to thank you for your continued trust in Advantix.
+            </p>
+            <div style="background-color: #fdf2f8; padding: 20px; border-radius: 6px; margin-bottom: 20px; text-align: center;">
+              <p style="color: #9f1239; font-size: 18px; font-weight: bold; margin: 0;">
+                Your partnership means the world to us!
+              </p>
+            </div>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 15px;">
+              It's clients like you that make what we do so rewarding. We're committed to delivering exceptional results and supporting your business growth.
+            </p>
+            <p style="color: #333; font-size: 16px; line-height: 1.6;">
+              Here's to our continued success together!
+            </p>
+            <p style="${footerStyle}">
+              With gratitude,<br/>
               <strong>Advantix Admin Team</strong>
             </p>
           </div>
@@ -189,13 +379,26 @@ export default function ClientMailboxPage() {
   };
 
   const getDefaultSubject = () => {
-    if (watchedEmailType === "activation") {
-      return `Your Ad Account is Now Active - ${selectedAdAccount?.accountName || ""}`;
+    switch (watchedEmailType) {
+      case "activation":
+        return `Your Ad Account is Now Active - ${selectedAdAccount?.accountName || ""}`;
+      case "suspension":
+        return `Important: Your Ad Account Has Been Suspended - ${selectedAdAccount?.accountName || ""}`;
+      case "welcome":
+        return `Welcome to Advantix - ${selectedClient?.name || ""}!`;
+      case "monthly_report":
+        return `Your Monthly Performance Report - ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+      case "payment_reminder":
+        return `Payment Reminder - Advantix Services`;
+      case "campaign_launch":
+        return `Your New Campaign is Now Live!`;
+      case "budget_alert":
+        return `Budget Alert: Action Required`;
+      case "thank_you":
+        return `Thank You from the Advantix Team!`;
+      default:
+        return "Message from Advantix Admin";
     }
-    if (watchedEmailType === "suspension") {
-      return `Important: Your Ad Account Has Been Suspended - ${selectedAdAccount?.accountName || ""}`;
-    }
-    return "Message from Advantix Admin";
   };
 
   const isEmailConfigured = (emailSettings as any)?.isConfigured ?? false;
@@ -280,9 +483,15 @@ export default function ClientMailboxPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="custom">Custom Message</SelectItem>
-                              <SelectItem value="activation">Account Activation Alert</SelectItem>
-                              <SelectItem value="suspension">Account Suspension Alert</SelectItem>
+                              <SelectItem value="custom">✏️ Custom Message</SelectItem>
+                              <SelectItem value="welcome">🎉 Welcome Email</SelectItem>
+                              <SelectItem value="monthly_report">📊 Monthly Report</SelectItem>
+                              <SelectItem value="payment_reminder">💳 Payment Reminder</SelectItem>
+                              <SelectItem value="campaign_launch">🚀 Campaign Launch</SelectItem>
+                              <SelectItem value="budget_alert">⚠️ Budget Alert</SelectItem>
+                              <SelectItem value="thank_you">💝 Thank You</SelectItem>
+                              <SelectItem value="activation">✅ Account Activation Alert</SelectItem>
+                              <SelectItem value="suspension">⛔ Account Suspension Alert</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
