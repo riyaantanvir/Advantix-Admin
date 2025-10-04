@@ -57,10 +57,11 @@ export default function ClientMailboxPage() {
     queryKey: ["/api/clients"],
   });
 
-  // Fetch all ad accounts
+  // Fetch all ad accounts (only for activation/suspension emails)
+  const needsAdAccount = watchedEmailType === "activation" || watchedEmailType === "suspension";
   const { data: allAdAccounts = [], isLoading: adAccountsLoading } = useQuery<AdAccount[]>({
     queryKey: ["/api/ad-accounts"],
-    enabled: watchedEmailType !== "custom",
+    enabled: needsAdAccount,
   });
 
   // Filter ad accounts for selected client
@@ -499,8 +500,8 @@ export default function ClientMailboxPage() {
                       )}
                     />
 
-                    {/* Ad Account Selection (for non-custom emails) */}
-                    {watchedEmailType !== "custom" && (
+                    {/* Ad Account Selection (only for activation/suspension emails) */}
+                    {needsAdAccount && (
                       <FormField
                         control={form.control}
                         name="adAccountId"

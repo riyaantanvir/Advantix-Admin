@@ -598,14 +598,19 @@ export const clientMailboxEmailSchema = z.object({
   if (data.emailType === "custom") {
     return !!data.customMessage && data.customMessage.trim().length > 0;
   }
+  return true;
+}, {
+  message: "Custom messages require a message body",
+  path: ["customMessage"],
+}).refine((data) => {
   // Activation and suspension require adAccountId
   if (data.emailType === "activation" || data.emailType === "suspension") {
-    return !!data.adAccountId;
+    return !!data.adAccountId && data.adAccountId.trim().length > 0;
   }
   return true;
 }, {
-  message: "Custom messages require a message, activation/suspension require an ad account",
-  path: ["customMessage"],
+  message: "Activation and suspension emails require an ad account selection",
+  path: ["adAccountId"],
 });
 
 export type ClientMailboxEmail = z.infer<typeof clientMailboxEmailSchema>;
