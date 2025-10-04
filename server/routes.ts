@@ -51,6 +51,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, desc, sql } from "drizzle-orm";
+import { sendAdAccountActivationEmail, sendAdAccountSuspensionEmail, sendSpendWarningEmail } from "./email-sender";
 
 // Extend Express Request to include user
 declare global {
@@ -1021,10 +1022,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Get old ad account to check for status changes
+      const oldAdAccount = await storage.getAdAccount(req.params.id);
+      if (!oldAdAccount) {
+        return res.status(404).json({ message: "Ad account not found" });
+      }
+      
       const adAccount = await storage.updateAdAccount(req.params.id, validatedData);
       if (!adAccount) {
         return res.status(404).json({ message: "Ad account not found" });
       }
+      
+      // Send email notifications if status changed
+      if (validatedData.status && validatedData.status !== oldAdAccount.status) {
+        try {
+          const client = await storage.getClient(adAccount.clientId);
+          if (client) {
+            const emailPreferences = await storage.getClientEmailPreferences(client.id);
+            
+            // Check if email notifications are enabled for this client
+            if (emailPreferences?.enableNotifications && emailPreferences?.enableAdAccountActivationAlerts) {
+              const emailSettings = await storage.getEmailSettings();
+              
+              // Only send if email is configured
+              if (emailSettings?.isConfigured && client.contactEmail) {
+                if (validatedData.status === 'active' && oldAdAccount.status === 'inactive') {
+                  // Send activation email
+                  await sendAdAccountActivationEmail(
+                    client.contactEmail,
+                    client.name,
+                    adAccount.accountName,
+                    adAccount.platform
+                  );
+                  console.log(`[EMAIL] Sent activation email for ad account ${adAccount.accountName} to ${client.contactEmail}`);
+                } else if (validatedData.status === 'inactive' && oldAdAccount.status === 'active') {
+                  // Send suspension email
+                  await sendAdAccountSuspensionEmail(
+                    client.contactEmail,
+                    client.name,
+                    adAccount.accountName,
+                    adAccount.platform
+                  );
+                  console.log(`[EMAIL] Sent suspension email for ad account ${adAccount.accountName} to ${client.contactEmail}`);
+                }
+              }
+            }
+          }
+        } catch (emailError) {
+          // Log email error but don't fail the ad account update
+          console.error("[EMAIL ERROR] Failed to send notification:", emailError);
+        }
+      }
+      
       res.json(adAccount);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -3635,6 +3684,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false, 
         message: error.message || "Internal server error" 
       });
+    }
+  });
+
+  // Client Email Preferences Routes
+  // Get client email preferences for a specific client
+  app.get("/api/clients/:clientId/email-preferences", authenticate, async (req: Request, res: Response) => {
+    try {
+      const preferences = await storage.getClientEmailPreferences(req.params.clientId);
+      if (!preferences) {
+        // Return default preferences if none exist
+        return res.json({
+          enableNotifications: false,
+          enableAdAccountActivationAlerts: false,
+          enableAdAccountSuspensionAlerts: false,
+          enableSpendWarnings: false,
+          spendWarningThreshold: 80
+        });
+      }
+      res.json(preferences);
+    } catch (error) {
+      console.error("Get client email preferences error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Save client email preferences
+  app.post("/api/clients/:clientId/email-preferences", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { enableNotifications, enableAdAccountActivationAlerts, enableAdAccountSuspensionAlerts, enableSpendWarnings, spendWarningThreshold } = req.body;
+      
+      // Validate that client exists
+      const client = await storage.getClient(req.params.clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // Save preferences
+      const preferences = await storage.saveClientEmailPreferences(req.params.clientId, {
+        enableNotifications: enableNotifications ?? false,
+        enableAdAccountActivationAlerts: enableAdAccountActivationAlerts ?? false,
+        enableAdAccountSuspensionAlerts: enableAdAccountSuspensionAlerts ?? false,
+        enableSpendWarnings: enableSpendWarnings ?? false,
+        spendWarningThreshold: spendWarningThreshold || 80
+      });
+
+      res.json({ message: "Email preferences saved successfully", preferences });
+    } catch (error: any) {
+      console.error("Save client email preferences error:", error);
+      res.status(500).json({ message: error.message || "Internal server error" });
+    }
+  });
+
+  // Get all client email preferences
+  app.get("/api/clients/email-preferences/all", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const allPreferences = await storage.getAllClientEmailPreferences();
+      res.json(allPreferences);
+    } catch (error) {
+      console.error("Get all client email preferences error:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
