@@ -1033,41 +1033,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ad account not found" });
       }
       
-      // Send email notifications if status changed
-      if (validatedData.status && validatedData.status !== oldAdAccount.status) {
-        try {
-          const client = await storage.getClient(adAccount.clientId);
-          if (client) {
-            const emailPreferences = await storage.getClientEmailPreferences(client.id);
-            const emailSettings = await storage.getEmailSettings();
-            
-            console.log(`[EMAIL DEBUG] Status changed from ${oldAdAccount.status} to ${validatedData.status}`);
-            console.log(`[EMAIL DEBUG] Preferences enabled: ${emailPreferences?.enableNotifications}, Email configured: ${emailSettings?.isConfigured}, Client email: ${client.email}`);
-            
-            // Check if email notifications are enabled for this client and email service is configured
-            if (emailPreferences?.enableNotifications && emailSettings?.isConfigured && client.email) {
-              if (validatedData.status === 'active' && (oldAdAccount.status === 'suspended' || oldAdAccount.status === 'inactive')) {
-                // Send activation email if enabled
-                if (emailPreferences.enableAdAccountActivationAlerts) {
-                  await sendAdAccountActivationEmail(adAccount, client);
-                  console.log(`[EMAIL] Sent activation email for ad account ${adAccount.accountName} to ${client.email}`);
-                }
-              } else if ((validatedData.status === 'suspended' || validatedData.status === 'inactive') && oldAdAccount.status === 'active') {
-                // Send suspension email if enabled
-                if (emailPreferences.enableAdAccountSuspensionAlerts) {
-                  await sendAdAccountSuspensionEmail(adAccount, client);
-                  console.log(`[EMAIL] Sent suspension email for ad account ${adAccount.accountName} to ${client.email}`);
-                }
-              }
-            } else {
-              console.log(`[EMAIL DEBUG] Email not sent - preferences: ${emailPreferences?.enableNotifications}, configured: ${emailSettings?.isConfigured}, email: ${client.email}`);
-            }
-          }
-        } catch (emailError) {
-          // Log email error but don't fail the ad account update
-          console.error("[EMAIL ERROR] Failed to send notification:", emailError);
-        }
-      }
+      // AUTOMATIC EMAIL SENDING DISABLED - Use Client Mailbox for manual emails
+      // if (validatedData.status && validatedData.status !== oldAdAccount.status) {
+      //   ... automatic email code removed ...
+      // }
       
       res.json(adAccount);
     } catch (error) {
