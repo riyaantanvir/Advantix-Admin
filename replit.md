@@ -69,7 +69,32 @@ This is a full-stack web application built with React and Express.js, featuring 
   - BD Bulk SMS: API endpoint https://api.bdbulksms.com/api/send
   - Cost-effective: 0.16-0.17 BDT per SMS (vs Twilio $0.05-0.10 USD)
 
-**Client Email Notifications** (October 4, 2025) - Per-client email notification preferences for ad account changes:
+**Client Mailbox System** (October 4, 2025) - Manual email composer replacing unreliable automated notifications:
+- **Manual Email Composer**: New dedicated page for composing and sending emails to clients
+  - Client selector dropdown with email address display
+  - Email type selection: Custom Message, Account Activation Alert, Account Suspension Alert
+  - Dynamic ad account selection based on selected client (for activation/suspension)
+  - Subject line input with smart defaults
+  - Custom message textarea for personalized emails
+  - Live HTML email preview panel showing final email appearance
+  - Real-time validation using Zod schema
+  - Send button with proper permission checks
+- **Security & Validation**:
+  - Page access restricted to Manager, Admin, and Super Admin roles
+  - API endpoint protected with `requirePagePermission("client_mailbox", "edit")`
+  - Request body validated with Zod schema (`clientMailboxEmailSchema`)
+  - Frontend uses shadcn's `useForm` with `zodResolver` for type-safe validation
+  - All fields properly validated before submission
+- **Email Templates**: Reuses existing professional HTML templates
+  - Activation template with account details and available balance
+  - Suspension template with helpful next steps
+  - Custom message template with branded header/footer
+- **Database Schema**: New page permissions for client_mailbox
+- **API Endpoint**: POST /api/client-mailbox/send with full validation chain
+- **Integration**: Connects to existing email service (Resend/SendGrid/Mailgun)
+- **Note**: Automatic email notifications disabled due to reliability issues
+
+**Client Email Notifications** (October 4, 2025) - Per-client email notification preferences for ad account changes (DISABLED):
 - **Client Email Preferences Management**: New Admin panel tab for per-client notification settings
   - Client selector dropdown showing client name and email address
   - Visual warnings when email service not configured or client has no email
