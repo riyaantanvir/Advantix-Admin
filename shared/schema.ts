@@ -627,6 +627,31 @@ export const insertSmsSettingSchema = createInsertSchema(smsSettings).omit({
 export type InsertSmsSetting = z.infer<typeof insertSmsSettingSchema>;
 export type SmsSetting = typeof smsSettings.$inferSelect;
 
+// Client Email Preferences
+export const clientEmailPreferences = pgTable("client_email_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull().unique(),
+  receiveActivationEmails: boolean("receive_activation_emails").default(true),
+  receiveSuspensionEmails: boolean("receive_suspension_emails").default(true),
+  receiveSpendAlerts: boolean("receive_spend_alerts").default(true),
+  spendAlertThreshold80: boolean("spend_alert_threshold_80").default(true), // Alert at 80% of limit
+  spendAlertThreshold90: boolean("spend_alert_threshold_90").default(true), // Alert at 90% of limit
+  spendAlertThreshold100: boolean("spend_alert_threshold_100").default(true), // Alert at 100% of limit
+  receiveDailySummary: boolean("receive_daily_summary").default(false),
+  receiveWeeklySummary: boolean("receive_weekly_summary").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertClientEmailPreferenceSchema = createInsertSchema(clientEmailPreferences).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientEmailPreference = z.infer<typeof insertClientEmailPreferenceSchema>;
+export type ClientEmailPreference = typeof clientEmailPreferences.$inferSelect;
+
 // Facebook Ad Account Insights
 export const facebookAccountInsights = pgTable("facebook_account_insights", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
