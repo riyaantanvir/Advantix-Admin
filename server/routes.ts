@@ -3688,6 +3688,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client Email Preferences Routes
+  // Get all client email preferences (must be before :clientId route)
+  app.get("/api/clients/email-preferences/all", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const allPreferences = await storage.getAllClientEmailPreferences();
+      res.json(allPreferences);
+    } catch (error) {
+      console.error("Get all client email preferences error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Get client email preferences for a specific client
   app.get("/api/clients/:clientId/email-preferences", authenticate, async (req: Request, res: Response) => {
     try {
@@ -3733,17 +3744,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Save client email preferences error:", error);
       res.status(500).json({ message: error.message || "Internal server error" });
-    }
-  });
-
-  // Get all client email preferences
-  app.get("/api/clients/email-preferences/all", authenticate, requireSuperAdmin, async (req: Request, res: Response) => {
-    try {
-      const allPreferences = await storage.getAllClientEmailPreferences();
-      res.json(allPreferences);
-    } catch (error) {
-      console.error("Get all client email preferences error:", error);
-      res.status(500).json({ message: "Internal server error" });
     }
   });
 
