@@ -201,6 +201,11 @@ export interface IStorage {
   saveSmsSettings(data: any): Promise<any>;
   updateSmsConnectionStatus(isConfigured: boolean, error?: string): Promise<void>;
 
+  // Client Email Preferences methods
+  getClientEmailPreferences(clientId: string): Promise<any>;
+  getAllClientEmailPreferences(): Promise<any[]>;
+  saveClientEmailPreferences(clientId: string, preferences: any): Promise<any>;
+
   // Facebook Account Insights methods
   getFacebookAccountInsights(adAccountId: string, startDate: Date, endDate: Date): Promise<any[]>;
   upsertFacebookAccountInsight(data: any): Promise<any>;

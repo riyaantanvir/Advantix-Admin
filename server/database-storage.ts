@@ -44,6 +44,8 @@ import {
   type InsertEmailSetting,
   type SmsSetting,
   type InsertSmsSetting,
+  type ClientEmailPreference,
+  type InsertClientEmailPreference,
   type FacebookAccountInsight,
   type InsertFacebookAccountInsight,
   type FacebookCampaignInsight,
@@ -76,6 +78,7 @@ import {
   facebookSettings,
   emailSettings,
   smsSettings,
+  clientEmailPreferences,
   facebookAccountInsights,
   facebookCampaignInsights,
   facebookAdSetInsights,
@@ -1958,6 +1961,64 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("[DB ERROR] Failed to update SMS connection status:", error);
       throw new Error(`Failed to update SMS connection status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Client Email Preferences methods
+  async getClientEmailPreferences(clientId: string): Promise<ClientEmailPreference | undefined> {
+    try {
+      const result = await db.select()
+        .from(clientEmailPreferences)
+        .where(eq(clientEmailPreferences.clientId, clientId))
+        .limit(1);
+      
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get client email preferences:", error);
+      throw new Error(`Failed to get client email preferences: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getAllClientEmailPreferences(): Promise<ClientEmailPreference[]> {
+    try {
+      const result = await db.select()
+        .from(clientEmailPreferences);
+      
+      return result;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get all client email preferences:", error);
+      throw new Error(`Failed to get all client email preferences: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async saveClientEmailPreferences(clientId: string, preferences: InsertClientEmailPreference): Promise<ClientEmailPreference> {
+    try {
+      const existing = await this.getClientEmailPreferences(clientId);
+      
+      if (existing) {
+        const result = await db.update(clientEmailPreferences)
+          .set({
+            ...preferences,
+            updatedAt: new Date(),
+          })
+          .where(eq(clientEmailPreferences.clientId, clientId))
+          .returning();
+        
+        console.log(`[DB] Updated client email preferences for client: ${clientId}`);
+        return result[0];
+      } else {
+        const result = await db.insert(clientEmailPreferences).values({
+          ...preferences,
+          clientId,
+          id: randomUUID(),
+        }).returning();
+        
+        console.log(`[DB] Created client email preferences for client: ${clientId}`);
+        return result[0];
+      }
+    } catch (error) {
+      console.error("[DB ERROR] Failed to save client email preferences:", error);
+      throw new Error(`Failed to save client email preferences: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
