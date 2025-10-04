@@ -119,6 +119,7 @@ export function getAdAccountSuspensionEmailTemplate(data: EmailTemplateData): { 
   const { adAccount, client } = data;
   const totalSpend = parseFloat((adAccount.totalSpend || 0).toString());
   const spendLimit = parseFloat(adAccount.spendLimit.toString());
+  const availableBalance = (spendLimit - totalSpend).toFixed(2);
 
   const subject = `⚠️ Ad Account Suspended - ${adAccount.accountName}`;
 
@@ -141,6 +142,7 @@ export function getAdAccountSuspensionEmailTemplate(data: EmailTemplateData): { 
     .detail-value { font-weight: 700; color: #111827; }
     .warning-badge { background: #ef4444; color: white; padding: 8px 16px; border-radius: 20px; display: inline-block; font-size: 14px; margin: 10px 0; }
     .footer { background: #f9fafb; padding: 20px; text-align: center; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none; color: #6b7280; font-size: 14px; }
+    .divider { border-top: 2px solid #fecaca; margin: 20px 0; }
   </style>
 </head>
 <body>
@@ -168,9 +170,14 @@ export function getAdAccountSuspensionEmailTemplate(data: EmailTemplateData): { 
           <span class="detail-label">🌐 Platform:</span>
           <span class="detail-value">${adAccount.platform.toUpperCase()}</span>
         </div>
+        <div class="divider"></div>
         <div class="detail-row">
           <span class="detail-label">💰 Total Spend:</span>
           <span class="detail-value">$${totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">💵 Available Balance:</span>
+          <span class="detail-value">$${parseFloat(availableBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">📊 Spend Limit:</span>
@@ -200,7 +207,9 @@ Account Details:
 📌 Ad Account Name: ${adAccount.accountName}
 🏢 Client: ${client.clientName}
 🌐 Platform: ${adAccount.platform.toUpperCase()}
+━━━━━━━━━━━━━━━━━━━━━━
 💰 Total Spend: $${totalSpend.toFixed(2)}
+💵 Available Balance: $${availableBalance}
 📊 Spend Limit: $${spendLimit.toFixed(2)}
 ━━━━━━━━━━━━━━━━━━━━━━
 

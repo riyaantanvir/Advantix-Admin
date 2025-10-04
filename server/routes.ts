@@ -1041,31 +1041,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const emailPreferences = await storage.getClientEmailPreferences(client.id);
             const emailSettings = await storage.getEmailSettings();
             
+            console.log(`[EMAIL DEBUG] Status changed from ${oldAdAccount.status} to ${validatedData.status}`);
+            console.log(`[EMAIL DEBUG] Preferences enabled: ${emailPreferences?.enableNotifications}, Email configured: ${emailSettings?.isConfigured}, Client email: ${client.email}`);
+            
             // Check if email notifications are enabled for this client and email service is configured
             if (emailPreferences?.enableNotifications && emailSettings?.isConfigured && client.email) {
-              if (validatedData.status === 'active' && oldAdAccount.status === 'inactive') {
+              if (validatedData.status === 'active' && (oldAdAccount.status === 'suspended' || oldAdAccount.status === 'inactive')) {
                 // Send activation email if enabled
                 if (emailPreferences.enableAdAccountActivationAlerts) {
-                  await sendAdAccountActivationEmail(
-                    client.email,
-                    client.clientName,
-                    adAccount.accountName,
-                    adAccount.platform
-                  );
+                  await sendAdAccountActivationEmail(adAccount, client);
                   console.log(`[EMAIL] Sent activation email for ad account ${adAccount.accountName} to ${client.email}`);
                 }
-              } else if (validatedData.status === 'inactive' && oldAdAccount.status === 'active') {
+              } else if ((validatedData.status === 'suspended' || validatedData.status === 'inactive') && oldAdAccount.status === 'active') {
                 // Send suspension email if enabled
                 if (emailPreferences.enableAdAccountSuspensionAlerts) {
-                  await sendAdAccountSuspensionEmail(
-                    client.email,
-                    client.clientName,
-                    adAccount.accountName,
-                    adAccount.platform
-                  );
+                  await sendAdAccountSuspensionEmail(adAccount, client);
                   console.log(`[EMAIL] Sent suspension email for ad account ${adAccount.accountName} to ${client.email}`);
                 }
               }
+            } else {
+              console.log(`[EMAIL DEBUG] Email not sent - preferences: ${emailPreferences?.enableNotifications}, configured: ${emailSettings?.isConfigured}, email: ${client.email}`);
             }
           }
         } catch (emailError) {
@@ -3764,13 +3759,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email service is not configured" });
       }
       
-      // Send a test suspension email
-      await sendAdAccountSuspensionEmail(
-        client.email,
-        client.clientName,
-        "Test Ad Account",
-        "Facebook"
-      );
+      // Create a test ad account with realistic spend data
+      const testAdAccount: AdAccount = {
+        id: '',
+        platform: 'Facebook' as any,
+        accountName: 'Test Ad Account',
+        accountId: 'test-123',
+        clientId: client.id,
+        spendLimit: '5000.00',
+        totalSpend: '3500.00',
+        status: 'suspended',
+        notes: null,
+        createdAt: null,
+        updatedAt: null
+      };
+      
+      // Send a test suspension email with real spend data
+      await sendAdAccountSuspensionEmail(testAdAccount, client);
       
       console.log(`[EMAIL TEST] Sent test email to ${client.email}`);
       res.json({ message: "Test email sent successfully" });
