@@ -72,9 +72,18 @@ This is a full-stack web application built with React and Express.js, featuring 
 **Client Mailbox System** (October 4, 2025) - Manual email composer replacing unreliable automated notifications:
 - **Manual Email Composer**: New dedicated page for composing and sending emails to clients
   - Client selector dropdown with email address display
-  - Email type selection: Custom Message, Account Activation Alert, Account Suspension Alert
-  - Dynamic ad account selection based on selected client (for activation/suspension)
-  - Subject line input with smart defaults
+  - **Email type selection with 9 professional templates**:
+    - ✏️ Custom Message - personalized content
+    - 🎉 Welcome Email - onboarding new clients
+    - 📊 Monthly Report - performance summaries
+    - 💳 Payment Reminder - invoice notifications
+    - 🚀 Campaign Launch - new campaign announcements
+    - ⚠️ Budget Alert - budget threshold warnings
+    - 💝 Thank You - appreciation messages
+    - ✅ Account Activation Alert - ad account activation
+    - ⛔ Account Suspension Alert - ad account suspension
+  - Dynamic ad account selection based on selected client (for activation/suspension types)
+  - Subject line input with smart defaults for each template type
   - Custom message textarea for personalized emails
   - Live HTML email preview panel showing final email appearance
   - Real-time validation using Zod schema
