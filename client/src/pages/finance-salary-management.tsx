@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, DollarSign, Calendar, User, Clock, RefreshCw, Filter, Calculator, Receipt, CreditCard } from "lucide-react";
 import { type User as UserType } from "@shared/schema";
 import Sidebar from "@/components/layout/Sidebar";
+import { GenerateSalaryDialog } from "@/components/GenerateSalaryDialog";
 
 interface SalaryFormData {
   employeeId: string; // Actually userId, keeping name for backend compatibility
@@ -45,6 +46,7 @@ interface SalaryRecord extends SalaryFormData {
 
 export default function FinanceSalaryManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [editingSalary, setEditingSalary] = useState<SalaryRecord | null>(null);
   const [filterMonth, setFilterMonth] = useState("");
   const [filterEmployee, setFilterEmployee] = useState("all");
@@ -363,6 +365,15 @@ export default function FinanceSalaryManagement() {
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${salariesLoading ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setIsGenerateDialogOpen(true)}
+              data-testid="button-open-generate-salary"
+            >
+              <Calculator className="h-4 w-4 mr-2" />
+              Generate Salary
             </Button>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
@@ -1041,6 +1052,12 @@ export default function FinanceSalaryManagement() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Generate Salary Dialog */}
+        <GenerateSalaryDialog 
+          open={isGenerateDialogOpen} 
+          onOpenChange={setIsGenerateDialogOpen}
+        />
       </div>
     </Sidebar>
   );

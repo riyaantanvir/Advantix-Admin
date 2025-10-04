@@ -1,143 +1,6 @@
 # Overview
 
-This is a full-stack web application built with React and Express.js, featuring a modern authentication system and admin dashboard. The application is named "Advantix Admin" and provides comprehensive campaign management, client tracking, financial management, and work reporting capabilities. It uses a PostgreSQL database with Drizzle ORM for data persistence and includes a comprehensive UI component library built with shadcn/ui and Tailwind CSS.
-
-## Recent Updates (October 2, 2025)
-
-**Advantix Ads Manager** - New advanced campaign creation system with:
-- **3-Step Campaign Wizard**: Guided workflow for creating Facebook ad campaigns
-  - Step 1: Campaign Setup (objective, budget, ad account selection, **Facebook Page selection**)
-  - Step 2: Audience Targeting (age range slider, gender selection, location targeting, interests)
-  - Step 3: Creative Assets (ad copy, headlines, image/video upload with preview)
-- **Facebook Pages Integration**: 
-  - New facebook_pages table to store Facebook Pages linked to ad accounts
-  - Dynamic page selection based on selected ad account
-  - API endpoint GET /api/facebook/pages/:adAccountId for fetching pages
-  - Optional page selection in campaign wizard with helpful empty state messages
-  - **Sync with FB Button**: One-click sync for ad accounts and pages from Facebook Graph API
-    - POST /api/facebook/sync-accounts endpoint fetches and stores both ad accounts and pages
-    - Real-time feedback with spinning icon during sync and success/error toasts
-    - Automatic cache invalidation to refresh data after sync
-- **Campaign Drafts Management**: 
-  - **Create**: Save drafts at any wizard step before publishing
-  - **Edit**: Click Edit button to load draft into wizard and modify any field
-  - **Update**: Changes save with PUT /api/campaign-drafts/:id endpoint
-  - **Publish**: Launch campaigns directly to Facebook from drafts
-  - **Delete**: Remove unwanted drafts
-  - Smart targeting state management with fallback defaults
-- **Collapsible Sidebar**: Main navigation sidebar available throughout wizard for easy access to other sections
-- **Template System**: Foundation for campaign templates and saved audiences
-- **Media Upload**: Image and video upload functionality with real-time preview
-- **Database Schema**: New tables for campaign_drafts, campaign_templates, saved_audiences, saved_creatives, facebook_pages
-
-**Email Automation** - Email notification system for client communication:
-- **Email Settings Configuration**: New Admin panel tab for centralized email setup
-  - Provider selection: Resend, SendGrid, or Mailgun support
-  - **API Key Storage**: Stored directly in database (email_settings table) per user request, not in Replit Secrets
-  - Sender configuration: Email address and display name
-  - Notification toggles: Enable/disable email notifications
-  - Test connection: Validates API key and provider settings before activation
-- **Notification Types**:
-  - New Ad Alerts: Automatic emails when new ads are created
-  - Daily Performance Summaries: Scheduled reports at configurable times
-- **Database Schema**: New email_settings table with provider, apiKey, senderEmail, senderName, and notification preferences
-- **API Endpoints**: 
-  - GET /api/email/settings - Retrieve current email configuration
-  - POST /api/email/settings - Save email settings with validation
-  - POST /api/email/test-connection - Verify API key and connection
-
-**SMS Notifications** (October 3, 2025) - Text message alerts for Bangladesh clients:
-- **SMS Settings Configuration**: New Admin panel tab for Bangladesh SMS provider setup
-  - Provider selection: SMS in BD or BD Bulk SMS (both ~0.16-0.17 BDT per SMS)
-  - **API Key Storage**: Stored directly in database (sms_settings table), not in Replit Secrets
-  - Sender ID configuration: Phone number or branded sender ID
-  - Notification toggles: Master switch and ad-active alerts
-  - Test send: Validates API key and sends test SMS to Bangladesh numbers
-- **Bangladesh Phone Validation**: 
-  - Supports formats: +8801XXXXXXXXX, 8801XXXXXXXXX, or 01XXXXXXXXX
-  - Automatic normalization to international format (880...)
-  - Regex validation: /^(\+?880|0)?1[3-9]\d{8}$/
-- **Notification Types**:
-  - Ad Active Alerts: Automatic SMS when ads become active in Bangladesh
-- **Database Schema**: New sms_settings table with provider, apiKey, phoneNumber, enableNotifications, enableAdActiveAlerts, isConfigured, lastTestedAt, connectionError
-- **API Endpoints**: 
-  - GET /api/sms/settings - Retrieve current SMS configuration
-  - POST /api/sms/settings - Save SMS settings with validation
-  - POST /api/sms/test-send - Send test SMS to verify connection
-- **Provider Integration**:
-  - SMS in BD: API endpoint https://api.sms.net.bd/sendsms
-  - BD Bulk SMS: API endpoint https://api.bdbulksms.com/api/send
-  - Cost-effective: 0.16-0.17 BDT per SMS (vs Twilio $0.05-0.10 USD)
-
-**Client Mailbox System** (October 4, 2025) - Manual email composer replacing unreliable automated notifications:
-- **Manual Email Composer**: New dedicated page for composing and sending emails to clients
-  - Client selector dropdown with email address display
-  - **Email type selection with 9 professional templates**:
-    - ✏️ Custom Message - personalized content
-    - 🎉 Welcome Email - onboarding new clients
-    - 📊 Monthly Report - performance summaries
-    - 💳 Payment Reminder - invoice notifications
-    - 🚀 Campaign Launch - new campaign announcements
-    - ⚠️ Budget Alert - budget threshold warnings
-    - 💝 Thank You - appreciation messages
-    - ✅ Account Activation Alert - ad account activation
-    - ⛔ Account Suspension Alert - ad account suspension
-  - Dynamic ad account selection based on selected client (for activation/suspension types)
-  - Subject line input with smart defaults for each template type
-  - Custom message textarea for personalized emails
-  - Live HTML email preview panel showing final email appearance
-  - Real-time validation using Zod schema
-  - Send button with proper permission checks
-- **Security & Validation**:
-  - Page access restricted to Manager, Admin, and Super Admin roles
-  - API endpoint protected with `requirePagePermission("client_mailbox", "edit")`
-  - Request body validated with Zod schema (`clientMailboxEmailSchema`)
-  - Frontend uses shadcn's `useForm` with `zodResolver` for type-safe validation
-  - All fields properly validated before submission
-- **Email Templates**: Reuses existing professional HTML templates
-  - Activation template with account details and available balance
-  - Suspension template with helpful next steps
-  - Custom message template with branded header/footer
-- **Database Schema**: New page permissions for client_mailbox
-- **API Endpoint**: POST /api/client-mailbox/send with full validation chain
-- **Integration**: Connects to existing email service (Resend/SendGrid/Mailgun)
-- **Note**: Automatic email notifications disabled due to reliability issues
-
-**Client Email Notifications** (October 4, 2025) - Per-client email notification preferences for ad account changes (DISABLED):
-- **Client Email Preferences Management**: New Admin panel tab for per-client notification settings
-  - Client selector dropdown showing client name and email address
-  - Visual warnings when email service not configured or client has no email
-  - Master notification toggle to enable/disable all notifications for a client
-  - Individual toggles for specific notification types
-  - Configurable spend warning threshold percentage
-- **Notification Types**:
-  - Ad Account Activation Alerts: Automatic emails when ad accounts change from inactive to active
-  - Ad Account Suspension Alerts: Automatic emails when ad accounts change from active to inactive  
-  - Spend Warning Alerts: Emails when ad spend reaches threshold (configurable percentage)
-- **Email Templates**: HTML email templates in server/email-templates.ts
-  - Professional branded emails with "Advantix Admin" sender name
-  - Activation template with platform and account details
-  - Suspension template with helpful next steps
-  - Spend warning template with current spend and limit information
-- **Email Sending**: Centralized email sender utility in server/email-sender.ts
-  - Support for Resend, SendGrid, and Mailgun providers
-  - Automatic provider selection based on email settings
-  - Error handling and logging for failed sends
-- **Database Schema**: New client_email_preferences table with:
-  - clientId (foreign key to clients table)
-  - enableNotifications (master switch)
-  - enableAdAccountActivationAlerts, enableAdAccountSuspensionAlerts, enableSpendWarnings
-  - spendWarningThreshold (default 80%)
-- **API Endpoints**:
-  - GET /api/clients/:clientId/email-preferences - Get preferences for specific client
-  - POST /api/clients/:clientId/email-preferences - Save client preferences
-  - GET /api/clients/email-preferences/all - Get all client preferences (admin only)
-- **Integration**: Email notifications automatically triggered in PUT /api/ad-accounts/:id
-  - Checks if status changed between inactive and active
-  - Verifies client has email preferences enabled
-  - Validates email service is configured and client has email address
-  - Sends appropriate email template based on status change
-  - Errors logged but don't fail the ad account update
+This full-stack web application, "Advantix Admin," is a comprehensive platform for managing digital advertising campaigns. It offers tools for campaign creation, client tracking, financial management (including automated salary generation from work reports), and detailed work reporting. The system integrates an advanced admin dashboard, a modern authentication system, and a robust UI component library, aiming to streamline operations for marketing agencies and businesses managing ad campaigns. It facilitates client communication through a manual email composer with professional templates and offers advanced campaign creation with Facebook Ads integration, including ad account and page synchronization.
 
 # User Preferences
 
@@ -147,61 +10,66 @@ Preferred communication style: Simple, everyday language.
 
 ## Frontend Architecture
 - **Framework**: React 18 with TypeScript
-- **Routing**: Wouter for lightweight client-side routing
+- **Routing**: Wouter for client-side routing
 - **State Management**: TanStack Query for server state management
-- **UI Framework**: shadcn/ui components built on Radix UI primitives
-- **Styling**: Tailwind CSS with CSS variables for theming
-- **Build Tool**: Vite with custom configuration for development and production
+- **UI Framework**: shadcn/ui built on Radix UI primitives
+- **Styling**: Tailwind CSS with CSS variables
+- **Build Tool**: Vite
 
 ## Backend Architecture
 - **Framework**: Express.js with TypeScript
 - **Database**: PostgreSQL with Neon serverless driver
-- **ORM**: Drizzle ORM for type-safe database operations
+- **ORM**: Drizzle ORM for type-safe operations
 - **Authentication**: Token-based authentication with session storage
 - **API Design**: RESTful API with centralized error handling
-- **Development**: Hot module replacement and custom middleware for request logging
+- **Email/SMS Services**: Pluggable architecture supporting Resend, SendGrid, Mailgun for email, and specific Bangladesh providers for SMS, configurable via Admin panel.
+- **Third-Party Integrations**: Facebook Graph API for ad account and page synchronization.
 
 ## Database Schema
-- **Users Table**: Stores user credentials with unique usernames and active status
-- **Sessions Table**: Manages authentication tokens with expiration tracking
-- **Validation**: Zod schemas for runtime type validation and form handling
-- **Migrations**: Drizzle Kit for database schema management
+- **Core Entities**: Users, Sessions, Clients, Campaigns, Work Reports, Salaries, Ad Accounts, Facebook Pages, Email Settings, SMS Settings, Client Email Preferences (disabled).
+- **Validation**: Zod schemas for runtime type validation.
+- **Migrations**: Drizzle Kit for schema management.
 
 ## Authentication & Authorization
-- **Strategy**: Bearer token authentication stored in localStorage
-- **Session Management**: Server-side session validation with token expiration
-- **Route Protection**: Client-side route guards with authentication checks
-- **Default Credentials**: Admin user with username "Admin" and password "2604"
+- **Strategy**: Bearer token authentication stored in localStorage.
+- **Session Management**: Server-side session validation.
+- **Route Protection**: Client-side guards and API endpoint permission checks (e.g., `requirePagePermission`).
+- **Default Credentials**: Admin user ("Admin"/"2604").
 
 ## Component Architecture
-- **Design System**: Comprehensive UI component library with consistent theming
-- **Form Handling**: React Hook Form with Zod validation resolvers
-- **Responsive Design**: Mobile-first approach with adaptive layouts
-- **Accessibility**: ARIA-compliant components with keyboard navigation support
+- **Design System**: Comprehensive UI component library with consistent theming.
+- **Form Handling**: React Hook Form with Zod validation.
+- **Responsive Design**: Mobile-first approach.
+- **Accessibility**: ARIA-compliant components.
+
+## Feature Specifications
+- **Campaign Management**: 3-step wizard for Facebook ad campaigns (Setup, Audience, Creative Assets), draft management, media upload.
+- **Financial Management**: Automated salary generation from work reports, intelligent calculation based on hours, basic salary, and configurable bonuses. Salary approval workflow with Pending, Approved, Rejected statuses.
+- **Client Communication**: Manual email composer with 9 professional templates (e.g., Welcome, Monthly Report, Payment Reminder, Campaign Launch, Budget Alert, Account Activation/Suspension), live HTML preview, and role-based access.
+- **External Service Configuration**: Admin panel for setting up email (Resend, SendGrid, Mailgun) and SMS (Bangladesh-specific providers) services, including API key storage in the database and test connection functionalities.
 
 # External Dependencies
 
 ## Core Technologies
-- **@neondatabase/serverless**: PostgreSQL database connectivity
-- **drizzle-orm**: Type-safe database ORM
-- **@tanstack/react-query**: Server state management and caching
+- **@neondatabase/serverless**: PostgreSQL driver
+- **drizzle-orm**: ORM for database interactions
+- **@tanstack/react-query**: Server state management
 - **wouter**: Lightweight React router
 - **zod**: Runtime type validation
 
 ## UI & Styling
-- **@radix-ui/***: Headless UI component primitives
-- **tailwindcss**: Utility-first CSS framework
+- **@radix-ui/***: Headless UI components
+- **tailwindcss**: CSS framework
 - **class-variance-authority**: Component variant management
 - **lucide-react**: Icon library
 
 ## Development Tools
-- **vite**: Fast build tool and development server
+- **vite**: Build tool and development server
 - **tsx**: TypeScript execution for Node.js
-- **esbuild**: Fast JavaScript bundler for production
-- **@replit/vite-plugin-***: Replit-specific development enhancements
+- **esbuild**: JavaScript bundler
 
-## Session Storage
-- **connect-pg-simple**: PostgreSQL session store for Express
-- **ws**: WebSocket implementation for Neon database connections
-
-The application follows a monorepo structure with shared schemas between client and server, enabling type safety across the full stack. The authentication system uses a fallback in-memory storage implementation that can be easily replaced with database-backed storage.
+## Integrations
+- **Facebook Graph API**: For syncing ad accounts and pages.
+- **Resend, SendGrid, Mailgun**: Email service providers.
+- **SMS in BD, BD Bulk SMS**: Bangladesh-specific SMS providers.
+- **connect-pg-simple**: PostgreSQL session store for Express.

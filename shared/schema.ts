@@ -110,6 +110,9 @@ export const salaries = pgTable("salaries", {
   paymentMethod: text("payment_method").notNull().default("bank_transfer"), // "cash", "bank_transfer", "mobile_banking"
   paymentStatus: text("payment_status").notNull().default("unpaid"), // "paid", "unpaid"
   
+  // Approval Information
+  salaryApprovalStatus: text("salary_approval_status").notNull().default("pending"), // "pending", "approved", "rejected"
+  
   // Additional Information
   remarks: text("remarks"),
   month: text("month").notNull(), // "YYYY-MM" format
@@ -120,6 +123,7 @@ export const salaries = pgTable("salaries", {
   return {
     paymentMethodCheck: sql`CHECK (${table.paymentMethod} IN ('cash', 'bank_transfer', 'mobile_banking'))`,
     paymentStatusCheck: sql`CHECK (${table.paymentStatus} IN ('paid', 'unpaid'))`,
+    salaryApprovalStatusCheck: sql`CHECK (${table.salaryApprovalStatus} IN ('pending', 'approved', 'rejected'))`,
     uniqueEmployeeMonth: sql`UNIQUE(${table.employeeId}, ${table.month})`
   }
 });

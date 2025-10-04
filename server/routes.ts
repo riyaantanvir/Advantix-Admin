@@ -2364,6 +2364,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate Salary Preview
+  app.get("/api/salaries/generate-preview", authenticate, requirePagePermission('salaries', 'view'), async (req: Request, res: Response) => {
+    try {
+      const { employeeId, month } = req.query;
+      
+      if (!employeeId || !month) {
+        return res.status(400).json({ message: "Employee ID and month are required" });
+      }
+
+      // Validate month format (YYYY-MM)
+      const monthRegex = /^\d{4}-\d{2}$/;
+      if (!monthRegex.test(month as string)) {
+        return res.status(400).json({ message: "Invalid month format. Use YYYY-MM" });
+      }
+
+      // Get employee details
+      const employee = await storage.getUser(employeeId as string);
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+
+      // Check if salary already exists for this employee and month
+      const allSalaries = await storage.getSalaries();
+      const existingSalary = allSalaries.find(s => s.employeeId === employeeId && s.month === month);
+      
+      if (existingSalary) {
+        return res.status(200).json({
+          exists: true,
+          existingSalary,
+          message: "Salary already exists for this employee and month"
+        });
+      }
+
+      // Get work reports for this employee and month
+      const allWorkReports = await storage.getWorkReports(employeeId as string);
+      const monthStart = new Date(`${month}-01T00:00:00`);
+      const monthEnd = new Date(monthStart);
+      monthEnd.setMonth(monthEnd.getMonth() + 1);
+
+      const monthWorkReports = allWorkReports.filter(report => {
+        const reportDate = new Date(report.date);
+        return reportDate >= monthStart && reportDate < monthEnd && 
+               (report.status === 'submitted' || report.status === 'approved');
+      });
+
+      // Calculate total hours
+      const totalHours = monthWorkReports.reduce((sum, report) => {
+        return sum + parseFloat(report.hoursWorked as string);
+      }, 0);
+
+      // Get most recent salary for this employee to get basic salary and contractual hours
+      const employeeSalaries = allSalaries
+        .filter(s => s.employeeId === employeeId)
+        .sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
+      
+      const previousSalary = employeeSalaries[0];
+
+      // Default values
+      let basicSalary = previousSalary?.basicSalary ? parseFloat(previousSalary.basicSalary) : 0;
+      let contractualHours = previousSalary?.contractualHours || 160;
+
+      // Calculate hourly rate and base payment
+      const hourlyRate = contractualHours > 0 ? basicSalary / contractualHours : 0;
+      const basePayment = totalHours * hourlyRate;
+
+      res.json({
+        exists: false,
+        employee: {
+          id: employee.id,
+          name: employee.name || employee.username,
+        },
+        workReports: {
+          count: monthWorkReports.length,
+          totalHours: totalHours.toFixed(2),
+          reports: monthWorkReports.map(r => ({
+            id: r.id,
+            title: r.title,
+            date: r.date,
+            hoursWorked: r.hoursWorked,
+          }))
+        },
+        preview: {
+          basicSalary: basicSalary.toFixed(2),
+          contractualHours,
+          actualWorkingHours: totalHours.toFixed(2),
+          hourlyRate: hourlyRate.toFixed(2),
+          basePayment: basePayment.toFixed(2),
+          hasPreviousSalary: !!previousSalary
+        }
+      });
+    } catch (error) {
+      console.error("Generate salary preview error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Generate Salary
+  app.post("/api/salaries/generate", authenticate, requirePagePermission('salaries', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const {
+        employeeId,
+        employeeName,
+        month,
+        basicSalary,
+        contractualHours,
+        actualWorkingHours,
+        festivalBonus = 0,
+        performanceBonus = 0,
+        otherBonus = 0,
+        paymentMethod = 'bank_transfer',
+        paymentStatus = 'unpaid',
+        salaryApprovalStatus = 'pending',
+        remarks
+      } = req.body;
+
+      // Validate required fields
+      if (!employeeId || !employeeName || !month || !basicSalary || !contractualHours || actualWorkingHours === undefined) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Check if salary already exists for this employee and month
+      const allSalaries = await storage.getSalaries();
+      const existingSalary = allSalaries.find(s => s.employeeId === employeeId && s.month === month);
+      
+      if (existingSalary) {
+        return res.status(400).json({ message: "Salary already exists for this employee and month" });
+      }
+
+      // Calculate values
+      const hourlyRate = parseFloat(basicSalary) / parseInt(contractualHours);
+      const basePayment = parseFloat(actualWorkingHours) * hourlyRate;
+      const totalBonus = parseFloat(festivalBonus) + parseFloat(performanceBonus) + parseFloat(otherBonus);
+      const grossPayment = basePayment + totalBonus;
+      const finalPayment = grossPayment;
+
+      // Create salary record
+      const salaryData = {
+        employeeId,
+        employeeName,
+        basicSalary: basicSalary.toString(),
+        contractualHours: parseInt(contractualHours),
+        actualWorkingHours: actualWorkingHours.toString(),
+        hourlyRate: hourlyRate.toFixed(2),
+        basePayment: basePayment.toFixed(2),
+        festivalBonus: festivalBonus.toString(),
+        performanceBonus: performanceBonus.toString(),
+        otherBonus: otherBonus.toString(),
+        totalBonus: totalBonus.toFixed(2),
+        grossPayment: grossPayment.toFixed(2),
+        finalPayment: finalPayment.toFixed(2),
+        paymentMethod,
+        paymentStatus,
+        salaryApprovalStatus,
+        remarks,
+        month
+      };
+
+      const salary = await storage.createSalary(salaryData);
+      res.status(201).json(salary);
+    } catch (error) {
+      console.error("Generate salary error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
 
   // Data Backup and Export Endpoints - Super Admin Only
   
