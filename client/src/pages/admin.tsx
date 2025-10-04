@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign, Tag as TagIcon, Plus, Database, Download, Upload, FileText, AlertCircle, Send, MessageSquare, Bot, Mail } from "lucide-react";
+import { UserPlus, Edit3, Trash2, Users, Shield, RefreshCw, Settings, Lock, DollarSign, Tag as TagIcon, Plus, Database, Download, Upload, FileText, AlertCircle, Send, MessageSquare, Bot, Mail, Bell } from "lucide-react";
 import type { User, InsertUserWithRole, Page, RolePermission, Tag, InsertTag, UserMenuPermission, InsertUserMenuPermission, Employee, InsertEmployee, TelegramConfig, InsertTelegramConfig, TelegramChatId, InsertTelegramChatId } from "@shared/schema";
 
 interface UserFormData {
@@ -4391,6 +4391,305 @@ function SmsSettings() {
   );
 }
 
+function ClientEmailNotifications() {
+  const { toast } = useToast();
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [enableNotifications, setEnableNotifications] = useState(false);
+  const [enableAdAccountActivationAlerts, setEnableAdAccountActivationAlerts] = useState(false);
+  const [enableAdAccountSuspensionAlerts, setEnableAdAccountSuspensionAlerts] = useState(false);
+  const [enableSpendWarnings, setEnableSpendWarnings] = useState(false);
+  const [spendWarningThreshold, setSpendWarningThreshold] = useState(80);
+
+  // Fetch all clients
+  const { data: clients = [], isLoading: clientsLoading } = useQuery<any[]>({
+    queryKey: ["/api/clients"],
+  });
+
+  // Fetch email settings to check if email is configured
+  const { data: emailSettings } = useQuery<any>({
+    queryKey: ["/api/email/settings"],
+  });
+
+  // Fetch client email preferences when a client is selected
+  const { data: preferences, isLoading: preferencesLoading, refetch: refetchPreferences } = useQuery<any>({
+    queryKey: ["/api/clients", selectedClientId, "email-preferences"],
+    queryFn: async () => {
+      if (!selectedClientId) return null;
+      const response = await fetch(`/api/clients/${selectedClientId}/email-preferences`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+      });
+      if (!response.ok) throw new Error("Failed to fetch preferences");
+      return response.json();
+    },
+    enabled: !!selectedClientId,
+  });
+
+  // Update form when preferences are loaded
+  useEffect(() => {
+    if (preferences) {
+      setEnableNotifications(preferences.enableNotifications || false);
+      setEnableAdAccountActivationAlerts(preferences.enableAdAccountActivationAlerts || false);
+      setEnableAdAccountSuspensionAlerts(preferences.enableAdAccountSuspensionAlerts || false);
+      setEnableSpendWarnings(preferences.enableSpendWarnings || false);
+      setSpendWarningThreshold(preferences.spendWarningThreshold || 80);
+    }
+  }, [preferences]);
+
+  // Save preferences mutation
+  const savePreferencesMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedClientId) throw new Error("No client selected");
+      
+      const response = await fetch(`/api/clients/${selectedClientId}/email-preferences`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({
+          enableNotifications,
+          enableAdAccountActivationAlerts,
+          enableAdAccountSuspensionAlerts,
+          enableSpendWarnings,
+          spendWarningThreshold,
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to save preferences");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Email notification preferences saved successfully",
+      });
+      refetchPreferences();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save preferences",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleClientSelect = (clientId: string) => {
+    setSelectedClientId(clientId);
+  };
+
+  const handleSave = () => {
+    savePreferencesMutation.mutate();
+  };
+
+  const selectedClient = clients.find(c => c.id === selectedClientId);
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="w-5 h-5" />
+            Client Email Notifications
+          </CardTitle>
+          <CardDescription>
+            Configure email notification preferences for each client. Clients will receive automated emails for ad account status changes when enabled.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {!emailSettings?.isConfigured && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-yellow-900 dark:text-yellow-100">Email Service Not Configured</h4>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
+                    Please configure your email settings in the "Email Settings" tab before enabling client notifications.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="client-select">Select Client</Label>
+              <Select value={selectedClientId || ""} onValueChange={handleClientSelect}>
+                <SelectTrigger id="client-select" data-testid="select-client">
+                  <SelectValue placeholder="Choose a client..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name} {client.contactEmail ? `(${client.contactEmail})` : "(No email)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedClientId && selectedClient && (
+              <div className="border rounded-lg p-4 space-y-6 bg-gray-50 dark:bg-gray-800/50">
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-lg">{selectedClient.name}</h3>
+                  {selectedClient.contactEmail ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <Mail className="w-4 h-4 inline mr-1" />
+                      {selectedClient.contactEmail}
+                    </p>
+                  ) : (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3">
+                      <p className="text-sm text-red-800 dark:text-red-200">
+                        <AlertCircle className="w-4 h-4 inline mr-1" />
+                        No contact email set for this client. Please add an email address in the Clients page.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {preferencesLoading ? (
+                  <div className="text-center py-4">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-gray-400" />
+                    <p className="text-sm text-gray-500 mt-2">Loading preferences...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="enable-notifications" className="text-base">
+                          Enable Email Notifications
+                        </Label>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Master switch for all email notifications for this client
+                        </p>
+                      </div>
+                      <Switch
+                        id="enable-notifications"
+                        checked={enableNotifications}
+                        onCheckedChange={setEnableNotifications}
+                        disabled={!emailSettings?.isConfigured || !selectedClient.contactEmail}
+                        data-testid="switch-enable-notifications"
+                      />
+                    </div>
+
+                    {enableNotifications && (
+                      <>
+                        <div className="border-t pt-4 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="activation-alerts" className="text-base">
+                                Ad Account Activation Alerts
+                              </Label>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Send email when an ad account is activated
+                              </p>
+                            </div>
+                            <Switch
+                              id="activation-alerts"
+                              checked={enableAdAccountActivationAlerts}
+                              onCheckedChange={setEnableAdAccountActivationAlerts}
+                              data-testid="switch-activation-alerts"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="suspension-alerts" className="text-base">
+                                Ad Account Suspension Alerts
+                              </Label>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Send email when an ad account is suspended
+                              </p>
+                            </div>
+                            <Switch
+                              id="suspension-alerts"
+                              checked={enableAdAccountSuspensionAlerts}
+                              onCheckedChange={setEnableAdAccountSuspensionAlerts}
+                              data-testid="switch-suspension-alerts"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="spend-warnings" className="text-base">
+                                Spend Warning Alerts
+                              </Label>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Send email when ad spend reaches threshold
+                              </p>
+                            </div>
+                            <Switch
+                              id="spend-warnings"
+                              checked={enableSpendWarnings}
+                              onCheckedChange={setEnableSpendWarnings}
+                              data-testid="switch-spend-warnings"
+                            />
+                          </div>
+
+                          {enableSpendWarnings && (
+                            <div className="pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                              <Label htmlFor="threshold">Spend Warning Threshold (%)</Label>
+                              <Input
+                                id="threshold"
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={spendWarningThreshold}
+                                onChange={(e) => setSpendWarningThreshold(parseInt(e.target.value) || 80)}
+                                className="w-32 mt-2"
+                                data-testid="input-spend-threshold"
+                              />
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                Alert when spend reaches {spendWarningThreshold}% of limit
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    <div className="flex justify-end pt-4 border-t">
+                      <Button
+                        onClick={handleSave}
+                        disabled={savePreferencesMutation.isPending || !selectedClient.contactEmail}
+                        data-testid="button-save-preferences"
+                      >
+                        {savePreferencesMutation.isPending ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4 mr-2" />
+                            Save Preferences
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!selectedClientId && (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <Bell className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                <p>Select a client to configure their email notification preferences</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   return (
     <Sidebar>
@@ -4409,7 +4708,7 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="users" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6 max-w-6xl">
+            <TabsList className="grid w-full grid-cols-7 max-w-7xl">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 User Management
@@ -4438,6 +4737,10 @@ export default function AdminPage() {
                 <MessageSquare className="w-4 h-4" />
                 SMS Settings
               </TabsTrigger>
+              <TabsTrigger value="client-email" className="flex items-center gap-2">
+                <Bell className="w-4 h-4" />
+                Client Emails
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="users">
@@ -4462,6 +4765,10 @@ export default function AdminPage() {
 
             <TabsContent value="sms">
               <SmsSettings />
+            </TabsContent>
+
+            <TabsContent value="client-email">
+              <ClientEmailNotifications />
             </TabsContent>
           </Tabs>
         </div>

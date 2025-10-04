@@ -69,6 +69,42 @@ This is a full-stack web application built with React and Express.js, featuring 
   - BD Bulk SMS: API endpoint https://api.bdbulksms.com/api/send
   - Cost-effective: 0.16-0.17 BDT per SMS (vs Twilio $0.05-0.10 USD)
 
+**Client Email Notifications** (October 4, 2025) - Per-client email notification preferences for ad account changes:
+- **Client Email Preferences Management**: New Admin panel tab for per-client notification settings
+  - Client selector dropdown showing client name and email address
+  - Visual warnings when email service not configured or client has no email
+  - Master notification toggle to enable/disable all notifications for a client
+  - Individual toggles for specific notification types
+  - Configurable spend warning threshold percentage
+- **Notification Types**:
+  - Ad Account Activation Alerts: Automatic emails when ad accounts change from inactive to active
+  - Ad Account Suspension Alerts: Automatic emails when ad accounts change from active to inactive  
+  - Spend Warning Alerts: Emails when ad spend reaches threshold (configurable percentage)
+- **Email Templates**: HTML email templates in server/email-templates.ts
+  - Professional branded emails with "Advantix Admin" sender name
+  - Activation template with platform and account details
+  - Suspension template with helpful next steps
+  - Spend warning template with current spend and limit information
+- **Email Sending**: Centralized email sender utility in server/email-sender.ts
+  - Support for Resend, SendGrid, and Mailgun providers
+  - Automatic provider selection based on email settings
+  - Error handling and logging for failed sends
+- **Database Schema**: New client_email_preferences table with:
+  - clientId (foreign key to clients table)
+  - enableNotifications (master switch)
+  - enableAdAccountActivationAlerts, enableAdAccountSuspensionAlerts, enableSpendWarnings
+  - spendWarningThreshold (default 80%)
+- **API Endpoints**:
+  - GET /api/clients/:clientId/email-preferences - Get preferences for specific client
+  - POST /api/clients/:clientId/email-preferences - Save client preferences
+  - GET /api/clients/email-preferences/all - Get all client preferences (admin only)
+- **Integration**: Email notifications automatically triggered in PUT /api/ad-accounts/:id
+  - Checks if status changed between inactive and active
+  - Verifies client has email preferences enabled
+  - Validates email service is configured and client has email address
+  - Sends appropriate email template based on status change
+  - Errors logged but don't fail the ad account update
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
