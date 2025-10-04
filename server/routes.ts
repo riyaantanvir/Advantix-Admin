@@ -1039,15 +1039,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const client = await storage.getClient(adAccount.clientId);
           if (client) {
             const emailPreferences = await storage.getClientEmailPreferences(client.id);
+            const emailSettings = await storage.getEmailSettings();
             
-            // Check if email notifications are enabled for this client
-            if (emailPreferences?.enableNotifications && emailPreferences?.enableAdAccountActivationAlerts) {
-              const emailSettings = await storage.getEmailSettings();
-              
-              // Only send if email is configured
-              if (emailSettings?.isConfigured && client.email) {
-                if (validatedData.status === 'active' && oldAdAccount.status === 'inactive') {
-                  // Send activation email
+            // Check if email notifications are enabled for this client and email service is configured
+            if (emailPreferences?.enableNotifications && emailSettings?.isConfigured && client.email) {
+              if (validatedData.status === 'active' && oldAdAccount.status === 'inactive') {
+                // Send activation email if enabled
+                if (emailPreferences.enableAdAccountActivationAlerts) {
                   await sendAdAccountActivationEmail(
                     client.email,
                     client.clientName,
@@ -1055,8 +1053,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     adAccount.platform
                   );
                   console.log(`[EMAIL] Sent activation email for ad account ${adAccount.accountName} to ${client.email}`);
-                } else if (validatedData.status === 'inactive' && oldAdAccount.status === 'active') {
-                  // Send suspension email
+                }
+              } else if (validatedData.status === 'inactive' && oldAdAccount.status === 'active') {
+                // Send suspension email if enabled
+                if (emailPreferences.enableAdAccountSuspensionAlerts) {
                   await sendAdAccountSuspensionEmail(
                     client.email,
                     client.clientName,
@@ -3744,6 +3744,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Save client email preferences error:", error);
       res.status(500).json({ message: error.message || "Internal server error" });
+    }
+  });
+
+  // Send test email to a client
+  app.post("/api/clients/:clientId/email-preferences/test", authenticate, async (req: Request, res: Response) => {
+    try {
+      const client = await storage.getClient(req.params.clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      if (!client.email) {
+        return res.status(400).json({ message: "Client has no email address" });
+      }
+      
+      const emailSettings = await storage.getEmailSettings();
+      if (!emailSettings?.isConfigured) {
+        return res.status(400).json({ message: "Email service is not configured" });
+      }
+      
+      // Send a test suspension email
+      await sendAdAccountSuspensionEmail(
+        client.email,
+        client.clientName,
+        "Test Ad Account",
+        "Facebook"
+      );
+      
+      console.log(`[EMAIL TEST] Sent test email to ${client.email}`);
+      res.json({ message: "Test email sent successfully" });
+    } catch (error) {
+      console.error("Send test email error:", error);
+      res.status(500).json({ message: "Failed to send test email", error: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 

@@ -4479,12 +4479,49 @@ function ClientEmailNotifications() {
     },
   });
 
+  const sendTestEmailMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedClientId) throw new Error("No client selected");
+      
+      const response = await fetch(`/api/clients/${selectedClientId}/email-preferences/test`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to send test email");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Test email sent successfully! Check the client's inbox.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send test email",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleClientSelect = (clientId: string) => {
     setSelectedClientId(clientId);
   };
 
   const handleSave = () => {
     savePreferencesMutation.mutate();
+  };
+
+  const handleSendTestEmail = () => {
+    sendTestEmailMutation.mutate();
   };
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
@@ -4653,7 +4690,25 @@ function ClientEmailNotifications() {
                       </>
                     )}
 
-                    <div className="flex justify-end pt-4 border-t">
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                      <Button
+                        variant="outline"
+                        onClick={handleSendTestEmail}
+                        disabled={sendTestEmailMutation.isPending || !selectedClient.email || !emailSettings?.isConfigured}
+                        data-testid="button-send-test-email"
+                      >
+                        {sendTestEmailMutation.isPending ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Mail className="w-4 h-4 mr-2" />
+                            Send Test Email
+                          </>
+                        )}
+                      </Button>
                       <Button
                         onClick={handleSave}
                         disabled={savePreferencesMutation.isPending || !selectedClient.email}
