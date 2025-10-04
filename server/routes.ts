@@ -3773,10 +3773,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (emailType === "thank_you") {
         emailHtml = `<div style="${baseStyle}"><div style="${cardStyle}"><h2 style="color: #ec4899; margin-bottom: 20px;">💝 Thank You!</h2><p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 15px;">Hello <strong>${client.clientName}</strong>,</p><p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">We wanted to take a moment to thank you for your continued trust in Advantix.</p><div style="background-color: #fdf2f8; padding: 20px; border-radius: 6px; margin-bottom: 20px; text-align: center;"><p style="color: #9f1239; font-size: 18px; font-weight: bold; margin: 0;">Your partnership means the world to us!</p></div><p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 15px;">It's clients like you that make what we do so rewarding. We're committed to delivering exceptional results and supporting your business growth.</p><p style="color: #333; font-size: 16px; line-height: 1.6;">Here's to our continued success together!</p><p style="${footerStyle}">With gratitude,<br/><strong>Advantix Admin Team</strong></p></div></div>`;
         emailText = `Thank You!\n\nHello ${client.clientName},\n\nWe wanted to take a moment to thank you for your continued trust in Advantix.\n\nYour partnership means the world to us!\n\nIt's clients like you that make what we do so rewarding. We're committed to delivering exceptional results and supporting your business growth.\n\nHere's to our continued success together!\n\nWith gratitude,\nAdvantix Admin Team`;
-      } else {
-        // Account activation or suspension email
-        if (!adAccountId) {
-          return res.status(400).json({ message: "Ad account is required for this email type" });
+      } else if (emailType === "activation" || emailType === "suspension") {
+        // Account activation or suspension email - requires ad account
+        if (!adAccountId || adAccountId.trim() === "") {
+          return res.status(400).json({ message: "Ad account is required for activation and suspension emails" });
         }
         
         const adAccount = await storage.getAdAccount(adAccountId);
@@ -3801,9 +3801,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           emailHtml = template.html;
           emailText = template.text;
           emailSubject = subject || template.subject;
-        } else {
-          return res.status(400).json({ message: "Invalid email type" });
         }
+      } else {
+        return res.status(400).json({ message: "Invalid email type" });
       }
       
       // Send the email
