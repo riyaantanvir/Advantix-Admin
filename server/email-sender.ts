@@ -1,4 +1,6 @@
-import type { EmailSetting } from "@shared/schema";
+import type { EmailSetting, AdAccount, Client } from "@shared/schema";
+import { getAdAccountActivationEmailTemplate, getAdAccountSuspensionEmailTemplate, getSpendAlertEmailTemplate } from "./email-templates";
+import { storage } from "./storage";
 
 interface EmailData {
   to: string;
@@ -92,6 +94,182 @@ export async function sendEmail(settings: EmailSetting, emailData: EmailData): P
     return true;
   } catch (error) {
     console.error("Send email error:", error);
+    return false;
+  }
+}
+
+export async function sendAdAccountActivationEmail(
+  recipientEmail: string,
+  clientName: string,
+  accountName: string,
+  platform: string
+): Promise<boolean> {
+  try {
+    const emailSettings = await storage.getEmailSettings();
+    if (!emailSettings || !emailSettings.isConfigured) {
+      console.error("Email settings not configured");
+      return false;
+    }
+
+    const mockClient: Client = {
+      id: '',
+      clientName: clientName,
+      businessName: '',
+      contactPerson: clientName,
+      email: recipientEmail,
+      phone: '',
+      address: null,
+      notes: null,
+      status: 'active',
+      createdAt: null,
+      updatedAt: null
+    };
+
+    const mockAdAccount: AdAccount = {
+      id: '',
+      platform: platform as any,
+      accountName: accountName,
+      accountId: '',
+      clientId: '',
+      spendLimit: '0',
+      totalSpend: '0',
+      status: 'active',
+      notes: null,
+      createdAt: null,
+      updatedAt: null
+    };
+
+    const template = getAdAccountActivationEmailTemplate({
+      adAccount: mockAdAccount,
+      client: mockClient
+    });
+
+    return await sendEmail(emailSettings, {
+      to: recipientEmail,
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    });
+  } catch (error) {
+    console.error("Send activation email error:", error);
+    return false;
+  }
+}
+
+export async function sendAdAccountSuspensionEmail(
+  recipientEmail: string,
+  clientName: string,
+  accountName: string,
+  platform: string
+): Promise<boolean> {
+  try {
+    const emailSettings = await storage.getEmailSettings();
+    if (!emailSettings || !emailSettings.isConfigured) {
+      console.error("Email settings not configured");
+      return false;
+    }
+
+    const mockClient: Client = {
+      id: '',
+      clientName: clientName,
+      businessName: '',
+      contactPerson: clientName,
+      email: recipientEmail,
+      phone: '',
+      address: null,
+      notes: null,
+      status: 'active',
+      createdAt: null,
+      updatedAt: null
+    };
+
+    const mockAdAccount: AdAccount = {
+      id: '',
+      platform: platform as any,
+      accountName: accountName,
+      accountId: '',
+      clientId: '',
+      spendLimit: '0',
+      totalSpend: '0',
+      status: 'inactive',
+      notes: null,
+      createdAt: null,
+      updatedAt: null
+    };
+
+    const template = getAdAccountSuspensionEmailTemplate({
+      adAccount: mockAdAccount,
+      client: mockClient
+    });
+
+    return await sendEmail(emailSettings, {
+      to: recipientEmail,
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    });
+  } catch (error) {
+    console.error("Send suspension email error:", error);
+    return false;
+  }
+}
+
+export async function sendSpendWarningEmail(
+  recipientEmail: string,
+  clientName: string,
+  accountName: string,
+  platform: string,
+  threshold: number
+): Promise<boolean> {
+  try {
+    const emailSettings = await storage.getEmailSettings();
+    if (!emailSettings || !emailSettings.isConfigured) {
+      console.error("Email settings not configured");
+      return false;
+    }
+
+    const mockClient: Client = {
+      id: '',
+      clientName: clientName,
+      businessName: '',
+      contactPerson: clientName,
+      email: recipientEmail,
+      phone: '',
+      address: null,
+      notes: null,
+      status: 'active',
+      createdAt: null,
+      updatedAt: null
+    };
+
+    const mockAdAccount: AdAccount = {
+      id: '',
+      platform: platform as any,
+      accountName: accountName,
+      accountId: '',
+      clientId: '',
+      spendLimit: '1000',
+      totalSpend: '800',
+      status: 'active',
+      notes: null,
+      createdAt: null,
+      updatedAt: null
+    };
+
+    const template = getSpendAlertEmailTemplate({
+      adAccount: mockAdAccount,
+      client: mockClient,
+      threshold
+    });
+
+    return await sendEmail(emailSettings, {
+      to: recipientEmail,
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    });
+  } catch (error) {
+    console.error("Send spend warning email error:", error);
     return false;
   }
 }

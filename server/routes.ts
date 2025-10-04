@@ -1045,25 +1045,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const emailSettings = await storage.getEmailSettings();
               
               // Only send if email is configured
-              if (emailSettings?.isConfigured && client.contactEmail) {
+              if (emailSettings?.isConfigured && client.email) {
                 if (validatedData.status === 'active' && oldAdAccount.status === 'inactive') {
                   // Send activation email
                   await sendAdAccountActivationEmail(
-                    client.contactEmail,
-                    client.name,
+                    client.email,
+                    client.clientName,
                     adAccount.accountName,
                     adAccount.platform
                   );
-                  console.log(`[EMAIL] Sent activation email for ad account ${adAccount.accountName} to ${client.contactEmail}`);
+                  console.log(`[EMAIL] Sent activation email for ad account ${adAccount.accountName} to ${client.email}`);
                 } else if (validatedData.status === 'inactive' && oldAdAccount.status === 'active') {
                   // Send suspension email
                   await sendAdAccountSuspensionEmail(
-                    client.contactEmail,
-                    client.name,
+                    client.email,
+                    client.clientName,
                     adAccount.accountName,
                     adAccount.platform
                   );
-                  console.log(`[EMAIL] Sent suspension email for ad account ${adAccount.accountName} to ${client.contactEmail}`);
+                  console.log(`[EMAIL] Sent suspension email for ad account ${adAccount.accountName} to ${client.email}`);
                 }
               }
             }

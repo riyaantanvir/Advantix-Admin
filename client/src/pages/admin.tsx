@@ -4526,7 +4526,7 @@ function ClientEmailNotifications() {
                 <SelectContent>
                   {clients.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
-                      {client.name} {client.contactEmail ? `(${client.contactEmail})` : "(No email)"}
+                      {client.clientName} {client.email ? `(${client.email})` : "(No email)"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -4536,11 +4536,11 @@ function ClientEmailNotifications() {
             {selectedClientId && selectedClient && (
               <div className="border rounded-lg p-4 space-y-6 bg-gray-50 dark:bg-gray-800/50">
                 <div className="space-y-2">
-                  <h3 className="font-semibold text-lg">{selectedClient.name}</h3>
-                  {selectedClient.contactEmail ? (
+                  <h3 className="font-semibold text-lg">{selectedClient.clientName}</h3>
+                  {selectedClient.email ? (
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       <Mail className="w-4 h-4 inline mr-1" />
-                      {selectedClient.contactEmail}
+                      {selectedClient.email}
                     </p>
                   ) : (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3">
@@ -4572,7 +4572,7 @@ function ClientEmailNotifications() {
                         id="enable-notifications"
                         checked={enableNotifications}
                         onCheckedChange={setEnableNotifications}
-                        disabled={!emailSettings?.isConfigured || !selectedClient.contactEmail}
+                        disabled={!emailSettings?.isConfigured || !selectedClient.email}
                         data-testid="switch-enable-notifications"
                       />
                     </div>
@@ -4656,7 +4656,7 @@ function ClientEmailNotifications() {
                     <div className="flex justify-end pt-4 border-t">
                       <Button
                         onClick={handleSave}
-                        disabled={savePreferencesMutation.isPending || !selectedClient.contactEmail}
+                        disabled={savePreferencesMutation.isPending || !selectedClient.email}
                         data-testid="button-save-preferences"
                       >
                         {savePreferencesMutation.isPending ? (
