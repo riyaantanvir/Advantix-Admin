@@ -631,14 +631,11 @@ export type SmsSetting = typeof smsSettings.$inferSelect;
 export const clientEmailPreferences = pgTable("client_email_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientId: varchar("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull().unique(),
-  receiveActivationEmails: boolean("receive_activation_emails").default(true),
-  receiveSuspensionEmails: boolean("receive_suspension_emails").default(true),
-  receiveSpendAlerts: boolean("receive_spend_alerts").default(true),
-  spendAlertThreshold80: boolean("spend_alert_threshold_80").default(true), // Alert at 80% of limit
-  spendAlertThreshold90: boolean("spend_alert_threshold_90").default(true), // Alert at 90% of limit
-  spendAlertThreshold100: boolean("spend_alert_threshold_100").default(true), // Alert at 100% of limit
-  receiveDailySummary: boolean("receive_daily_summary").default(false),
-  receiveWeeklySummary: boolean("receive_weekly_summary").default(false),
+  enableNotifications: boolean("enable_notifications").default(false),
+  enableAdAccountActivationAlerts: boolean("enable_ad_account_activation_alerts").default(false),
+  enableAdAccountSuspensionAlerts: boolean("enable_ad_account_suspension_alerts").default(false),
+  enableSpendWarnings: boolean("enable_spend_warnings").default(false),
+  spendWarningThreshold: integer("spend_warning_threshold").default(80),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
