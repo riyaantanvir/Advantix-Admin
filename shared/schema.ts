@@ -574,6 +574,32 @@ export const insertFacebookSettingSchema = createInsertSchema(facebookSettings).
 export type InsertFacebookSetting = z.infer<typeof insertFacebookSettingSchema>;
 export type FacebookSetting = typeof facebookSettings.$inferSelect;
 
+// Client Mailbox Schemas
+export const clientMailboxEmailSchema = z.object({
+  clientId: z.string().min(1, "Client is required"),
+  emailType: z.enum(["custom", "activation", "suspension"], {
+    required_error: "Email type is required",
+  }),
+  subject: z.string().optional(),
+  customMessage: z.string().optional(),
+  adAccountId: z.string().optional(),
+}).refine((data) => {
+  // Custom messages require the customMessage field
+  if (data.emailType === "custom") {
+    return !!data.customMessage && data.customMessage.trim().length > 0;
+  }
+  // Activation and suspension require adAccountId
+  if (data.emailType === "activation" || data.emailType === "suspension") {
+    return !!data.adAccountId;
+  }
+  return true;
+}, {
+  message: "Custom messages require a message, activation/suspension require an ad account",
+  path: ["customMessage"],
+});
+
+export type ClientMailboxEmail = z.infer<typeof clientMailboxEmailSchema>;
+
 // Email Settings
 export const emailSettings = pgTable("email_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

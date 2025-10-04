@@ -3711,6 +3711,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual email send from Client Mailbox
+  app.post("/api/client-mailbox/send", authenticate, requirePagePermission("client_mailbox", "edit"), async (req: Request, res: Response) => {
+    try {
+      // Validate request body with Zod
+      const { clientMailboxEmailSchema } = await import('@shared/schema');
+      const validationResult = clientMailboxEmailSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request data", 
+          errors: validationResult.error.errors 
+        });
+      }
+      
+      const { clientId, emailType, subject, customMessage, adAccountId } = validationResult.data;
+      
+      // Validate client exists
+      const client = await storage.getClient(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      if (!client.email) {
+        return res.status(400).json({ message: "Client has no email address" });
+      }
+      
+      // Check email settings
+      const emailSettings = await storage.getEmailSettings();
+      if (!emailSettings?.isConfigured) {
+        return res.status(400).json({ message: "Email service is not configured" });
+      }
+      
+      let emailHtml = "";
+      let emailSubject = subject || "Message from Advantix Admin";
+      let emailText = "";
+      
+      if (emailType === "custom") {
+        // Custom message
+        emailHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+            <div style="background-color: white; padding: 30px; border-radius: 8px;">
+              <h2 style="color: #1a73e8; margin-bottom: 20px;">Message from Advantix Admin</h2>
+              <p style="color: #333; font-size: 16px; line-height: 1.6; white-space: pre-wrap;">${customMessage}</p>
+              <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+                Best regards,<br/>
+                <strong>Advantix Admin Team</strong>
+              </p>
+            </div>
+          </div>
+        `;
+        emailText = customMessage;
+      } else {
+        // Account activation or suspension email
+        if (!adAccountId) {
+          return res.status(400).json({ message: "Ad account is required for this email type" });
+        }
+        
+        const adAccount = await storage.getAdAccount(adAccountId);
+        if (!adAccount) {
+          return res.status(404).json({ message: "Ad account not found" });
+        }
+        
+        if (adAccount.clientId !== clientId) {
+          return res.status(400).json({ message: "Ad account does not belong to this client" });
+        }
+        
+        // Use existing email templates
+        const { getAdAccountActivationEmailTemplate, getAdAccountSuspensionEmailTemplate } = await import('./email-templates');
+        
+        if (emailType === "activation") {
+          const template = getAdAccountActivationEmailTemplate({ adAccount, client });
+          emailHtml = template.html;
+          emailText = template.text;
+          emailSubject = subject || template.subject;
+        } else if (emailType === "suspension") {
+          const template = getAdAccountSuspensionEmailTemplate({ adAccount, client });
+          emailHtml = template.html;
+          emailText = template.text;
+          emailSubject = subject || template.subject;
+        } else {
+          return res.status(400).json({ message: "Invalid email type" });
+        }
+      }
+      
+      // Send the email
+      const { sendEmail } = await import('./email-sender');
+      const success = await sendEmail(emailSettings, {
+        to: client.email,
+        subject: emailSubject,
+        html: emailHtml,
+        text: emailText
+      });
+      
+      if (!success) {
+        return res.status(500).json({ message: "Failed to send email" });
+      }
+      
+      res.json({ message: "Email sent successfully" });
+    } catch (error: any) {
+      console.error("Manual email send error:", error);
+      res.status(500).json({ message: error.message || "Internal server error" });
+    }
+  });
+
   // Send test email to a client
   app.post("/api/clients/:clientId/email-preferences/test", authenticate, async (req: Request, res: Response) => {
     try {

@@ -12,6 +12,7 @@ import CampaignDetailsPage from "@/pages/campaign-details";
 import ClientsPage from "@/pages/clients";
 import AdAccountsPage from "@/pages/ad-accounts";
 import WorkReportsPage from "@/pages/work-reports";
+import ClientMailboxPage from "@/pages/client-mailbox";
 import AdminPage from "@/pages/admin";
 import FinanceDashboard from "@/pages/finance-dashboard";
 import FinanceProjects from "@/pages/finance-projects";
@@ -238,6 +239,7 @@ function Router() {
       <Route path="/clients" component={() => <ProtectedRoute component={ClientsPage} pageKey="clients" />} />
       <Route path="/ad-accounts" component={() => <ProtectedRoute component={AdAccountsPage} pageKey="ad_accounts" />} />
       <Route path="/work-reports" component={() => <ProtectedRoute component={WorkReportsPage} pageKey="work_reports" />} />
+      <Route path="/client-mailbox" component={() => <ProtectedRoute component={ClientMailboxPage} pageKey="client_mailbox" />} />
       <Route path="/finance/dashboard" component={() => <ProtectedRoute component={FinanceDashboard} pageKey="finance" />} />
       <Route path="/finance/projects" component={() => <ProtectedRoute component={FinanceProjects} pageKey="finance" />} />
       <Route path="/finance/payments" component={() => <ProtectedRoute component={FinancePayments} pageKey="finance" />} />
