@@ -2236,7 +2236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Salary Management API Routes
   
   // Get all salaries
-  app.get("/api/salaries", authenticate, requirePagePermission('salaries', 'view'), async (req: Request, res: Response) => {
+  app.get("/api/salaries", authenticate, requirePagePermission('salary_management', 'view'), async (req: Request, res: Response) => {
     try {
       const salaries = await storage.getSalaries();
       res.json(salaries);
@@ -2246,126 +2246,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get salary statistics (MUST be before /:id route)
-  app.get("/api/salaries/stats", authenticate, requirePagePermission('salaries', 'view'), async (req: Request, res: Response) => {
-    try {
-      const [salaries, workReports] = await Promise.all([
-        storage.getSalaries(),
-        storage.getWorkReports()
-      ]);
-
-      // Calculate salary statistics
-      const totalSalaries = salaries.length;
-      const paidSalaries = salaries.filter(s => s.paymentStatus === 'paid');
-      const unpaidSalaries = salaries.filter(s => s.paymentStatus === 'unpaid');
-      
-      const totalPaidAmount = paidSalaries.reduce((sum, salary) => sum + parseFloat(salary.finalPayment), 0);
-      const totalPendingAmount = unpaidSalaries.reduce((sum, salary) => sum + parseFloat(salary.finalPayment), 0);
-      const totalSalaryAmount = salaries.reduce((sum, salary) => sum + parseFloat(salary.finalPayment), 0);
-      
-      // Calculate work report statistics
-      const totalWorkHours = workReports.reduce((sum, report) => sum + parseFloat(report.hoursWorked), 0);
-      const totalSalaryHours = salaries.reduce((sum, salary) => sum + parseFloat(salary.actualWorkingHours), 0);
-      
-      // Group by user for comparison
-      const userWorkHours: Record<string, number> = {};
-      const userSalaryHours: Record<string, number> = {};
-      
-      workReports.forEach(report => {
-        userWorkHours[report.userId] = (userWorkHours[report.userId] || 0) + parseFloat(report.hoursWorked);
-      });
-      
-      salaries.forEach(salary => {
-        userSalaryHours[salary.employeeId] = (userSalaryHours[salary.employeeId] || 0) + parseFloat(salary.actualWorkingHours);
-      });
-
-      const stats = {
-        totalSalaries,
-        paidSalaries: paidSalaries.length,
-        unpaidSalaries: unpaidSalaries.length,
-        totalPaidAmount,
-        totalPendingAmount,
-        totalSalaryAmount,
-        totalWorkHours,
-        totalSalaryHours,
-        hoursDifference: totalWorkHours - totalSalaryHours,
-        userWorkHours,
-        userSalaryHours,
-        averageSalary: totalSalaries > 0 ? totalSalaryAmount / totalSalaries : 0,
-        paymentRate: totalSalaries > 0 ? (paidSalaries.length / totalSalaries) * 100 : 0
-      };
-
-      res.json(stats);
-    } catch (error) {
-      console.error("Get salary stats error:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // Get single salary
-  app.get("/api/salaries/:id", authenticate, requirePagePermission('salaries', 'view'), async (req: Request, res: Response) => {
-    try {
-      const salary = await storage.getSalary(req.params.id);
-      if (!salary) {
-        return res.status(404).json({ message: "Salary record not found" });
-      }
-      res.json(salary);
-    } catch (error) {
-      console.error("Get salary error:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // Create new salary
-  app.post("/api/salaries", authenticate, requirePagePermission('salaries', 'edit'), async (req: Request, res: Response) => {
-    try {
-      // For now, accept the data as-is since frontend sends calculated fields
-      // TODO: Add proper validation later
-      const salary = await storage.createSalary(req.body);
-      res.status(201).json(salary);
-    } catch (error) {
-      console.error("Create salary error:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Validation error", errors: error.errors });
-      }
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // Update salary
-  app.put("/api/salaries/:id", authenticate, requirePagePermission('salaries', 'edit'), async (req: Request, res: Response) => {
-    try {
-      const validatedData = insertSalarySchema.partial().parse(req.body);
-      const salary = await storage.updateSalary(req.params.id, validatedData);
-      if (!salary) {
-        return res.status(404).json({ message: "Salary record not found" });
-      }
-      res.json(salary);
-    } catch (error) {
-      console.error("Update salary error:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Validation error", errors: error.errors });
-      }
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // Delete salary
-  app.delete("/api/salaries/:id", authenticate, requirePagePermission('salaries', 'delete'), async (req: Request, res: Response) => {
-    try {
-      const deleted = await storage.deleteSalary(req.params.id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Salary record not found" });
-      }
-      res.json({ message: "Salary record deleted successfully" });
-    } catch (error) {
-      console.error("Delete salary error:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // Generate Salary Preview
-  app.get("/api/salaries/generate-preview", authenticate, requirePagePermission('salaries', 'view'), async (req: Request, res: Response) => {
+  // Generate Salary routes (MUST be before /:id route)
+  app.get("/api/salaries/generate-preview", authenticate, requirePagePermission('salary_management', 'view'), async (req: Request, res: Response) => {
     try {
       const { employeeId, month } = req.query;
       
@@ -2464,8 +2346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate Salary
-  app.post("/api/salaries/generate", authenticate, requirePagePermission('salaries', 'edit'), async (req: Request, res: Response) => {
+  app.post("/api/salaries/generate", authenticate, requirePagePermission('salary_management', 'edit'), async (req: Request, res: Response) => {
     try {
       const {
         employeeId,
@@ -2488,41 +2369,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // Check if salary already exists for this employee and month
+      // Check if salary already exists
       const allSalaries = await storage.getSalaries();
       const existingSalary = allSalaries.find(s => s.employeeId === employeeId && s.month === month);
       
       if (existingSalary) {
-        return res.status(400).json({ message: "Salary already exists for this employee and month" });
+        return res.status(409).json({ message: "Salary already exists for this employee and month" });
+      }
+
+      // Get work reports to validate
+      const allWorkReports = await storage.getWorkReports(employeeId);
+      const monthStart = new Date(`${month}-01T00:00:00`);
+      const monthEnd = new Date(monthStart);
+      monthEnd.setMonth(monthEnd.getMonth() + 1);
+
+      const monthWorkReports = allWorkReports.filter(report => {
+        const reportDate = new Date(report.date);
+        return reportDate >= monthStart && reportDate < monthEnd && 
+               (report.status === 'submitted' || report.status === 'approved');
+      });
+
+      if (monthWorkReports.length === 0) {
+        return res.status(400).json({ message: "No work reports found for this employee and month" });
       }
 
       // Calculate values
-      const hourlyRate = parseFloat(basicSalary) / parseInt(contractualHours);
-      const basePayment = parseFloat(actualWorkingHours) * hourlyRate;
       const totalBonus = parseFloat(festivalBonus) + parseFloat(performanceBonus) + parseFloat(otherBonus);
+      const hourlyRate = parseFloat(basicSalary) / contractualHours;
+      const basePayment = parseFloat(actualWorkingHours) * hourlyRate;
       const grossPayment = basePayment + totalBonus;
       const finalPayment = grossPayment;
 
-      // Create salary record
       const salaryData = {
         employeeId,
         employeeName,
-        basicSalary: basicSalary.toString(),
-        contractualHours: parseInt(contractualHours),
-        actualWorkingHours: actualWorkingHours.toString(),
-        hourlyRate: hourlyRate.toFixed(2),
-        basePayment: basePayment.toFixed(2),
-        festivalBonus: festivalBonus.toString(),
-        performanceBonus: performanceBonus.toString(),
-        otherBonus: otherBonus.toString(),
-        totalBonus: totalBonus.toFixed(2),
-        grossPayment: grossPayment.toFixed(2),
-        finalPayment: finalPayment.toFixed(2),
+        month,
+        basicSalary: parseFloat(basicSalary),
+        contractualHours,
+        actualWorkingHours: parseFloat(actualWorkingHours),
+        hourlyRate: parseFloat(hourlyRate.toFixed(2)),
+        basePayment: parseFloat(basePayment.toFixed(2)),
+        festivalBonus: parseFloat(festivalBonus),
+        performanceBonus: parseFloat(performanceBonus),
+        otherBonus: parseFloat(otherBonus),
+        totalBonus: parseFloat(totalBonus.toFixed(2)),
+        grossPayment: parseFloat(grossPayment.toFixed(2)),
+        finalPayment: parseFloat(finalPayment.toFixed(2)),
         paymentMethod,
         paymentStatus,
         salaryApprovalStatus,
-        remarks,
-        month
+        remarks
       };
 
       const salary = await storage.createSalary(salaryData);
@@ -2536,6 +2432,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get salary statistics (MUST be before /:id route)
+  app.get("/api/salaries/stats", authenticate, requirePagePermission('salary_management', 'view'), async (req: Request, res: Response) => {
+    try {
+      const [salaries, workReports] = await Promise.all([
+        storage.getSalaries(),
+        storage.getWorkReports()
+      ]);
+
+      // Calculate salary statistics
+      const totalSalaries = salaries.length;
+      const paidSalaries = salaries.filter(s => s.paymentStatus === 'paid');
+      const unpaidSalaries = salaries.filter(s => s.paymentStatus === 'unpaid');
+      
+      const totalPaidAmount = paidSalaries.reduce((sum, salary) => sum + parseFloat(salary.finalPayment), 0);
+      const totalPendingAmount = unpaidSalaries.reduce((sum, salary) => sum + parseFloat(salary.finalPayment), 0);
+      const totalSalaryAmount = salaries.reduce((sum, salary) => sum + parseFloat(salary.finalPayment), 0);
+      
+      // Calculate work report statistics
+      const totalWorkHours = workReports.reduce((sum, report) => sum + parseFloat(report.hoursWorked), 0);
+      const totalSalaryHours = salaries.reduce((sum, salary) => sum + parseFloat(salary.actualWorkingHours), 0);
+      
+      // Group by user for comparison
+      const userWorkHours: Record<string, number> = {};
+      const userSalaryHours: Record<string, number> = {};
+      
+      workReports.forEach(report => {
+        userWorkHours[report.userId] = (userWorkHours[report.userId] || 0) + parseFloat(report.hoursWorked);
+      });
+      
+      salaries.forEach(salary => {
+        userSalaryHours[salary.employeeId] = (userSalaryHours[salary.employeeId] || 0) + parseFloat(salary.actualWorkingHours);
+      });
+
+      const stats = {
+        totalSalaries,
+        paidSalaries: paidSalaries.length,
+        unpaidSalaries: unpaidSalaries.length,
+        totalPaidAmount,
+        totalPendingAmount,
+        totalSalaryAmount,
+        totalWorkHours,
+        totalSalaryHours,
+        hoursDifference: totalWorkHours - totalSalaryHours,
+        userWorkHours,
+        userSalaryHours,
+        averageSalary: totalSalaries > 0 ? totalSalaryAmount / totalSalaries : 0,
+        paymentRate: totalSalaries > 0 ? (paidSalaries.length / totalSalaries) * 100 : 0
+      };
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Get salary stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get single salary
+  app.get("/api/salaries/:id", authenticate, requirePagePermission('salary_management', 'view'), async (req: Request, res: Response) => {
+    try {
+      const salary = await storage.getSalary(req.params.id);
+      if (!salary) {
+        return res.status(404).json({ message: "Salary record not found" });
+      }
+      res.json(salary);
+    } catch (error) {
+      console.error("Get salary error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create new salary
+  app.post("/api/salaries", authenticate, requirePagePermission('salary_management', 'edit'), async (req: Request, res: Response) => {
+    try {
+      // For now, accept the data as-is since frontend sends calculated fields
+      // TODO: Add proper validation later
+      const salary = await storage.createSalary(req.body);
+      res.status(201).json(salary);
+    } catch (error) {
+      console.error("Create salary error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update salary
+  app.put("/api/salaries/:id", authenticate, requirePagePermission('salary_management', 'edit'), async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertSalarySchema.partial().parse(req.body);
+      const salary = await storage.updateSalary(req.params.id, validatedData);
+      if (!salary) {
+        return res.status(404).json({ message: "Salary record not found" });
+      }
+      res.json(salary);
+    } catch (error) {
+      console.error("Update salary error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete salary
+  app.delete("/api/salaries/:id", authenticate, requirePagePermission('salary_management', 'delete'), async (req: Request, res: Response) => {
+    try {
+      const deleted = await storage.deleteSalary(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Salary record not found" });
+      }
+      res.json({ message: "Salary record deleted successfully" });
+    } catch (error) {
+      console.error("Delete salary error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
 
   // Data Backup and Export Endpoints - Super Admin Only
   

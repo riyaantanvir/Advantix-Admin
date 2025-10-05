@@ -70,6 +70,18 @@ export function GenerateSalaryDialog({ open, onOpenChange }: GenerateSalaryDialo
   // Fetch preview data when employee and month are selected
   const { data: previewData, isLoading: previewLoading, refetch: refetchPreview } = useQuery<PreviewData>({
     queryKey: ["/api/salaries/generate-preview", selectedEmployeeId, selectedMonth],
+    queryFn: async () => {
+      const response = await fetch(`/api/salaries/generate-preview?employeeId=${selectedEmployeeId}&month=${selectedMonth}`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      return response.json();
+    },
     enabled: !!selectedEmployeeId && !!selectedMonth && open,
   });
 
