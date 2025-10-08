@@ -142,6 +142,14 @@ export default function Sidebar({ children }: SidebarProps) {
       testId: "nav-client-mailbox",
       pageKey: "client_mailbox"
     },
+    { 
+      href: "/client-accounts", 
+      icon: User, 
+      label: "Client Accounts",
+      testId: "nav-client-accounts",
+      pageKey: "admin",
+      superAdminOnly: false
+    },
     {
       href: "/fb-ad-management",
       icon: () => (

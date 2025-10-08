@@ -220,7 +220,7 @@ export const rolePermissions = pgTable("role_permissions", {
 });
 
 // Validation schemas with role constraints
-const UserRoleEnum = z.enum([UserRole.USER, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+const UserRoleEnum = z.enum([UserRole.USER, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.CLIENT]);
 
 export const insertUserSchema = createInsertSchema(users).pick({
   name: true,
@@ -234,6 +234,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
 // Admin-only user creation schema (for super admins)
 export const insertUserWithRoleSchema = insertUserSchema.extend({
   role: UserRoleEnum.default(UserRole.USER),
+  clientId: z.string().optional(),
 });
 
 export const insertAdAccountSchema = createInsertSchema(adAccounts).omit({
