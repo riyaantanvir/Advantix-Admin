@@ -883,12 +883,11 @@ export default function CampaignsPage() {
                   <Filter className="h-4 w-4" />
                   Filters:
                 </div>
-                <Select value={filterAdAccountId} onValueChange={setFilterAdAccountId}>
+                <Select value={filterAdAccountId || undefined} onValueChange={(value) => setFilterAdAccountId(value)}>
                   <SelectTrigger className="w-[200px]" data-testid="select-filter-ad-account">
                     <SelectValue placeholder="All Ad Accounts" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Ad Accounts</SelectItem>
                     {adAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.accountName}
@@ -897,12 +896,11 @@ export default function CampaignsPage() {
                   </SelectContent>
                 </Select>
 
-                <Select value={filterCampaignId} onValueChange={setFilterCampaignId}>
+                <Select value={filterCampaignId || undefined} onValueChange={(value) => setFilterCampaignId(value)}>
                   <SelectTrigger className="w-[200px]" data-testid="select-filter-campaign">
                     <SelectValue placeholder="All Campaigns" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Campaigns</SelectItem>
                     {campaigns.map((campaign) => (
                       <SelectItem key={campaign.id} value={campaign.id}>
                         {campaign.name}
