@@ -333,6 +333,15 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getClientUsers(): Promise<User[]> {
+    try {
+      return db.select().from(users).where(eq(users.role, UserRole.CLIENT)).orderBy(desc(users.createdAt));
+    } catch (error) {
+      console.error(`[DB ERROR] Failed to get client users:`, error);
+      throw new Error(`Failed to get client users: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   async validateCredentials(username: string, password: string): Promise<User | null> {
     try {
       const user = await this.getUserByUsername(username);
@@ -404,8 +413,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Campaign methods
-  async getCampaigns(): Promise<Campaign[]> {
+  async getCampaigns(clientId?: string): Promise<Campaign[]> {
     try {
+      if (clientId) {
+        return db.select().from(campaigns).where(eq(campaigns.clientId, clientId)).orderBy(desc(campaigns.createdAt));
+      }
       return db.select().from(campaigns).orderBy(desc(campaigns.createdAt));
     } catch (error) {
       console.error(`[DB ERROR] Failed to get campaigns:`, error);
@@ -624,8 +636,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Ad Account methods
-  async getAdAccounts(): Promise<AdAccount[]> {
+  async getAdAccounts(clientId?: string): Promise<AdAccount[]> {
     try {
+      if (clientId) {
+        return db.select().from(adAccounts).where(eq(adAccounts.clientId, clientId)).orderBy(desc(adAccounts.createdAt));
+      }
       return db.select().from(adAccounts).orderBy(desc(adAccounts.createdAt));
     } catch (error) {
       console.error(`[DB ERROR] Failed to get ad accounts:`, error);

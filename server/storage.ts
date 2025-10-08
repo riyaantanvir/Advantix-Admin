@@ -51,6 +51,7 @@ export interface IStorage {
   updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
   getAllUsers(): Promise<User[]>;
+  getClientUsers(): Promise<User[]>; // Get all users with role='client'
   validateCredentials(username: string, password: string): Promise<User | null>;
   
   // Session methods
@@ -59,7 +60,7 @@ export interface IStorage {
   deleteSession(token: string): Promise<void>;
   
   // Campaign methods
-  getCampaigns(): Promise<Campaign[]>;
+  getCampaigns(clientId?: string): Promise<Campaign[]>; // Optional clientId for filtering
   getCampaign(id: string): Promise<Campaign | undefined>;
   createCampaign(campaign: InsertCampaign): Promise<Campaign>;
   updateCampaign(id: string, campaign: Partial<InsertCampaign>): Promise<Campaign | undefined>;
@@ -79,7 +80,7 @@ export interface IStorage {
   deleteClient(id: string): Promise<boolean>;
   
   // Ad Account methods
-  getAdAccounts(): Promise<AdAccount[]>;
+  getAdAccounts(clientId?: string): Promise<AdAccount[]>; // Optional clientId for filtering
   getAdAccount(id: string): Promise<AdAccount | undefined>;
   createAdAccount(adAccount: InsertAdAccount): Promise<AdAccount>;
   updateAdAccount(id: string, adAccount: Partial<InsertAdAccount>): Promise<AdAccount | undefined>;
@@ -284,6 +285,7 @@ export class MemStorage implements IStorage {
       username: "Admin",
       password: "2604", // In production, this should be hashed
       role: UserRole.SUPER_ADMIN,
+      clientId: null,
       isActive: true,
       createdAt: new Date(),
     };
@@ -487,6 +489,14 @@ export class MemStorage implements IStorage {
     });
   }
 
+  async getClientUsers(): Promise<User[]> {
+    return Array.from(this.users.values())
+      .filter(user => user.role === UserRole.CLIENT)
+      .sort((a, b) => {
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+  }
+
   async validateCredentials(username: string, password: string): Promise<User | null> {
     const user = await this.getUserByUsername(username);
     if (user && user.password === password && user.isActive) {
@@ -529,8 +539,12 @@ export class MemStorage implements IStorage {
   }
 
   // Campaign methods
-  async getCampaigns(): Promise<Campaign[]> {
-    return Array.from(this.campaigns.values()).sort((a, b) => {
+  async getCampaigns(clientId?: string): Promise<Campaign[]> {
+    let campaigns = Array.from(this.campaigns.values());
+    if (clientId) {
+      campaigns = campaigns.filter(campaign => campaign.clientId === clientId);
+    }
+    return campaigns.sort((a, b) => {
       return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
     });
   }
@@ -616,8 +630,12 @@ export class MemStorage implements IStorage {
   }
 
   // Ad Account methods
-  async getAdAccounts(): Promise<AdAccount[]> {
-    return Array.from(this.adAccounts.values()).sort((a, b) => {
+  async getAdAccounts(clientId?: string): Promise<AdAccount[]> {
+    let adAccounts = Array.from(this.adAccounts.values());
+    if (clientId) {
+      adAccounts = adAccounts.filter(account => account.clientId === clientId);
+    }
+    return adAccounts.sort((a, b) => {
       return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
     });
   }

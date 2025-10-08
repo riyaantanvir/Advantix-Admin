@@ -9,6 +9,7 @@ export const UserRole = {
   MANAGER: 'manager' as const,
   ADMIN: 'admin' as const,
   SUPER_ADMIN: 'super_admin' as const,
+  CLIENT: 'client' as const,
 } as const;
 
 export type UserRoleType = typeof UserRole[keyof typeof UserRole];
@@ -18,12 +19,13 @@ export const users = pgTable("users", {
   name: text("name"),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("user"), // "user", "manager", "admin", "super_admin"
+  role: text("role").notNull().default("user"), // "user", "manager", "admin", "super_admin", "client"
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "restrict" }), // For client users
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => {
   return {
-    roleCheck: sql`CHECK (${table.role} IN ('user', 'manager', 'admin', 'super_admin'))`
+    roleCheck: sql`CHECK (${table.role} IN ('user', 'manager', 'admin', 'super_admin', 'client'))`
   }
 });
 
