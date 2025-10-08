@@ -51,7 +51,7 @@ import {
   facebookSettings
 } from "@shared/schema";
 import { z } from "zod";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lte } from "drizzle-orm";
 import { sendAdAccountActivationEmail, sendAdAccountSuspensionEmail, sendSpendWarningEmail } from "./email-sender";
 
 // Extend Express Request to include user
@@ -282,6 +282,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(campaigns);
     } catch (error) {
       console.error("Get campaigns error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get campaign analytics with filters
+  app.get("/api/campaigns/analytics", authenticate, requirePagePermission('campaigns', 'view'), async (req: Request, res: Response) => {
+    try {
+      const { adAccountId, campaignId, startDate, endDate } = req.query;
+
+      // Build where conditions
+      const conditions: any[] = [];
+      
+      if (adAccountId && typeof adAccountId === 'string') {
+        conditions.push(eq(campaigns.adAccountId, adAccountId));
+      }
+      
+      if (campaignId && typeof campaignId === 'string') {
+        conditions.push(eq(campaigns.id, campaignId));
+      }
+      
+      if (startDate && typeof startDate === 'string') {
+        conditions.push(gte(campaigns.startDate, new Date(startDate)));
+      }
+      
+      if (endDate && typeof endDate === 'string') {
+        conditions.push(lte(campaigns.startDate, new Date(endDate)));
+      }
+
+      // Fetch filtered campaigns with ad account info
+      const filteredCampaigns = await db
+        .select({
+          id: campaigns.id,
+          name: campaigns.name,
+          spend: campaigns.spend,
+          budget: campaigns.budget,
+          dailyBudget: campaigns.dailyBudget,
+          lifetimeBudget: campaigns.lifetimeBudget,
+          budgetRemaining: campaigns.budgetRemaining,
+          adAccountId: campaigns.adAccountId,
+          adAccountName: adAccounts.accountName,
+          adAccountPlatform: adAccounts.platform,
+        })
+        .from(campaigns)
+        .leftJoin(adAccounts, eq(campaigns.adAccountId, adAccounts.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+      // Group by ad account and calculate totals
+      const adAccountStats = new Map<string, {
+        adAccountId: string;
+        adAccountName: string;
+        platform: string;
+        totalSpend: number;
+        totalBudget: number;
+        availableBalance: number;
+        campaignCount: number;
+      }>();
+
+      filteredCampaigns.forEach(campaign => {
+        const accountId = campaign.adAccountId || 'unassigned';
+        const accountName = campaign.adAccountName || 'Unassigned';
+        const platform = campaign.adAccountPlatform || 'unknown';
+
+        if (!adAccountStats.has(accountId)) {
+          adAccountStats.set(accountId, {
+            adAccountId: accountId,
+            adAccountName: accountName,
+            platform: platform,
+            totalSpend: 0,
+            totalBudget: 0,
+            availableBalance: 0,
+            campaignCount: 0,
+          });
+        }
+
+        const stats = adAccountStats.get(accountId)!;
+        const spend = parseFloat(campaign.spend || '0');
+        const budget = parseFloat(campaign.budget || campaign.dailyBudget || campaign.lifetimeBudget || '0');
+        
+        stats.totalSpend += spend;
+        stats.totalBudget += budget;
+        stats.campaignCount += 1;
+      });
+
+      // Calculate available balance for each ad account
+      const analytics = Array.from(adAccountStats.values()).map(stat => ({
+        ...stat,
+        availableBalance: stat.totalBudget - stat.totalSpend,
+      }));
+
+      res.json({
+        analytics,
+        totalCampaigns: filteredCampaigns.length,
+        grandTotalSpend: analytics.reduce((sum, a) => sum + a.totalSpend, 0),
+        grandTotalBudget: analytics.reduce((sum, a) => sum + a.totalBudget, 0),
+      });
+    } catch (error) {
+      console.error("Get campaign analytics error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
