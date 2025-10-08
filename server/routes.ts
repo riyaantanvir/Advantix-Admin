@@ -47,7 +47,8 @@ import {
   campaigns,
   campaignDailySpends,
   adAccounts,
-  facebookPages
+  facebookPages,
+  facebookSettings
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, desc, sql } from "drizzle-orm";
@@ -614,6 +615,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Import campaigns CSV error:", error);
       res.status(500).json({ message: "Failed to import CSV file" });
+    }
+  });
+
+  // Validation schema for Facebook sync
+  const syncFacebookCampaignsSchema = z.object({
+    adAccountId: z.string().min(1, "Ad Account ID is required").regex(/^\d+$/, "Ad Account ID must be numeric"),
+    clientId: z.string().optional().nullable(),
+  });
+
+  // Sync campaigns from Facebook Marketing API
+  app.post("/api/campaigns/sync-facebook", authenticate, requirePagePermission('campaigns', 'edit'), async (req: Request, res: Response) => {
+    try {
+      // Validate request body
+      const validatedData = syncFacebookCampaignsSchema.parse(req.body);
+      
+      // Get Facebook settings
+      const fbSettings = await db.select().from(facebookSettings).limit(1);
+      
+      if (fbSettings.length === 0 || !fbSettings[0].accessToken) {
+        return res.status(400).json({ 
+          message: "Facebook API not configured. Please set up your Facebook access token in settings." 
+        });
+      }
+
+      const { accessToken } = fbSettings[0];
+      const { adAccountId, clientId } = validatedData;
+
+      // Fetch campaigns from Facebook Marketing API
+      const fields = 'id,name,status,effective_status,objective,daily_budget,lifetime_budget,budget_remaining,spend_cap,created_time,updated_time';
+      const url = `https://graph.facebook.com/v21.0/act_${adAccountId}/campaigns`;
+      
+      const response = await fetch(`${url}?fields=${fields}&access_token=${accessToken}&limit=100`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Facebook API error:", errorData);
+        return res.status(400).json({ 
+          message: errorData.error?.message || "Failed to fetch campaigns from Facebook" 
+        });
+      }
+
+      const data = await response.json();
+      const fbCampaigns = data.data || [];
+
+      // Get insights (spend data) for each campaign
+      const campaignsWithInsights = await Promise.all(
+        fbCampaigns.map(async (fbCampaign: any) => {
+          try {
+            const insightsUrl = `https://graph.facebook.com/v21.0/${fbCampaign.id}/insights`;
+            const insightsResponse = await fetch(
+              `${insightsUrl}?fields=spend&access_token=${accessToken}`
+            );
+            
+            if (insightsResponse.ok) {
+              const insightsData = await insightsResponse.json();
+              const spend = insightsData.data?.[0]?.spend || '0';
+              return { ...fbCampaign, spend };
+            }
+          } catch (error) {
+            console.error(`Failed to fetch insights for campaign ${fbCampaign.id}:`, error);
+          }
+          return { ...fbCampaign, spend: '0' };
+        })
+      );
+
+      // Get the ad account to link campaigns
+      const adAccount = await db.select().from(adAccounts)
+        .where(eq(adAccounts.accountId, adAccountId))
+        .limit(1);
+
+      let dbAdAccountId = adAccount[0]?.id;
+
+      // If ad account doesn't exist, create it
+      if (!dbAdAccountId) {
+        const newAdAccount = await db.insert(adAccounts).values({
+          platform: 'facebook',
+          accountName: `Ad Account ${adAccountId}`,
+          accountId: adAccountId,
+          clientId: clientId || null,
+          spendLimit: '999999',
+          status: 'active'
+        }).returning();
+        dbAdAccountId = newAdAccount[0].id;
+      }
+
+      let syncedCount = 0;
+      let updatedCount = 0;
+      const errors: string[] = [];
+
+      // Sync each campaign
+      for (const fbCampaign of campaignsWithInsights) {
+        try {
+          // Convert budget from cents to dollars
+          const dailyBudget = fbCampaign.daily_budget ? (parseFloat(fbCampaign.daily_budget) / 100).toFixed(2) : null;
+          const lifetimeBudget = fbCampaign.lifetime_budget ? (parseFloat(fbCampaign.lifetime_budget) / 100).toFixed(2) : null;
+          const budgetRemaining = fbCampaign.budget_remaining ? (parseFloat(fbCampaign.budget_remaining) / 100).toFixed(2) : null;
+          const spend = fbCampaign.spend ? parseFloat(fbCampaign.spend).toFixed(2) : '0';
+
+          // Determine which budget to use as the main budget
+          const mainBudget = dailyBudget || lifetimeBudget || '0';
+
+          const campaignData = {
+            name: fbCampaign.name,
+            startDate: fbCampaign.created_time ? new Date(fbCampaign.created_time) : new Date(),
+            adAccountId: dbAdAccountId,
+            clientId: clientId || null,
+            status: fbCampaign.status === 'ACTIVE' ? 'active' : fbCampaign.status === 'PAUSED' ? 'paused' : 'completed',
+            objective: fbCampaign.objective || 'awareness',
+            budget: mainBudget,
+            spend: spend,
+            fbCampaignId: fbCampaign.id,
+            isSynced: true,
+            dailyBudget: dailyBudget,
+            lifetimeBudget: lifetimeBudget,
+            budgetRemaining: budgetRemaining,
+            effectiveStatus: fbCampaign.effective_status,
+            lastSyncedAt: new Date(),
+            updatedAt: fbCampaign.updated_time ? new Date(fbCampaign.updated_time) : new Date(),
+          };
+
+          // Check if campaign already exists by fbCampaignId
+          const existingCampaign = await db.select().from(campaigns)
+            .where(eq(campaigns.fbCampaignId, fbCampaign.id))
+            .limit(1);
+
+          if (existingCampaign.length > 0) {
+            // Update existing campaign
+            await db.update(campaigns)
+              .set(campaignData)
+              .where(eq(campaigns.id, existingCampaign[0].id));
+            updatedCount++;
+          } else {
+            // Insert new campaign
+            await db.insert(campaigns).values(campaignData);
+            syncedCount++;
+          }
+        } catch (error) {
+          console.error(`Error syncing campaign ${fbCampaign.name}:`, error);
+          errors.push(`Failed to sync campaign "${fbCampaign.name}": ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      res.json({
+        message: `Successfully synced ${syncedCount} new campaign(s) and updated ${updatedCount} existing campaign(s)`,
+        synced: syncedCount,
+        updated: updatedCount,
+        total: fbCampaigns.length,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error) {
+      console.error("Sync Facebook campaigns error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to sync campaigns from Facebook" 
+      });
     }
   });
 

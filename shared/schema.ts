@@ -41,7 +41,7 @@ export const adAccounts = pgTable("ad_accounts", {
   platform: text("platform").notNull(), // "facebook", "google", "tiktok", etc.
   accountName: text("account_name").notNull(),
   accountId: text("account_id").notNull(), // External account ID
-  clientId: varchar("client_id").references(() => clients.id, { onDelete: "restrict" }).notNull(),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "restrict" }),
   spendLimit: decimal("spend_limit", { precision: 12, scale: 2 }).notNull(),
   totalSpend: decimal("total_spend", { precision: 12, scale: 2 }).default("0"),
   status: text("status").notNull().default("active"), // "active", "suspended"

@@ -62,7 +62,8 @@ import {
   ExternalLink,
   Calendar,
   Download,
-  Upload
+  Upload,
+  CloudDownload
 } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -96,7 +97,9 @@ export default function CampaignsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const { toast } = useToast();
+  const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+  const [syncAdAccountId, setSyncAdAccountId] = useState("");
+  const { toast} = useToast();
 
   // Form setup
   const createForm = useForm<CampaignFormData>({
@@ -412,6 +415,45 @@ export default function CampaignsPage() {
     }
   };
 
+  // Sync campaigns from Facebook
+  const syncFacebookCampaignsMutation = useMutation({
+    mutationFn: async (adAccountId: string) => {
+      const response = await apiRequest("POST", "/api/campaigns/sync-facebook", {
+        adAccountId,
+        clientId: null,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      toast({
+        title: "Success!",
+        description: data.message || "Campaigns synced successfully from Facebook",
+      });
+      setIsSyncDialogOpen(false);
+      setSyncAdAccountId("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to sync campaigns from Facebook",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSyncFacebook = () => {
+    if (!syncAdAccountId || syncAdAccountId.trim() === "") {
+      toast({
+        title: "Error",
+        description: "Please enter a Facebook Ad Account ID",
+        variant: "destructive",
+      });
+      return;
+    }
+    syncFacebookCampaignsMutation.mutate(syncAdAccountId);
+  };
+
   return (
     <Sidebar>
       <div className="flex-1 overflow-auto">
@@ -476,6 +518,69 @@ export default function CampaignsPage() {
                   className="hidden"
                   data-testid="input-csv-file"
                 />
+                <Dialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900"
+                      data-testid="button-sync-facebook"
+                    >
+                      <CloudDownload className="h-4 w-4 mr-2" />
+                      Sync Campaign Management
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Sync Facebook Campaigns</DialogTitle>
+                      <DialogDescription>
+                        Enter your Facebook Ad Account ID to sync campaigns from Facebook.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <label htmlFor="ad-account-id" className="text-sm font-medium">
+                          Facebook Ad Account ID
+                        </label>
+                        <Input
+                          id="ad-account-id"
+                          placeholder="e.g., 123456789012345"
+                          value={syncAdAccountId}
+                          onChange={(e) => setSyncAdAccountId(e.target.value)}
+                          data-testid="input-sync-ad-account-id"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Enter the numeric ID of your Facebook Ad Account (without "act_" prefix)
+                        </p>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsSyncDialogOpen(false)}
+                        data-testid="button-cancel-sync"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSyncFacebook}
+                        disabled={syncFacebookCampaignsMutation.isPending}
+                        data-testid="button-confirm-sync"
+                      >
+                        {syncFacebookCampaignsMutation.isPending ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                            Syncing...
+                          </>
+                        ) : (
+                          <>
+                            <CloudDownload className="h-4 w-4 mr-2" />
+                            Sync Campaigns
+                          </>
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-new-campaign">
@@ -768,14 +873,26 @@ export default function CampaignsPage() {
                             data-testid={`campaign-row-${campaign.id}`}
                           >
                             <TableCell className="font-medium">
-                              <Button
-                                variant="link"
-                                className="p-0 h-auto font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400"
-                                onClick={() => setLocation(`/campaigns/${campaign.id}`)}
-                                data-testid={`link-campaign-${campaign.id}`}
-                              >
-                                {campaign.name}
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="link"
+                                  className="p-0 h-auto font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400"
+                                  onClick={() => setLocation(`/campaigns/${campaign.id}`)}
+                                  data-testid={`link-campaign-${campaign.id}`}
+                                >
+                                  {campaign.name}
+                                </Button>
+                                {campaign.isSynced && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="text-xs bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+                                    title="Synced from Facebook"
+                                  >
+                                    <CloudDownload className="h-3 w-3 mr-1" />
+                                    FB
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               {format(new Date(campaign.startDate), "MMM dd, yyyy")}
