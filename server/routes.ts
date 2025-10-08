@@ -291,26 +291,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { adAccountId, campaignId, startDate, endDate } = req.query;
 
-      // Build where conditions
-      const conditions: any[] = [];
+      const hasDateFilter = (startDate && typeof startDate === 'string') || (endDate && typeof endDate === 'string');
+
+      // Build campaign filter conditions
+      const campaignConditions: any[] = [];
       
       if (adAccountId && typeof adAccountId === 'string') {
-        conditions.push(eq(campaigns.adAccountId, adAccountId));
+        campaignConditions.push(eq(campaigns.adAccountId, adAccountId));
       }
       
       if (campaignId && typeof campaignId === 'string') {
-        conditions.push(eq(campaigns.id, campaignId));
-      }
-      
-      if (startDate && typeof startDate === 'string') {
-        conditions.push(gte(campaigns.startDate, new Date(startDate)));
-      }
-      
-      if (endDate && typeof endDate === 'string') {
-        conditions.push(lte(campaigns.startDate, new Date(endDate)));
+        campaignConditions.push(eq(campaigns.id, campaignId));
       }
 
-      // Fetch filtered campaigns with ad account info
+      // If date filters are provided, aggregate from daily spends
+      if (hasDateFilter) {
+        // Build date filter conditions for daily spends
+        const dateConditions: any[] = [];
+        
+        if (startDate && typeof startDate === 'string') {
+          dateConditions.push(gte(campaignDailySpends.date, new Date(startDate)));
+        }
+        
+        if (endDate && typeof endDate === 'string') {
+          dateConditions.push(lte(campaignDailySpends.date, new Date(endDate)));
+        }
+
+        // Fetch campaigns with their daily spends in the date range
+        const campaignsWithSpend = await db
+          .select({
+            campaignId: campaigns.id,
+            campaignName: campaigns.name,
+            adAccountId: campaigns.adAccountId,
+            adAccountName: adAccounts.accountName,
+            adAccountPlatform: adAccounts.platform,
+            budget: campaigns.budget,
+            dailyBudget: campaigns.dailyBudget,
+            lifetimeBudget: campaigns.lifetimeBudget,
+            dailySpendAmount: campaignDailySpends.amount,
+          })
+          .from(campaigns)
+          .leftJoin(adAccounts, eq(campaigns.adAccountId, adAccounts.id))
+          .leftJoin(
+            campaignDailySpends,
+            and(
+              eq(campaignDailySpends.campaignId, campaigns.id),
+              ...(dateConditions.length > 0 ? dateConditions : [])
+            )
+          )
+          .where(campaignConditions.length > 0 ? and(...campaignConditions) : undefined);
+
+        // Group by campaign first to calculate campaign-level spend
+        const campaignSpendMap = new Map<string, {
+          campaignId: string;
+          campaignName: string;
+          adAccountId: string | null;
+          adAccountName: string | null;
+          platform: string | null;
+          budget: string;
+          totalSpend: number;
+        }>();
+
+        campaignsWithSpend.forEach(row => {
+          const campaignId = row.campaignId;
+          if (!campaignSpendMap.has(campaignId)) {
+            campaignSpendMap.set(campaignId, {
+              campaignId: row.campaignId,
+              campaignName: row.campaignName,
+              adAccountId: row.adAccountId,
+              adAccountName: row.adAccountName,
+              platform: row.adAccountPlatform,
+              budget: row.budget || row.dailyBudget || row.lifetimeBudget || '0',
+              totalSpend: 0,
+            });
+          }
+          
+          const campaignData = campaignSpendMap.get(campaignId)!;
+          if (row.dailySpendAmount) {
+            campaignData.totalSpend += parseFloat(row.dailySpendAmount);
+          }
+        });
+
+        // Group by ad account
+        const adAccountStats = new Map<string, {
+          adAccountId: string;
+          adAccountName: string;
+          platform: string;
+          totalSpend: number;
+          totalBudget: number;
+          availableBalance: number;
+          campaignCount: number;
+        }>();
+
+        campaignSpendMap.forEach(campaign => {
+          const accountId = campaign.adAccountId || 'unassigned';
+          const accountName = campaign.adAccountName || 'Unassigned';
+          const platform = campaign.platform || 'unknown';
+
+          if (!adAccountStats.has(accountId)) {
+            adAccountStats.set(accountId, {
+              adAccountId: accountId,
+              adAccountName: accountName,
+              platform: platform,
+              totalSpend: 0,
+              totalBudget: 0,
+              availableBalance: 0,
+              campaignCount: 0,
+            });
+          }
+
+          const stats = adAccountStats.get(accountId)!;
+          stats.totalSpend += campaign.totalSpend;
+          stats.totalBudget += parseFloat(campaign.budget);
+          stats.campaignCount += 1;
+        });
+
+        const analytics = Array.from(adAccountStats.values()).map(stat => ({
+          ...stat,
+          availableBalance: stat.totalBudget - stat.totalSpend,
+        }));
+
+        return res.json({
+          analytics,
+          totalCampaigns: campaignSpendMap.size,
+          grandTotalSpend: analytics.reduce((sum, a) => sum + a.totalSpend, 0),
+          grandTotalBudget: analytics.reduce((sum, a) => sum + a.totalBudget, 0),
+        });
+      }
+
+      // If no date filter, use campaign's total spend
       const filteredCampaigns = await db
         .select({
           id: campaigns.id,
@@ -319,16 +428,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           budget: campaigns.budget,
           dailyBudget: campaigns.dailyBudget,
           lifetimeBudget: campaigns.lifetimeBudget,
-          budgetRemaining: campaigns.budgetRemaining,
           adAccountId: campaigns.adAccountId,
           adAccountName: adAccounts.accountName,
           adAccountPlatform: adAccounts.platform,
         })
         .from(campaigns)
         .leftJoin(adAccounts, eq(campaigns.adAccountId, adAccounts.id))
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
+        .where(campaignConditions.length > 0 ? and(...campaignConditions) : undefined);
 
-      // Group by ad account and calculate totals
+      // Group by ad account
       const adAccountStats = new Map<string, {
         adAccountId: string;
         adAccountName: string;
@@ -365,7 +473,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stats.campaignCount += 1;
       });
 
-      // Calculate available balance for each ad account
       const analytics = Array.from(adAccountStats.values()).map(stat => ({
         ...stat,
         availableBalance: stat.totalBudget - stat.totalSpend,
