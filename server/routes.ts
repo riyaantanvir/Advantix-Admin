@@ -274,11 +274,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(req.user);
   });
 
+  // Client User Management Routes
+  // Get all client users
+  app.get("/api/client-users", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const clientUsers = await storage.getClientUsers();
+      res.json(clientUsers);
+    } catch (error) {
+      console.error("Get client users error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create client user
+  app.post("/api/client-users", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const userData = insertUserWithRoleSchema.parse(req.body);
+      
+      // Ensure role is CLIENT
+      if (userData.role !== UserRole.CLIENT) {
+        return res.status(400).json({ message: "Invalid role. Must be 'client'" });
+      }
+
+      // Ensure clientId is provided
+      if (!userData.clientId) {
+        return res.status(400).json({ message: "clientId is required for client users" });
+      }
+
+      const user = await storage.createUser(userData);
+      res.json(user);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Create client user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update client user
+  app.put("/api/client-users/:id", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userData = insertUserWithRoleSchema.partial().parse(req.body);
+
+      const user = await storage.updateUser(id, userData);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json(user);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Update client user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete client user
+  app.delete("/api/client-users/:id", authenticate, requireAdminOrSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteUser(id);
+
+      if (!deleted) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Delete client user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Campaign Routes
-  // Get all campaigns
+  // Get all campaigns (filtered by clientId for client users)
   app.get("/api/campaigns", authenticate, requirePagePermission('campaigns', 'view'), async (req: Request, res: Response) => {
     try {
-      const campaigns = await storage.getCampaigns();
+      // Get the full user object to check clientId
+      const user = await storage.getUser(req.user!.id);
+      
+      // If user is a client, filter campaigns by their clientId
+      let clientIdFilter: string | undefined = undefined;
+      if (user?.role === UserRole.CLIENT && user.clientId) {
+        clientIdFilter = user.clientId;
+      }
+
+      const campaigns = await storage.getCampaigns(clientIdFilter);
       res.json(campaigns);
     } catch (error) {
       console.error("Get campaigns error:", error);
@@ -293,8 +378,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const hasDateFilter = (startDate && typeof startDate === 'string') || (endDate && typeof endDate === 'string');
 
+      // Get the full user object to check clientId
+      const user = await storage.getUser(req.user!.id);
+
       // Build campaign filter conditions
       const campaignConditions: any[] = [];
+      
+      // If user is a client, filter by their clientId
+      if (user?.role === UserRole.CLIENT && user.clientId) {
+        campaignConditions.push(eq(campaigns.clientId, user.clientId));
+      }
       
       if (adAccountId && typeof adAccountId === 'string') {
         campaignConditions.push(eq(campaigns.adAccountId, adAccountId));
@@ -1327,10 +1420,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Ad Accounts Routes
-  // Get all ad accounts
+  // Get all ad accounts (filtered by clientId for client users)
   app.get("/api/ad-accounts", authenticate, requirePagePermission('ad_accounts', 'view'), async (req: Request, res: Response) => {
     try {
-      const adAccounts = await storage.getAdAccounts();
+      // Get the full user object to check clientId
+      const user = await storage.getUser(req.user!.id);
+      
+      // If user is a client, filter ad accounts by their clientId
+      let clientIdFilter: string | undefined = undefined;
+      if (user?.role === UserRole.CLIENT && user.clientId) {
+        clientIdFilter = user.clientId;
+      }
+
+      const adAccounts = await storage.getAdAccounts(clientIdFilter);
       res.json(adAccounts);
     } catch (error) {
       console.error("Get ad accounts error:", error);
