@@ -1153,10 +1153,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertAdAccountSchema.parse(req.body);
       
-      // Validate that client exists
-      const client = await storage.getClient(validatedData.clientId);
-      if (!client) {
-        return res.status(400).json({ message: "Client not found" });
+      // Validate that client exists if clientId is provided
+      if (validatedData.clientId) {
+        const client = await storage.getClient(validatedData.clientId);
+        if (!client) {
+          return res.status(400).json({ message: "Client not found" });
+        }
       }
       
       const adAccount = await storage.createAdAccount(validatedData);
