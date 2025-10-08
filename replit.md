@@ -49,6 +49,7 @@ Preferred communication style: Simple, everyday language.
   - **Facebook Campaign Sync**: One-click sync to import campaigns from Facebook Marketing API with full budget details (daily/lifetime budgets, spend, remaining budget, status)
   - Visual indicators for synced campaigns with "FB" badge
   - Automatic campaign updates on re-sync
+  - **Campaign Analytics Dashboard**: Real-time reporting dashboard displaying ad account-wise metrics including total spend, total budget, and available balance. Features interactive filters for ad account, campaign, and date range (with proper daily spend aggregation for date-filtered queries). Shows grand totals and ad account breakdown cards.
 - **Financial Management**: Automated salary generation from work reports, intelligent calculation based on hours, basic salary, and configurable bonuses. Salary approval workflow with Pending, Approved, Rejected statuses.
 - **Client Communication**: Manual email composer with 9 professional templates (e.g., Welcome, Monthly Report, Payment Reminder, Campaign Launch, Budget Alert, Account Activation/Suspension), live HTML preview, and role-based access.
 - **External Service Configuration**: Admin panel for setting up email (Resend, SendGrid, Mailgun) and SMS (Bangladesh-specific providers) services, including API key storage in the database and test connection functionalities.
