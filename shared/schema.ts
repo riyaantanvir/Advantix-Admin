@@ -62,6 +62,16 @@ export const campaigns = pgTable("campaigns", {
   objective: text("objective").notNull(),
   budget: decimal("budget", { precision: 12, scale: 2 }).notNull(),
   spend: decimal("spend", { precision: 12, scale: 2 }).default("0"),
+  
+  // Facebook Sync Fields
+  fbCampaignId: text("fb_campaign_id"), // Facebook campaign ID
+  isSynced: boolean("is_synced").default(false), // Whether synced from Facebook
+  dailyBudget: decimal("daily_budget", { precision: 12, scale: 2 }), // Daily budget in dollars
+  lifetimeBudget: decimal("lifetime_budget", { precision: 12, scale: 2 }), // Lifetime budget in dollars
+  budgetRemaining: decimal("budget_remaining", { precision: 12, scale: 2 }), // Remaining budget
+  effectiveStatus: text("effective_status"), // Facebook effective status
+  lastSyncedAt: timestamp("last_synced_at"), // Last time synced from Facebook
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
