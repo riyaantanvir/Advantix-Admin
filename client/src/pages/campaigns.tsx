@@ -63,7 +63,11 @@ import {
   Calendar,
   Download,
   Upload,
-  CloudDownload
+  CloudDownload,
+  DollarSign,
+  TrendingUp,
+  Filter,
+  X
 } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -99,6 +103,13 @@ export default function CampaignsPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
   const [syncAdAccountId, setSyncAdAccountId] = useState("");
+  
+  // Analytics filters
+  const [filterAdAccountId, setFilterAdAccountId] = useState<string>("");
+  const [filterCampaignId, setFilterCampaignId] = useState<string>("");
+  const [filterStartDate, setFilterStartDate] = useState<Date | undefined>(undefined);
+  const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(undefined);
+  
   const { toast} = useToast();
 
   // Form setup
@@ -151,6 +162,41 @@ export default function CampaignsPage() {
       const response = await apiRequest("GET", "/api/ad-accounts");
       const data = await response.json();
       return data as AdAccount[];
+    },
+  });
+
+  // Fetch campaign analytics
+  const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
+    queryKey: [
+      "/api/campaigns/analytics",
+      filterAdAccountId,
+      filterCampaignId,
+      filterStartDate?.toISOString(),
+      filterEndDate?.toISOString()
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filterAdAccountId) params.append("adAccountId", filterAdAccountId);
+      if (filterCampaignId) params.append("campaignId", filterCampaignId);
+      if (filterStartDate) params.append("startDate", filterStartDate.toISOString());
+      if (filterEndDate) params.append("endDate", filterEndDate.toISOString());
+      
+      const response = await apiRequest("GET", `/api/campaigns/analytics?${params.toString()}`);
+      const data = await response.json();
+      return data as {
+        analytics: Array<{
+          adAccountId: string;
+          adAccountName: string;
+          platform: string;
+          totalSpend: number;
+          totalBudget: number;
+          availableBalance: number;
+          campaignCount: number;
+        }>;
+        totalCampaigns: number;
+        grandTotalSpend: number;
+        grandTotalBudget: number;
+      };
     },
   });
 
@@ -817,6 +863,228 @@ export default function CampaignsPage() {
                   </DialogContent>
                 </Dialog>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Campaign Analytics Dashboard */}
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Campaign Analytics
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Filters */}
+              <div className="flex items-center gap-3 flex-wrap mb-6 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <Filter className="h-4 w-4" />
+                  Filters:
+                </div>
+                <Select value={filterAdAccountId} onValueChange={setFilterAdAccountId}>
+                  <SelectTrigger className="w-[200px]" data-testid="select-filter-ad-account">
+                    <SelectValue placeholder="All Ad Accounts" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Ad Accounts</SelectItem>
+                    {adAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.accountName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={filterCampaignId} onValueChange={setFilterCampaignId}>
+                  <SelectTrigger className="w-[200px]" data-testid="select-filter-campaign">
+                    <SelectValue placeholder="All Campaigns" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Campaigns</SelectItem>
+                    {campaigns.map((campaign) => (
+                      <SelectItem key={campaign.id} value={campaign.id}>
+                        {campaign.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-[200px] justify-start text-left font-normal",
+                        !filterStartDate && "text-muted-foreground"
+                      )}
+                      data-testid="button-filter-start-date"
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {filterStartDate ? format(filterStartDate, "PPP") : "Start Date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={filterStartDate}
+                      onSelect={setFilterStartDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-[200px] justify-start text-left font-normal",
+                        !filterEndDate && "text-muted-foreground"
+                      )}
+                      data-testid="button-filter-end-date"
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {filterEndDate ? format(filterEndDate, "PPP") : "End Date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={filterEndDate}
+                      onSelect={setFilterEndDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                {(filterAdAccountId || filterCampaignId || filterStartDate || filterEndDate) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setFilterAdAccountId("");
+                      setFilterCampaignId("");
+                      setFilterStartDate(undefined);
+                      setFilterEndDate(undefined);
+                    }}
+                    className="h-9"
+                    data-testid="button-clear-filters"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+
+              {/* Summary Cards */}
+              {analyticsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                  <span className="ml-2 text-gray-500">Loading analytics...</span>
+                </div>
+              ) : analyticsData && analyticsData.analytics.length > 0 ? (
+                <div className="space-y-4">
+                  {/* Grand Total Summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
+                        <DollarSign className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Total Spend</div>
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                          ${analyticsData.grandTotalSpend.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
+                        <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Total Budget</div>
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                          ${analyticsData.grandTotalBudget.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
+                        <DollarSign className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Available Balance</div>
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                          ${(analyticsData.grandTotalBudget - analyticsData.grandTotalSpend).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ad Account Breakdown */}
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Ad Account Breakdown
+                    </h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {analyticsData.analytics.map((account) => (
+                        <Card 
+                          key={account.adAccountId}
+                          className="hover:shadow-lg transition-shadow"
+                          data-testid={`analytics-card-${account.adAccountId}`}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <h4 className="font-semibold text-gray-900 dark:text-white">
+                                  {account.adAccountName}
+                                </h4>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {account.platform.toUpperCase()} • {account.campaignCount} campaigns
+                                </p>
+                              </div>
+                              <Badge variant="outline" className="capitalize">
+                                {account.platform}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3 text-sm">
+                              <div>
+                                <div className="text-gray-500 dark:text-gray-400 text-xs">Spend</div>
+                                <div className="font-semibold text-red-600 dark:text-red-400">
+                                  ${account.totalSpend.toFixed(2)}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-gray-500 dark:text-gray-400 text-xs">Budget</div>
+                                <div className="font-semibold text-gray-900 dark:text-white">
+                                  ${account.totalBudget.toFixed(2)}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-gray-500 dark:text-gray-400 text-xs">Available</div>
+                                <div className={cn(
+                                  "font-semibold",
+                                  account.availableBalance > 0 
+                                    ? "text-green-600 dark:text-green-400" 
+                                    : "text-red-600 dark:text-red-400"
+                                )}>
+                                  ${account.availableBalance.toFixed(2)}
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No analytics data available for the selected filters.
+                </div>
+              )}
             </CardContent>
           </Card>
 
