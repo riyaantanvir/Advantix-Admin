@@ -44,9 +44,19 @@ import type { User, Client } from "@shared/schema";
 const clientUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   username: z.string().min(1, "Username is required"),
-  password: z.string().min(3, "Password must be at least 3 characters"),
+  password: z.string().optional(),
   clientId: z.string().min(1, "Client is required"),
   role: z.literal("client"),
+  isEditing: z.boolean().optional(),
+}).refine((data) => {
+  // Require password for new users
+  if (!data.isEditing && (!data.password || data.password.length < 3)) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Password must be at least 3 characters",
+  path: ["password"],
 });
 
 type ClientUserFormData = z.infer<typeof clientUserSchema>;
@@ -74,6 +84,7 @@ export default function ClientAccountsPage() {
       password: "",
       clientId: "",
       role: "client",
+      isEditing: false,
     },
   });
 
@@ -150,6 +161,7 @@ export default function ClientAccountsPage() {
         password: "", // Don't pre-fill password
         clientId: user.clientId || "",
         role: "client",
+        isEditing: true,
       });
     } else {
       setEditingUser(null);
@@ -159,6 +171,7 @@ export default function ClientAccountsPage() {
         password: "",
         clientId: "",
         role: "client",
+        isEditing: false,
       });
     }
     setIsDialogOpen(true);
