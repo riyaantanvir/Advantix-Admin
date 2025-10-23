@@ -295,6 +295,7 @@ function UserManagement() {
         clientManagement: false,
         adAccounts: false,
         workReports: false,
+        ownFarming: false,
         advantixDashboard: false,
         projects: false,
         payments: false,
