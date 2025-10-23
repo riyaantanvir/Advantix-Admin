@@ -77,6 +77,7 @@ function UserManagement() {
       clientManagement: false,
       adAccounts: false,
       workReports: false,
+      ownFarming: false,
       advantixDashboard: false,
       projects: false,
       payments: false,
@@ -766,6 +767,7 @@ function UserManagement() {
                     { key: 'clientManagement', label: 'Client Management' },
                     { key: 'adAccounts', label: 'Ad Accounts' },
                     { key: 'workReports', label: 'Work Reports' },
+                    { key: 'ownFarming', label: 'Own Farming' },
                   ].map((permission) => (
                     <div key={permission.key} className="flex items-center justify-between">
                       <Label htmlFor={`create-${permission.key}`} className="text-sm">
