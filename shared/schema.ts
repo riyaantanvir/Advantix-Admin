@@ -981,3 +981,55 @@ export const insertSavedAudienceSchema = createInsertSchema(savedAudiences).omit
 
 export type InsertSavedAudience = z.infer<typeof insertSavedAudienceSchema>;
 export type SavedAudience = typeof savedAudiences.$inferSelect;
+
+// Farming Accounts - For managing Facebook/TikTok farming accounts
+export const farmingAccounts = pgTable("farming_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Basic Information
+  comment: text("comment"),
+  socialMedia: text("social_media").notNull(), // "facebook", "tiktok"
+  vaId: varchar("va_id").references(() => users.id, { onDelete: "set null" }), // Virtual Assistant (user)
+  status: text("status").notNull().default("new"), // "new", "farming", "active", "suspended", "banned"
+  idName: text("id_name").notNull(), // Account ID/Name
+  email: text("email").notNull(),
+  
+  // Encrypted Fields (stored as JSON with structure: {ciphertext, iv, authTag})
+  recoveryEmailEncrypted: text("recovery_email_encrypted"), // JSON string of EncryptedData
+  passwordEncrypted: text("password_encrypted").notNull(), // JSON string of EncryptedData
+  twoFaSecretEncrypted: text("two_fa_secret_encrypted"), // JSON string of EncryptedData
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => {
+  return {
+    socialMediaCheck: sql`CHECK (${table.socialMedia} IN ('facebook', 'tiktok'))`,
+    statusCheck: sql`CHECK (${table.status} IN ('new', 'farming', 'active', 'suspended', 'banned'))`,
+  };
+});
+
+export const insertFarmingAccountSchema = createInsertSchema(farmingAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  // For input, we accept plain strings that will be encrypted server-side
+  recoveryEmail: z.string().email().optional(),
+  password: z.string().min(1, "Password is required"),
+  twoFaSecret: z.string().optional(),
+}).omit({
+  recoveryEmailEncrypted: true,
+  passwordEncrypted: true,
+  twoFaSecretEncrypted: true,
+});
+
+export type InsertFarmingAccount = z.infer<typeof insertFarmingAccountSchema>;
+export type FarmingAccount = typeof farmingAccounts.$inferSelect;
+
+// Type for decrypted account (only returned to admin users)
+export interface FarmingAccountWithSecrets extends FarmingAccount {
+  recoveryEmail?: string | null;
+  passwordDecrypted?: string | null;
+  twoFaSecret?: string | null;
+}
