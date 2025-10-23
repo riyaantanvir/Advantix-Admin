@@ -21,7 +21,9 @@ import {
   Calculator,
   BarChart3,
   Building2,
-  Mail
+  Mail,
+  Leaf,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -173,6 +175,29 @@ export default function Sidebar({ children }: SidebarProps) {
       pageKey: "advantix_ads_manager"
     },
     {
+      label: "Own Farming",
+      icon: Leaf,
+      testId: "nav-own-farming",
+      pageKey: "ownFarming",
+      isSection: true,
+      subItems: [
+        {
+          href: "/own-farming/new-created",
+          icon: Sparkles,
+          label: "New Created",
+          testId: "nav-own-farming-new-created",
+          pageKey: "ownFarming"
+        },
+        {
+          href: "/own-farming/farming-accounts",
+          icon: Leaf,
+          label: "Farming Accounts",
+          testId: "nav-own-farming-farming-accounts",
+          pageKey: "ownFarming"
+        }
+      ]
+    },
+    {
       label: "Advantix Finance",
       icon: Building2,
       testId: "nav-finance",
@@ -274,6 +299,14 @@ export default function Sidebar({ children }: SidebarProps) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const ownFarmingPermission = useQuery({
+    queryKey: [`/api/permissions/check/ownFarming`],
+    enabled: !!user && user.role !== 'super_admin',
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const fbAdManagementPermission = useQuery({
     queryKey: [`/api/permissions/check/fb_ad_management`],
     enabled: !!user && user.role !== 'super_admin',
@@ -314,6 +347,7 @@ export default function Sidebar({ children }: SidebarProps) {
       case 'clients': return clientsPermission.data;
       case 'ad_accounts': return adAccountsPermission.data;
       case 'work_reports': return workReportsPermission.data;
+      case 'ownFarming': return ownFarmingPermission.data;
       case 'client_mailbox': return clientMailboxPermission.data;
       case 'fb_ad_management': return fbAdManagementPermission.data;
       case 'finance': return financePermission.data;
