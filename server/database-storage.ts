@@ -2294,43 +2294,10 @@ export class DatabaseStorage implements IStorage {
       const account = await this.getFarmingAccount(id);
       if (!account) return undefined;
       
-      // Decrypt sensitive fields
-      let recoveryEmail = null;
-      let passwordDecrypted = null;
-      let twoFaSecret = null;
-      
-      try {
-        if (account.recoveryEmailEncrypted) {
-          const encData: EncryptedData = JSON.parse(account.recoveryEmailEncrypted);
-          recoveryEmail = decrypt(encData);
-        }
-      } catch (err) {
-        console.error("Failed to decrypt recovery email:", err);
-      }
-      
-      try {
-        if (account.passwordEncrypted) {
-          const encData: EncryptedData = JSON.parse(account.passwordEncrypted);
-          passwordDecrypted = decrypt(encData);
-        }
-      } catch (err) {
-        console.error("Failed to decrypt password:", err);
-      }
-      
-      try {
-        if (account.twoFaSecretEncrypted) {
-          const encData: EncryptedData = JSON.parse(account.twoFaSecretEncrypted);
-          twoFaSecret = decrypt(encData);
-        }
-      } catch (err) {
-        console.error("Failed to decrypt 2FA secret:", err);
-      }
-      
+      // Return account with sensitive fields (now stored as plain text)
       return {
         ...account,
-        recoveryEmail,
-        passwordDecrypted,
-        twoFaSecret
+        passwordDecrypted: account.password
       };
     } catch (error) {
       console.error("[DB ERROR] Failed to get farming account with secrets:", error);
@@ -2340,17 +2307,6 @@ export class DatabaseStorage implements IStorage {
 
   async createFarmingAccount(account: InsertFarmingAccount): Promise<FarmingAccount> {
     try {
-      // Encrypt sensitive fields
-      const recoveryEmailEncrypted = account.recoveryEmail 
-        ? JSON.stringify(encrypt(account.recoveryEmail)) 
-        : null;
-      
-      const passwordEncrypted = JSON.stringify(encrypt(account.password));
-      
-      const twoFaSecretEncrypted = account.twoFaSecret
-        ? JSON.stringify(encrypt(account.twoFaSecret))
-        : null;
-      
       const result = await db.insert(farmingAccounts).values({
         id: randomUUID(),
         comment: account.comment || null,
@@ -2359,9 +2315,9 @@ export class DatabaseStorage implements IStorage {
         status: account.status || 'new',
         idName: account.idName,
         email: account.email,
-        recoveryEmailEncrypted,
-        passwordEncrypted,
-        twoFaSecretEncrypted,
+        recoveryEmail: account.recoveryEmail || null,
+        password: account.password,
+        twoFaSecret: account.twoFaSecret || null,
       }).returning();
       
       return result[0];
@@ -2377,26 +2333,6 @@ export class DatabaseStorage implements IStorage {
         ...account,
         updatedAt: new Date(),
       };
-      
-      // Remove plain text fields that shouldn't be in database
-      delete updateData.password;
-      delete updateData.recoveryEmail;
-      delete updateData.twoFaSecret;
-      
-      // Encrypt new values if provided
-      if (account.password) {
-        updateData.passwordEncrypted = JSON.stringify(encrypt(account.password));
-      }
-      if (account.recoveryEmail !== undefined) {
-        updateData.recoveryEmailEncrypted = account.recoveryEmail 
-          ? JSON.stringify(encrypt(account.recoveryEmail))
-          : null;
-      }
-      if (account.twoFaSecret !== undefined) {
-        updateData.twoFaSecretEncrypted = account.twoFaSecret
-          ? JSON.stringify(encrypt(account.twoFaSecret))
-          : null;
-      }
       
       const result = await db.update(farmingAccounts)
         .set(updateData)

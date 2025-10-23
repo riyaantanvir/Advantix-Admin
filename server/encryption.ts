@@ -38,27 +38,35 @@ export interface EncryptedData {
 
 /**
  * Encrypts a plaintext string using AES-256-GCM
+ * Returns null if encryption key is not configured
  */
-export function encrypt(plaintext: string): EncryptedData {
+export function encrypt(plaintext: string): EncryptedData | null {
   if (!plaintext) {
-    throw new Error('Cannot encrypt empty string');
+    return null;
   }
 
-  const key = getEncryptionKey();
-  const iv = crypto.randomBytes(IV_LENGTH);
-  
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-  
-  let ciphertext = cipher.update(plaintext, 'utf8', 'base64');
-  ciphertext += cipher.final('base64');
-  
-  const authTag = cipher.getAuthTag();
-  
-  return {
-    ciphertext,
-    iv: iv.toString('base64'),
-    authTag: authTag.toString('base64'),
-  };
+  // Check if encryption key is configured
+  try {
+    const key = getEncryptionKey();
+    const iv = crypto.randomBytes(IV_LENGTH);
+    
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+    
+    let ciphertext = cipher.update(plaintext, 'utf8', 'base64');
+    ciphertext += cipher.final('base64');
+    
+    const authTag = cipher.getAuthTag();
+    
+    return {
+      ciphertext,
+      iv: iv.toString('base64'),
+      authTag: authTag.toString('base64'),
+    };
+  } catch (error) {
+    // Encryption key not configured - return null
+    console.warn('Encryption key not configured, skipping encryption for sensitive field');
+    return null;
+  }
 }
 
 /**
