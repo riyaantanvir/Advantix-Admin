@@ -62,6 +62,10 @@ interface FarmingAccountsPageProps {
   description?: string;
 }
 
+type FarmingAccountFormData = Omit<InsertFarmingAccount, 'vaId'> & {
+  vaId: string | null;
+};
+
 export default function FarmingAccountsPage({ 
   defaultStatus = "farming",
   title = "Farming Accounts",
@@ -73,17 +77,17 @@ export default function FarmingAccountsPage({
   // State
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState(defaultStatus);
-  const [socialMediaFilter, setSocialMediaFilter] = useState<string>("");
-  const [vaFilter, setVaFilter] = useState<string>("");
+  const [socialMediaFilter, setSocialMediaFilter] = useState<string>("all");
+  const [vaFilter, setVaFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<FarmingAccount | null>(null);
   const [viewedSecrets, setViewedSecrets] = useState<Record<string, FarmingAccountWithSecrets>>({});
-  const [formData, setFormData] = useState<InsertFarmingAccount>({
+  const [formData, setFormData] = useState<FarmingAccountFormData>({
     comment: "",
     socialMedia: "facebook",
-    vaId: null,
+    vaId: "none",
     status: defaultStatus,
     idName: "",
     email: "",
@@ -104,9 +108,9 @@ export default function FarmingAccountsPage({
     queryKey: ["/api/farming-accounts", { status: statusFilter, socialMedia: socialMediaFilter, va: vaFilter, search: searchTerm }],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (statusFilter) params.append("status", statusFilter);
-      if (socialMediaFilter) params.append("socialMedia", socialMediaFilter);
-      if (vaFilter) params.append("vaId", vaFilter);
+      if (statusFilter && statusFilter !== "all") params.append("status", statusFilter);
+      if (socialMediaFilter && socialMediaFilter !== "all") params.append("socialMedia", socialMediaFilter);
+      if (vaFilter && vaFilter !== "all" && vaFilter !== "none") params.append("vaId", vaFilter);
       if (searchTerm) params.append("search", searchTerm);
       
       const response = await fetch(`/api/farming-accounts?${params.toString()}`, {
@@ -279,7 +283,7 @@ export default function FarmingAccountsPage({
     setFormData({
       comment: "",
       socialMedia: "facebook",
-      vaId: null,
+      vaId: "none",
       status: defaultStatus,
       idName: "",
       email: "",
@@ -290,7 +294,11 @@ export default function FarmingAccountsPage({
   };
 
   const handleCreate = () => {
-    createMutation.mutate(formData);
+    const submitData = {
+      ...formData,
+      vaId: formData.vaId === "none" ? null : formData.vaId
+    };
+    createMutation.mutate(submitData);
   };
 
   const handleEdit = (account: FarmingAccount) => {
@@ -298,7 +306,7 @@ export default function FarmingAccountsPage({
     setFormData({
       comment: account.comment || "",
       socialMedia: account.socialMedia,
-      vaId: account.vaId,
+      vaId: account.vaId || "none",
       status: account.status,
       idName: account.idName,
       email: account.email,
@@ -316,7 +324,7 @@ export default function FarmingAccountsPage({
     const updateData: Partial<InsertFarmingAccount> = {
       comment: formData.comment,
       socialMedia: formData.socialMedia,
-      vaId: formData.vaId,
+      vaId: formData.vaId === "none" ? null : formData.vaId,
       status: formData.status,
       idName: formData.idName,
       email: formData.email,
@@ -414,8 +422,8 @@ export default function FarmingAccountsPage({
 
   const clearFilters = () => {
     setStatusFilter(defaultStatus);
-    setSocialMediaFilter("");
-    setVaFilter("");
+    setSocialMediaFilter("all");
+    setVaFilter("all");
     setSearchTerm("");
   };
 
@@ -456,7 +464,7 @@ export default function FarmingAccountsPage({
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="new">New</SelectItem>
                 <SelectItem value="farming">Farming</SelectItem>
                 <SelectItem value="suspended">Suspended</SelectItem>
@@ -469,7 +477,7 @@ export default function FarmingAccountsPage({
                 <SelectValue placeholder="All Platforms" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Platforms</SelectItem>
+                <SelectItem value="all">All Platforms</SelectItem>
                 <SelectItem value="facebook">Facebook</SelectItem>
                 <SelectItem value="tiktok">TikTok</SelectItem>
               </SelectContent>
@@ -480,7 +488,7 @@ export default function FarmingAccountsPage({
                 <SelectValue placeholder="All VAs" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All VAs</SelectItem>
+                <SelectItem value="all">All VAs</SelectItem>
                 {users.map(user => (
                   <SelectItem key={user.id} value={user.id}>
                     {user.name}
@@ -513,7 +521,7 @@ export default function FarmingAccountsPage({
               </Button>
             )}
             
-            {(statusFilter !== defaultStatus || socialMediaFilter || vaFilter || searchTerm) && (
+            {(statusFilter !== defaultStatus || (socialMediaFilter && socialMediaFilter !== "all") || (vaFilter && vaFilter !== "all") || searchTerm) && (
               <Button variant="ghost" onClick={clearFilters} data-testid="button-clear-filters">
                 <X className="h-4 w-4 mr-2" />
                 Clear Filters
@@ -744,7 +752,7 @@ export default function FarmingAccountsPage({
                   <SelectValue placeholder="Select VA" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {users.map(user => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name}
@@ -877,7 +885,7 @@ export default function FarmingAccountsPage({
                   <SelectValue placeholder="Select VA" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {users.map(user => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name}
