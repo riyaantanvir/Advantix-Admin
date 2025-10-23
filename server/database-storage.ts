@@ -54,6 +54,9 @@ import {
   type InsertFacebookAdSetInsight,
   type FacebookAdInsight,
   type InsertFacebookAdInsight,
+  type FarmingAccount,
+  type InsertFarmingAccount,
+  type FarmingAccountWithSecrets,
   UserRole,
   users,
   sessions,
@@ -86,12 +89,14 @@ import {
   facebookPages,
   campaignDrafts,
   campaignTemplates,
-  savedAudiences
+  savedAudiences,
+  farmingAccounts
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, gte, lte, or, like, sql } from "drizzle-orm";
 import { db } from "./db";
 import type { IStorage } from "./storage";
+import { encrypt, decrypt, type EncryptedData } from "./encryption";
 
 export class DatabaseStorage implements IStorage {
   constructor() {
@@ -2231,6 +2236,248 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("[DB ERROR] Failed to get ad account:", error);
       return null;
+    }
+  }
+
+  // Farming Accounts implementation
+  async getFarmingAccounts(filters?: { status?: string; socialMedia?: string; vaId?: string; search?: string }): Promise<FarmingAccount[]> {
+    try {
+      let query = db.select().from(farmingAccounts);
+      
+      const conditions = [];
+      if (filters?.status) {
+        conditions.push(eq(farmingAccounts.status, filters.status));
+      }
+      if (filters?.socialMedia) {
+        conditions.push(eq(farmingAccounts.socialMedia, filters.socialMedia));
+      }
+      if (filters?.vaId) {
+        conditions.push(eq(farmingAccounts.vaId, filters.vaId));
+      }
+      if (filters?.search) {
+        conditions.push(
+          or(
+            like(farmingAccounts.idName, `%${filters.search}%`),
+            like(farmingAccounts.email, `%${filters.search}%`),
+            like(farmingAccounts.comment, `%${filters.search}%`)
+          )
+        );
+      }
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const result = await query.orderBy(desc(farmingAccounts.createdAt));
+      return result;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get farming accounts:", error);
+      return [];
+    }
+  }
+
+  async getFarmingAccount(id: string): Promise<FarmingAccount | undefined> {
+    try {
+      const result = await db.select()
+        .from(farmingAccounts)
+        .where(eq(farmingAccounts.id, id))
+        .limit(1);
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get farming account:", error);
+      return undefined;
+    }
+  }
+
+  async getFarmingAccountWithSecrets(id: string): Promise<FarmingAccountWithSecrets | undefined> {
+    try {
+      const account = await this.getFarmingAccount(id);
+      if (!account) return undefined;
+      
+      // Decrypt sensitive fields
+      let recoveryEmail = null;
+      let passwordDecrypted = null;
+      let twoFaSecret = null;
+      
+      try {
+        if (account.recoveryEmailEncrypted) {
+          const encData: EncryptedData = JSON.parse(account.recoveryEmailEncrypted);
+          recoveryEmail = decrypt(encData);
+        }
+      } catch (err) {
+        console.error("Failed to decrypt recovery email:", err);
+      }
+      
+      try {
+        if (account.passwordEncrypted) {
+          const encData: EncryptedData = JSON.parse(account.passwordEncrypted);
+          passwordDecrypted = decrypt(encData);
+        }
+      } catch (err) {
+        console.error("Failed to decrypt password:", err);
+      }
+      
+      try {
+        if (account.twoFaSecretEncrypted) {
+          const encData: EncryptedData = JSON.parse(account.twoFaSecretEncrypted);
+          twoFaSecret = decrypt(encData);
+        }
+      } catch (err) {
+        console.error("Failed to decrypt 2FA secret:", err);
+      }
+      
+      return {
+        ...account,
+        recoveryEmail,
+        passwordDecrypted,
+        twoFaSecret
+      };
+    } catch (error) {
+      console.error("[DB ERROR] Failed to get farming account with secrets:", error);
+      return undefined;
+    }
+  }
+
+  async createFarmingAccount(account: InsertFarmingAccount): Promise<FarmingAccount> {
+    try {
+      // Encrypt sensitive fields
+      const recoveryEmailEncrypted = account.recoveryEmail 
+        ? JSON.stringify(encrypt(account.recoveryEmail)) 
+        : null;
+      
+      const passwordEncrypted = JSON.stringify(encrypt(account.password));
+      
+      const twoFaSecretEncrypted = account.twoFaSecret
+        ? JSON.stringify(encrypt(account.twoFaSecret))
+        : null;
+      
+      const result = await db.insert(farmingAccounts).values({
+        id: randomUUID(),
+        comment: account.comment || null,
+        socialMedia: account.socialMedia,
+        vaId: account.vaId || null,
+        status: account.status || 'new',
+        idName: account.idName,
+        email: account.email,
+        recoveryEmailEncrypted,
+        passwordEncrypted,
+        twoFaSecretEncrypted,
+      }).returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to create farming account:", error);
+      throw error;
+    }
+  }
+
+  async updateFarmingAccount(id: string, account: Partial<InsertFarmingAccount>): Promise<FarmingAccount | undefined> {
+    try {
+      const updateData: any = {
+        ...account,
+        updatedAt: new Date(),
+      };
+      
+      // Remove plain text fields that shouldn't be in database
+      delete updateData.password;
+      delete updateData.recoveryEmail;
+      delete updateData.twoFaSecret;
+      
+      // Encrypt new values if provided
+      if (account.password) {
+        updateData.passwordEncrypted = JSON.stringify(encrypt(account.password));
+      }
+      if (account.recoveryEmail !== undefined) {
+        updateData.recoveryEmailEncrypted = account.recoveryEmail 
+          ? JSON.stringify(encrypt(account.recoveryEmail))
+          : null;
+      }
+      if (account.twoFaSecret !== undefined) {
+        updateData.twoFaSecretEncrypted = account.twoFaSecret
+          ? JSON.stringify(encrypt(account.twoFaSecret))
+          : null;
+      }
+      
+      const result = await db.update(farmingAccounts)
+        .set(updateData)
+        .where(eq(farmingAccounts.id, id))
+        .returning();
+        
+      return result[0];
+    } catch (error) {
+      console.error("[DB ERROR] Failed to update farming account:", error);
+      return undefined;
+    }
+  }
+
+  async deleteFarmingAccount(id: string): Promise<boolean> {
+    try {
+      await db.delete(farmingAccounts).where(eq(farmingAccounts.id, id));
+      return true;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to delete farming account:", error);
+      return false;
+    }
+  }
+
+  async importFarmingAccountsFromCsv(accounts: InsertFarmingAccount[]): Promise<{ success: number; errors: string[] }> {
+    let success = 0;
+    const errors: string[] = [];
+    
+    for (const account of accounts) {
+      try {
+        await this.createFarmingAccount(account);
+        success++;
+      } catch (error: any) {
+        errors.push(`Failed to import ${account.email}: ${error.message}`);
+      }
+    }
+    
+    return { success, errors };
+  }
+
+  async exportFarmingAccountsToCsv(includeSecrets: boolean): Promise<any[]> {
+    try {
+      const accounts = await this.getFarmingAccounts();
+      
+      if (!includeSecrets) {
+        // Return accounts without decrypting secrets
+        return accounts.map(acc => ({
+          id: acc.id,
+          comment: acc.comment,
+          socialMedia: acc.socialMedia,
+          vaId: acc.vaId,
+          status: acc.status,
+          idName: acc.idName,
+          email: acc.email,
+          createdAt: acc.createdAt,
+        }));
+      }
+      
+      // Decrypt secrets for admin export
+      const accountsWithSecrets = await Promise.all(
+        accounts.map(async (acc) => {
+          const withSecrets = await this.getFarmingAccountWithSecrets(acc.id);
+          return {
+            id: acc.id,
+            comment: acc.comment,
+            socialMedia: acc.socialMedia,
+            vaId: acc.vaId,
+            status: acc.status,
+            idName: acc.idName,
+            email: acc.email,
+            recoveryEmail: withSecrets?.recoveryEmail || '',
+            password: withSecrets?.passwordDecrypted || '',
+            twoFaSecret: withSecrets?.twoFaSecret || '',
+            createdAt: acc.createdAt,
+          };
+        })
+      );
+      
+      return accountsWithSecrets;
+    } catch (error) {
+      console.error("[DB ERROR] Failed to export farming accounts:", error);
+      return [];
     }
   }
 }

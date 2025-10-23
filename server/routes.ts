@@ -24,9 +24,11 @@ import {
   insertSalarySchema,
   insertTelegramConfigSchema,
   insertTelegramChatIdSchema,
+  insertFarmingAccountSchema,
   type Campaign,
   type Client,
   type User,
+  type FarmingAccount,
   type AdAccount,
   type AdCopySet,
   type WorkReport,
@@ -5222,6 +5224,187 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get saved audiences error:", error);
       res.status(500).json({ message: "Failed to fetch saved audiences" });
+    }
+  });
+
+  // ===== FARMING ACCOUNTS ROUTES =====
+  
+  // Get all farming accounts with optional filters
+  app.get("/api/farming-accounts", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { status, socialMedia, vaId, search } = req.query;
+      
+      const filters = {
+        status: status as string | undefined,
+        socialMedia: socialMedia as string | undefined,
+        vaId: vaId as string | undefined,
+        search: search as string | undefined,
+      };
+      
+      const accounts = await storage.getFarmingAccounts(filters);
+      res.json(accounts);
+    } catch (error) {
+      console.error("Get farming accounts error:", error);
+      res.status(500).json({ message: "Failed to fetch farming accounts" });
+    }
+  });
+
+  // Get single farming account (with secrets for admin only)
+  app.get("/api/farming-accounts/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const includeSecrets = req.query.includeSecrets === 'true';
+      
+      // Only admin/super_admin can view secrets
+      if (includeSecrets && req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.SUPER_ADMIN) {
+        return res.status(403).json({ message: "Access denied. Admin access required to view secrets." });
+      }
+      
+      const account = includeSecrets 
+        ? await storage.getFarmingAccountWithSecrets(id)
+        : await storage.getFarmingAccount(id);
+        
+      if (!account) {
+        return res.status(404).json({ message: "Farming account not found" });
+      }
+      
+      res.json(account);
+    } catch (error) {
+      console.error("Get farming account error:", error);
+      res.status(500).json({ message: "Failed to fetch farming account" });
+    }
+  });
+
+  // Create farming account
+  app.post("/api/farming-accounts", authenticate, async (req: Request, res: Response) => {
+    try {
+      const accountData = insertFarmingAccountSchema.parse(req.body);
+      const account = await storage.createFarmingAccount(accountData);
+      res.status(201).json(account);
+    } catch (error: any) {
+      console.error("Create farming account error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message || "Failed to create farming account" });
+    }
+  });
+
+  // Update farming account
+  app.put("/api/farming-accounts/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const accountData = insertFarmingAccountSchema.partial().parse(req.body);
+      
+      const account = await storage.updateFarmingAccount(id, accountData);
+      if (!account) {
+        return res.status(404).json({ message: "Farming account not found" });
+      }
+      
+      res.json(account);
+    } catch (error: any) {
+      console.error("Update farming account error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message || "Failed to update farming account" });
+    }
+  });
+
+  // Delete farming account
+  app.delete("/api/farming-accounts/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteFarmingAccount(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Farming account not found" });
+      }
+      
+      res.json({ message: "Farming account deleted successfully" });
+    } catch (error) {
+      console.error("Delete farming account error:", error);
+      res.status(500).json({ message: "Failed to delete farming account" });
+    }
+  });
+
+  // CSV Import farming accounts
+  app.post("/api/farming-accounts/import/csv", authenticate, upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const fileContent = req.file.buffer.toString();
+      const records = parse(fileContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
+
+      // Validate and transform CSV records
+      const accounts: InsertFarmingAccount[] = records.map((record: any) => ({
+        comment: record.comment || record.Comment || null,
+        socialMedia: (record.socialMedia || record['Social Media'] || record.social_media || '').toLowerCase(),
+        vaId: record.vaId || record.VA || record.va_id || null,
+        status: (record.status || record.Status || 'new').toLowerCase(),
+        idName: record.idName || record['ID Name'] || record.id_name || '',
+        email: record.email || record.Email || '',
+        recoveryEmail: record.recoveryEmail || record['Recovery Mail'] || record.recovery_email || record.recovery_mail || undefined,
+        password: record.password || record.Password || '',
+        twoFaSecret: record.twoFaSecret || record['2FA'] || record.two_fa_secret || record.two_fa || undefined,
+      }));
+
+      const result = await storage.importFarmingAccountsFromCsv(accounts);
+      
+      res.json({
+        message: `Imported ${result.success} accounts successfully`,
+        success: result.success,
+        errors: result.errors,
+      });
+    } catch (error: any) {
+      console.error("CSV import error:", error);
+      res.status(500).json({ message: error.message || "Failed to import CSV" });
+    }
+  });
+
+  // CSV Export farming accounts (admin only for secrets)
+  app.get("/api/farming-accounts/export/csv", authenticate, async (req: Request, res: Response) => {
+    try {
+      const includeSecrets = req.query.includeSecrets === 'true';
+      
+      // Only admin/super_admin can export with secrets
+      if (includeSecrets && req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.SUPER_ADMIN) {
+        return res.status(403).json({ message: "Access denied. Admin access required to export with secrets." });
+      }
+      
+      const accounts = await storage.exportFarmingAccountsToCsv(includeSecrets);
+      
+      // Convert to CSV format
+      const headers = includeSecrets
+        ? ['id', 'comment', 'socialMedia', 'vaId', 'status', 'idName', 'email', 'recoveryEmail', 'password', 'twoFaSecret', 'createdAt']
+        : ['id', 'comment', 'socialMedia', 'vaId', 'status', 'idName', 'email', 'createdAt'];
+      
+      let csvContent = headers.join(',') + '\n';
+      
+      accounts.forEach(account => {
+        const row = headers.map(header => {
+          const value = (account as any)[header];
+          // Escape values with commas or quotes
+          if (value && typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+            return `"${value.replace(/"/g, '""')}"`;
+          }
+          return value || '';
+        });
+        csvContent += row.join(',') + '\n';
+      });
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=farming-accounts-${Date.now()}.csv`);
+      res.send(csvContent);
+    } catch (error) {
+      console.error("CSV export error:", error);
+      res.status(500).json({ message: "Failed to export CSV" });
     }
   });
 

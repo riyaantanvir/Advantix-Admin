@@ -39,6 +39,9 @@ import {
   type InsertTelegramConfig,
   type TelegramChatId,
   type InsertTelegramChatId,
+  type FarmingAccount,
+  type InsertFarmingAccount,
+  type FarmingAccountWithSecrets,
   UserRole
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -230,6 +233,16 @@ export interface IStorage {
 
   // Ad Account by ID
   getAdAccountById(id: string): Promise<any>;
+
+  // Farming Accounts methods
+  getFarmingAccounts(filters?: { status?: string; socialMedia?: string; vaId?: string; search?: string }): Promise<FarmingAccount[]>;
+  getFarmingAccount(id: string): Promise<FarmingAccount | undefined>;
+  getFarmingAccountWithSecrets(id: string): Promise<FarmingAccountWithSecrets | undefined>; // Admin only
+  createFarmingAccount(account: InsertFarmingAccount): Promise<FarmingAccount>;
+  updateFarmingAccount(id: string, account: Partial<InsertFarmingAccount>): Promise<FarmingAccount | undefined>;
+  deleteFarmingAccount(id: string): Promise<boolean>;
+  importFarmingAccountsFromCsv(accounts: InsertFarmingAccount[]): Promise<{ success: number; errors: string[] }>;
+  exportFarmingAccountsToCsv(includeSecrets: boolean): Promise<any[]>; // Admin only for secrets
 }
 
 export class MemStorage implements IStorage {
