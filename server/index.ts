@@ -38,10 +38,15 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Validate encryption setup before starting server
-  // This ensures we fail fast if ENCRYPTION_KEY is missing or invalid
-  validateEncryptionSetup();
-  log("✓ Encryption setup validated");
+  // Validate encryption setup at startup if ENCRYPTION_KEY is set
+  // If not set, farming accounts feature will require it when first used
+  try {
+    validateEncryptionSetup();
+    log("✓ Encryption setup validated");
+  } catch (error: any) {
+    log("⚠ Encryption not configured - farming accounts feature will be disabled");
+    log(`  To enable: Set ENCRYPTION_KEY environment variable (generate with: openssl rand -base64 32)`);
+  }
 
   const server = await registerRoutes(app);
 
