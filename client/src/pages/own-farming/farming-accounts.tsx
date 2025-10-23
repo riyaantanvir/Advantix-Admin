@@ -54,6 +54,7 @@ import {
   X
 } from "lucide-react";
 import type { FarmingAccount, InsertFarmingAccount, FarmingAccountWithSecrets, User as UserType } from "@shared/schema";
+import Sidebar from "@/components/layout/Sidebar";
 
 interface FarmingAccountsPageProps {
   defaultStatus?: string;
@@ -419,14 +420,15 @@ export default function FarmingAccountsPage({
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <Leaf className="h-8 w-8 text-green-600" />
-          {title}
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">{description}</p>
-      </div>
+    <Sidebar>
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Leaf className="h-8 w-8 text-green-600" />
+            {title}
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{description}</p>
+        </div>
 
       <Card>
         <CardHeader>
@@ -923,6 +925,7 @@ export default function FarmingAccountsPage({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </Sidebar>
   );
 }
