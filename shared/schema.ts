@@ -493,6 +493,8 @@ export const userMenuPermissions = pgTable("user_menu_permissions", {
   fbAdManagement: boolean("fb_ad_management").default(false),
   advantixAdsManager: boolean("advantix_ads_manager").default(false),
   ownFarming: boolean("own_farming").default(false),
+  newCreated: boolean("new_created").default(false),
+  farmingAccounts: boolean("farming_accounts").default(false),
   adminPanel: boolean("admin_panel").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

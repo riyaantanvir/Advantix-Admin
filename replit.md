@@ -26,7 +26,8 @@ Preferred communication style: Simple, everyday language.
 - **Third-Party Integrations**: Facebook Graph API for ad account and page synchronization.
 
 ## Database Schema
-- **Core Entities**: Users, Sessions, Clients, Campaigns, Work Reports, Salaries, Ad Accounts, Facebook Pages, Email Settings, SMS Settings, Client Email Preferences (disabled).
+- **Core Entities**: Users, Sessions, Clients, Campaigns, Work Reports, Salaries, Ad Accounts, Facebook Pages, Email Settings, SMS Settings, Client Email Preferences (disabled), Farming Accounts.
+- **User Menu Permissions**: Granular permission controls for menu visibility including dashboard, campaigns, clients, ad accounts, work reports, Own Farming (parent), New Created (sub-menu), Farming Accounts (sub-menu), finance, and admin panel access.
 - **Validation**: Zod schemas for runtime type validation.
 - **Migrations**: Drizzle Kit for schema management.
 
@@ -53,6 +54,10 @@ Preferred communication style: Simple, everyday language.
 - **Financial Management**: Automated salary generation from work reports, intelligent calculation based on hours, basic salary, and configurable bonuses. Salary approval workflow with Pending, Approved, Rejected statuses.
 - **Client Communication**: Manual email composer with 9 professional templates (e.g., Welcome, Monthly Report, Payment Reminder, Campaign Launch, Budget Alert, Account Activation/Suspension), live HTML preview, and role-based access.
 - **External Service Configuration**: Admin panel for setting up email (Resend, SendGrid, Mailgun) and SMS (Bangladesh-specific providers) services, including API key storage in the database and test connection functionalities.
+- **Own Farming Management**: Full CRUD operations for Facebook and TikTok farming accounts with plain-text storage of sensitive data (passwords, recovery emails, 2FA secrets). Features admin-only access controls, CSV import/export, and granular permission system with separate controls for:
+  - **Own Farming** (parent menu visibility)
+  - **New Created** (sub-menu for new account creation)
+  - **Farming Accounts** (sub-menu for account management)
 
 # External Dependencies
 

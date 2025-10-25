@@ -78,6 +78,8 @@ function UserManagement() {
       adAccounts: false,
       workReports: false,
       ownFarming: false,
+      newCreated: false,
+      farmingAccounts: false,
       advantixDashboard: false,
       projects: false,
       payments: false,
@@ -145,6 +147,9 @@ function UserManagement() {
           clientManagement: permission === 'clientManagement' ? value : false,
           adAccounts: permission === 'adAccounts' ? value : false,
           workReports: permission === 'workReports' ? value : false,
+          ownFarming: permission === 'ownFarming' ? value : false,
+          newCreated: permission === 'newCreated' ? value : false,
+          farmingAccounts: permission === 'farmingAccounts' ? value : false,
           advantixDashboard: permission === 'advantixDashboard' ? value : false,
           projects: permission === 'projects' ? value : false,
           payments: permission === 'payments' ? value : false,
@@ -182,6 +187,9 @@ function UserManagement() {
         clientManagement: false,
         adAccounts: false,
         workReports: false,
+        ownFarming: false,
+        newCreated: false,
+        farmingAccounts: false,
         advantixDashboard: false,
         projects: false,
         payments: false,
@@ -296,6 +304,8 @@ function UserManagement() {
         adAccounts: false,
         workReports: false,
         ownFarming: false,
+        newCreated: false,
+        farmingAccounts: false,
         advantixDashboard: false,
         projects: false,
         payments: false,
@@ -476,6 +486,9 @@ function UserManagement() {
                   <TableHead className="text-center font-semibold">Expenses & Salaries</TableHead>
                   <TableHead className="text-center font-semibold">Salary Management</TableHead>
                   <TableHead className="text-center font-semibold">Reports</TableHead>
+                  <TableHead className="text-center font-semibold">Own Farming</TableHead>
+                  <TableHead className="text-center font-semibold">New Created</TableHead>
+                  <TableHead className="text-center font-semibold">Farming Accounts</TableHead>
                   <TableHead className="text-center font-semibold">Admin Panel</TableHead>
                   <TableHead className="text-center font-semibold">Actions</TableHead>
                 </TableRow>
@@ -483,7 +496,7 @@ function UserManagement() {
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={15} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={18} className="text-center py-8 text-gray-500">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -647,6 +660,42 @@ function UserManagement() {
                           </div>
                           <span className={`text-sm font-medium ${permissions.reports ? 'text-green-600' : 'text-red-600'}`}>
                             {permissions.reports ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.ownFarming || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'ownFarming', checked)}
+                              data-testid={`switch-own-farming-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.ownFarming ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.ownFarming ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.newCreated || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'newCreated', checked)}
+                              data-testid={`switch-new-created-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.newCreated ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.newCreated ? 'Yes' : 'No'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={permissions.farmingAccounts || false}
+                              onCheckedChange={(checked) => handlePermissionToggle(user.id, 'farmingAccounts', checked)}
+                              data-testid={`switch-farming-accounts-${user.id}`}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium ${permissions.farmingAccounts ? 'text-green-600' : 'text-red-600'}`}>
+                            {permissions.farmingAccounts ? 'Yes' : 'No'}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">

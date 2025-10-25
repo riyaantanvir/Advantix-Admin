@@ -186,14 +186,14 @@ export default function Sidebar({ children }: SidebarProps) {
           icon: Sparkles,
           label: "New Created",
           testId: "nav-own-farming-new-created",
-          pageKey: "ownFarming"
+          pageKey: "newCreated"
         },
         {
           href: "/own-farming/farming-accounts",
           icon: Leaf,
           label: "Farming Accounts",
           testId: "nav-own-farming-farming-accounts",
-          pageKey: "ownFarming"
+          pageKey: "farmingAccounts"
         }
       ]
     },
@@ -307,6 +307,22 @@ export default function Sidebar({ children }: SidebarProps) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const newCreatedPermission = useQuery({
+    queryKey: [`/api/permissions/check/newCreated`],
+    enabled: !!user && user.role !== 'super_admin',
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const farmingAccountsPermission = useQuery({
+    queryKey: [`/api/permissions/check/farmingAccounts`],
+    enabled: !!user && user.role !== 'super_admin',
+    retry: false,
+    select: (data: any) => data?.hasPermission ?? false,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const fbAdManagementPermission = useQuery({
     queryKey: [`/api/permissions/check/fb_ad_management`],
     enabled: !!user && user.role !== 'super_admin',
@@ -348,6 +364,8 @@ export default function Sidebar({ children }: SidebarProps) {
       case 'ad_accounts': return adAccountsPermission.data;
       case 'work_reports': return workReportsPermission.data;
       case 'ownFarming': return ownFarmingPermission.data;
+      case 'newCreated': return newCreatedPermission.data;
+      case 'farmingAccounts': return farmingAccountsPermission.data;
       case 'client_mailbox': return clientMailboxPermission.data;
       case 'fb_ad_management': return fbAdManagementPermission.data;
       case 'finance': return financePermission.data;
